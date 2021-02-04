@@ -21,6 +21,9 @@ type CheckpointedPods struct {
 	ConfigSeen             string                   `json:"kubernetes.io/config.seen,omitempty"`
 	Manager                string                   `json:"io.container.manager,omitempty"`
 	Containers             []CheckpointedContainers `json:"Containers"`
+	HostIP                 string                   `json:"hostIP,omitempty"`
+	PodIP                  string                   `json:"podIP,omitempty"`
+	PodIPs                 []string                 `json:"podIPs,omitempty"`
 }
 
 type CheckpointedContainers struct {
