@@ -22,6 +22,7 @@ var (
 	kubeletCheckpointsDirectory = "/var/lib/kubelet/checkpoints"
 	name                        string
 	showPodUID                  bool
+	showPodIP                   bool
 	output                      string
 	input                       string
 	compress                    string
@@ -68,6 +69,12 @@ func setupShow() *cobra.Command {
 		"show-pod-uid",
 		false,
 		"Show Pod UID in output",
+	)
+	flags.BoolVar(
+		&showPodIP,
+		"show-pod-ip",
+		false,
+		"Show Pod IP in output",
 	)
 
 	return cmd
@@ -116,6 +123,9 @@ func show(cmd *cobra.Command, args []string) error {
 	if showPodUID {
 		header = append(header, "Pod UID")
 	}
+	if showPodIP {
+		header = append(header, "Pod IP")
+	}
 	table.SetHeader(header)
 	table.SetAutoMergeCells(true)
 	table.SetRowLine(true)
@@ -134,6 +144,9 @@ func show(cmd *cobra.Command, args []string) error {
 			row = []string{p.Name, p.Namespace, c.Name, c.Image, strconv.FormatBool(exists)}
 			if showPodUID {
 				row = append(row, p.PodUID)
+			}
+			if showPodIP {
+				row = append(row, p.PodIP)
 			}
 			table.Append(row)
 		}
