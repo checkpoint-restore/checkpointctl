@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+func nonDigitsToWhitespace(r rune) rune {
+	if !strings.ContainsRune("0123456789", r) {
+		return ' '
+	}
+	return r
+}
+
 func parseTriple(spec []string) (container, host, size uint32, err error) {
 	cid, err := strconv.ParseUint(spec[0], 10, 32)
 	if err != nil {
@@ -26,12 +33,9 @@ func parseTriple(spec []string) (container, host, size uint32, err error) {
 
 // ParseIDMap parses idmap triples from string.
 func ParseIDMap(mapSpec []string, mapSetting string) (idmap []IDMap, err error) {
-	stdErr := fmt.Errorf("error initializing ID mappings: %s setting is malformed expected [\"uint32:uint32:uint32\"]: %q", mapSetting, mapSpec)
+	stdErr := fmt.Errorf("error initializing ID mappings: %s setting is malformed", mapSetting)
 	for _, idMapSpec := range mapSpec {
-		if idMapSpec == "" {
-			continue
-		}
-		idSpec := strings.Split(idMapSpec, ":")
+		idSpec := strings.Fields(strings.Map(nonDigitsToWhitespace, idMapSpec))
 		if len(idSpec)%3 != 0 {
 			return nil, stdErr
 		}

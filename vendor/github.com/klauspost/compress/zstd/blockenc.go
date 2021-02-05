@@ -76,7 +76,6 @@ func (b *blockEnc) reset(prev *blockEnc) {
 	if prev != nil {
 		b.recentOffsets = prev.prevRecentOffsets
 	}
-	b.dictLitEnc = nil
 }
 
 // reset will reset the block for a new encode, but in the same stream,
