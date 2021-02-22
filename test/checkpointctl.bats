@@ -97,4 +97,74 @@ function teardown() {
 	[[ ${lines[16]} =~ "uid2" ]]
 }
 
+@test "Run checkpointctl show with empty tar file" {
+	touch "$TEST_TMP_DIR1"/empty.tar
+	checkpointctl show -t "$TEST_TMP_DIR1"/empty.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} =~ config.dump ]]
+}
 
+@test "Run checkpointctl show with tar file with empty config.dump" {
+	touch "$TEST_TMP_DIR1"/config.dump
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"config.dump: unexpected end of JSON input" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and no spec.dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"spec.dump: no such file or directory" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and empty spec.dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	touch "$TEST_TMP_DIR1"/spec.dump
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"spec.dump: unexpected end of JSON input" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and no network.status" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"network.status: no such file or directory" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and empty network.status" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	touch "$TEST_TMP_DIR1"/network.status
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"network.status: unexpected end of JSON input" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and valid network.status and no checkpoint directory" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp test/network.status "$TEST_TMP_DIR1"
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"checkpoint: no such file or directory" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and valid network.status and checkpoint directory" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp test/network.status "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[4]} == *"Unknown"* ]]
+}
