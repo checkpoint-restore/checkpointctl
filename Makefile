@@ -22,7 +22,7 @@ shellcheck:
 
 lint: golang-lint shellcheck
 
-test:
+test: $(NAME)
 	bats test/*bats
 
 vendor:
@@ -30,4 +30,14 @@ vendor:
 	GO111MODULE=on go mod vendor
 	GO111MODULE=on go mod verify
 
-.PHONY: clean lint golang-lint shellcheck vendor test
+help:
+	@echo "Usage: make <target>"
+	@echo " * clean - remove artifacts"
+	@echo " * lint - verify the source code (shellcheck/golangci-lint)"
+	@echo " * golang-lint - run golang-lint"
+	@echo " * shellcheck - run shellecheck"
+	@echo " * vendor - update go.mod, go.sum and vendor directory"
+	@echo " * test - run tests"
+	@echo " * help - show help"
+
+.PHONY: clean lint golang-lint shellcheck vendor test help
