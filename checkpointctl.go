@@ -104,12 +104,28 @@ func show(cmd *cobra.Command, args []string) error {
 		checkpointDirectory = dir
 	}
 
-	err, checkpointMetadata, checkpointMetadataPath := metadata.ReadCheckpointedPods(checkpointDirectory)
+	err, archiveType := metadata.DetectCheckpointArchiveType(checkpointDirectory)
+	if err != nil {
+		return err
+	}
+
+	switch archiveType {
+	case metadata.Kubelet:
+		return showKubeletCheckpoint(checkpointDirectory)
+	case metadata.Container:
+		return showContainerCheckpoint(checkpointDirectory)
+	}
+	fmt.Printf("%q contains unknown archive type\n", kubeletCheckpointsDirectory)
+	return nil
+}
+
+func showKubeletCheckpoint(checkpointDirectory string) error {
+	err, checkpointMetadata, checkpointMetadataPath := metadata.ReadKubeletCheckpoints(checkpointDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", checkpointMetadataPath)
 	}
 
-	fmt.Printf("\nDisplaying data from %s\n\n", checkpointMetadataPath)
+	fmt.Printf("\nDisplaying kubelet checkpoint data from %s\n\n", checkpointMetadataPath)
 
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
@@ -214,7 +230,7 @@ func extract(cmd *cobra.Command, args []string) error {
 	default:
 		return errors.Errorf("Select compression algorithm (%q) not supported\n", compress)
 	}
-	err, checkpointMetadata, checkpointMetadataPath := metadata.ReadCheckpointedPods(kubeletCheckpointsDirectory)
+	err, checkpointMetadata, checkpointMetadataPath := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", checkpointMetadataPath)
 	}
@@ -302,7 +318,7 @@ func insert(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "Unpacking of checkpoint archive %s failed\n", input)
 	}
 
-	err, insertData, _ := metadata.ReadCheckpointedPods(dir)
+	err, insertData, _ := metadata.ReadKubeletCheckpoints(dir)
 
 	if err != nil {
 		return errors.Wrapf(err, "%s not a kubelet checkpoint archive\n", input)
@@ -316,7 +332,7 @@ func insert(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	err, kubeletData, _ := metadata.ReadCheckpointedPods(kubeletCheckpointsDirectory)
+	err, kubeletData, _ := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
 	if os.IsNotExist(errors.Unwrap(errors.Unwrap(err))) {
 		// There is no existing checkpointed.pods file
 		kubeletData = insertData
