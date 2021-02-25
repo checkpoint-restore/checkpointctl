@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type CheckpointedPods struct {
+type CheckpointedPod struct {
 	PodUID                 string                   `json:"io.kubernetes.pod.uid,omitempty"`
 	ID                     string                   `json:"SandboxID,omitempty"`
 	Name                   string                   `json:"io.kubernetes.pod.name,omitempty"`
@@ -25,13 +25,13 @@ type CheckpointedPods struct {
 	ConfigSource           string                   `json:"kubernetes.io/config.source,omitempty"`
 	ConfigSeen             string                   `json:"kubernetes.io/config.seen,omitempty"`
 	Manager                string                   `json:"io.container.manager,omitempty"`
-	Containers             []CheckpointedContainers `json:"Containers"`
+	Containers             []CheckpointedContainer  `json:"Containers"`
 	HostIP                 string                   `json:"hostIP,omitempty"`
 	PodIP                  string                   `json:"podIP,omitempty"`
 	PodIPs                 []string                 `json:"podIPs,omitempty"`
 }
 
-type CheckpointedContainers struct {
+type CheckpointedContainer  struct {
 	Name                      string `json:"io.kubernetes.container.name,omitempty"`
 	ID                        string `json:"id,omitempty"`
 	TerminationMessagePath    string `json:"io.kubernetes.container.terminationMessagePath,omitempty"`
@@ -43,7 +43,7 @@ type CheckpointedContainers struct {
 
 type CheckpointMetadata struct {
 	Version          int `json:"version"`
-	CheckpointedPods []CheckpointedPods
+	CheckpointedPods []CheckpointedPod
 }
 
 const (
@@ -55,8 +55,10 @@ const (
 	NetworkStatusFile   = "network.status"
 	CheckpointDirectory = "checkpoint"
 	RootFsDiffTar       = "rootfs-diff.tar"
+	DeletedFilesFile    = "deleted.files"
 	// pod archive
 	PodOptionsFile = "pod.options"
+	PodDumpFile    = "pod.dump"
 )
 
 type CheckpointType int
@@ -79,6 +81,14 @@ type ContainerConfig struct {
 	RootfsImageName string    `json:"rootfsImageName,omitempty"`
 	OCIRuntime      string    `json:"runtime,omitempty"`
 	CreatedTime     time.Time `json:"createdTime"`
+}
+
+// This is metadata stored inside of a Pod checkpoint archive
+type CheckpointedPodOptions struct {
+	Version      int      `json:"version"`
+	Containers   []string `json:"containers,omitempty"`
+	MountLabel   string   `json:"mountLabel"`
+	ProcessLabel string   `json:"processLabel"`
 }
 
 func DetectCheckpointArchiveType(checkpointDirectory string) (error, CheckpointType) {
@@ -105,6 +115,13 @@ func ReadContainerCheckpointConfigDump(checkpointDirectory string) (error, *Cont
 	err, configDumpFile := ReadJSONFile(&containerConfig, checkpointDirectory, ConfigDumpFile)
 
 	return err, &containerConfig, configDumpFile
+}
+
+func ReadContainerCheckpointDeletedFiles(checkpointDirectory string) (error, []string, string) {
+	var deletedFiles []string
+	err, deletedFilesFile := ReadJSONFile(&deletedFiles, checkpointDirectory, DeletedFilesFile)
+
+	return err, deletedFiles, deletedFilesFile
 }
 
 func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) (error, []*cnitypes.Result, string) {
