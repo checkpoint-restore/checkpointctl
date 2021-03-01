@@ -17,21 +17,21 @@ import (
 )
 
 type CheckpointedPod struct {
-	PodUID                 string                   `json:"io.kubernetes.pod.uid,omitempty"`
-	ID                     string                   `json:"SandboxID,omitempty"`
-	Name                   string                   `json:"io.kubernetes.pod.name,omitempty"`
-	TerminationGracePeriod int64                    `json:"io.kubernetes.pod.terminationGracePeriod,omitempty"`
-	Namespace              string                   `json:"io.kubernetes.pod.namespace,omitempty"`
-	ConfigSource           string                   `json:"kubernetes.io/config.source,omitempty"`
-	ConfigSeen             string                   `json:"kubernetes.io/config.seen,omitempty"`
-	Manager                string                   `json:"io.container.manager,omitempty"`
-	Containers             []CheckpointedContainer  `json:"Containers"`
-	HostIP                 string                   `json:"hostIP,omitempty"`
-	PodIP                  string                   `json:"podIP,omitempty"`
-	PodIPs                 []string                 `json:"podIPs,omitempty"`
+	PodUID                 string                  `json:"io.kubernetes.pod.uid,omitempty"`
+	ID                     string                  `json:"SandboxID,omitempty"`
+	Name                   string                  `json:"io.kubernetes.pod.name,omitempty"`
+	TerminationGracePeriod int64                   `json:"io.kubernetes.pod.terminationGracePeriod,omitempty"`
+	Namespace              string                  `json:"io.kubernetes.pod.namespace,omitempty"`
+	ConfigSource           string                  `json:"kubernetes.io/config.source,omitempty"`
+	ConfigSeen             string                  `json:"kubernetes.io/config.seen,omitempty"`
+	Manager                string                  `json:"io.container.manager,omitempty"`
+	Containers             []CheckpointedContainer `json:"Containers"`
+	HostIP                 string                  `json:"hostIP,omitempty"`
+	PodIP                  string                  `json:"podIP,omitempty"`
+	PodIPs                 []string                `json:"podIPs,omitempty"`
 }
 
-type CheckpointedContainer  struct {
+type CheckpointedContainer struct {
 	Name                      string `json:"io.kubernetes.container.name,omitempty"`
 	ID                        string `json:"id,omitempty"`
 	TerminationMessagePath    string `json:"io.kubernetes.container.terminationMessagePath,omitempty"`
@@ -91,51 +91,51 @@ type CheckpointedPodOptions struct {
 	ProcessLabel string   `json:"processLabel"`
 }
 
-func DetectCheckpointArchiveType(checkpointDirectory string) (error, CheckpointType) {
+func DetectCheckpointArchiveType(checkpointDirectory string) (CheckpointType, error) {
 	_, err := os.Stat(filepath.Join(checkpointDirectory, CheckpointedPodsFile))
 	if err != nil && !os.IsNotExist(err) {
-		return errors.Wrapf(err, "Failed to access %q\n", CheckpointedPodsFile), Unknown
+		return Unknown, errors.Wrapf(err, "Failed to access %q\n", CheckpointedPodsFile)
 	}
 	if os.IsNotExist(err) {
-		return nil, Container
+		return Container, nil
 	}
 
-	return nil, Kubelet
+	return Kubelet, nil
 }
 
-func ReadContainerCheckpointSpecDump(checkpointDirectory string) (error, *spec.Spec, string) {
+func ReadContainerCheckpointSpecDump(checkpointDirectory string) (*spec.Spec, string, error) {
 	var specDump spec.Spec
-	err, specDumpFile := ReadJSONFile(&specDump, checkpointDirectory, SpecDumpFile)
+	specDumpFile, err := ReadJSONFile(&specDump, checkpointDirectory, SpecDumpFile)
 
-	return err, &specDump, specDumpFile
+	return &specDump, specDumpFile, err
 }
 
-func ReadContainerCheckpointConfigDump(checkpointDirectory string) (error, *ContainerConfig, string) {
+func ReadContainerCheckpointConfigDump(checkpointDirectory string) (*ContainerConfig, string, error) {
 	var containerConfig ContainerConfig
-	err, configDumpFile := ReadJSONFile(&containerConfig, checkpointDirectory, ConfigDumpFile)
+	configDumpFile, err := ReadJSONFile(&containerConfig, checkpointDirectory, ConfigDumpFile)
 
-	return err, &containerConfig, configDumpFile
+	return &containerConfig, configDumpFile, err
 }
 
-func ReadContainerCheckpointDeletedFiles(checkpointDirectory string) (error, []string, string) {
+func ReadContainerCheckpointDeletedFiles(checkpointDirectory string) ([]string, string, error) {
 	var deletedFiles []string
-	err, deletedFilesFile := ReadJSONFile(&deletedFiles, checkpointDirectory, DeletedFilesFile)
+	deletedFilesFile, err := ReadJSONFile(&deletedFiles, checkpointDirectory, DeletedFilesFile)
 
-	return err, deletedFiles, deletedFilesFile
+	return deletedFiles, deletedFilesFile, err
 }
 
-func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) (error, []*cnitypes.Result, string) {
+func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) ([]*cnitypes.Result, string, error) {
 	var networkStatus []*cnitypes.Result
-	err, networkStatusFile := ReadJSONFile(&networkStatus, checkpointDirectory, NetworkStatusFile)
+	networkStatusFile, err := ReadJSONFile(&networkStatus, checkpointDirectory, NetworkStatusFile)
 
-	return err, networkStatus, networkStatusFile
+	return networkStatus, networkStatusFile, err
 }
 
-func ReadKubeletCheckpoints(checkpointsDirectory string) (error, *CheckpointMetadata, string) {
+func ReadKubeletCheckpoints(checkpointsDirectory string) (*CheckpointMetadata, string, error) {
 	var checkpointMetadata CheckpointMetadata
-	err, checkpointMetadataPath := ReadJSONFile(&checkpointMetadata, checkpointsDirectory, CheckpointedPodsFile)
+	checkpointMetadataPath, err := ReadJSONFile(&checkpointMetadata, checkpointsDirectory, CheckpointedPodsFile)
 
-	return err, &checkpointMetadata, checkpointMetadataPath
+	return &checkpointMetadata, checkpointMetadataPath, err
 }
 
 func GetIPFromNetworkStatus(networkStatus []*cnitypes.Result) net.IP {
@@ -164,6 +164,7 @@ func GetMACFromNetworkStatus(networkStatus []*cnitypes.Result) net.HardwareAddr 
 	for _, n := range networkStatus[0].Interfaces {
 		if n.Sandbox != "" {
 			MAC, _ = net.ParseMAC(n.Mac)
+
 			break
 		}
 	}
@@ -172,34 +173,35 @@ func GetMACFromNetworkStatus(networkStatus []*cnitypes.Result) net.HardwareAddr 
 }
 
 // WriteJSONFile marshalls and writes the given data to a JSON file
-func WriteJSONFile(v interface{}, dir, file string) (error, string) {
+func WriteJSONFile(v interface{}, dir, file string) (string, error) {
 	fileJSON, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return errors.Wrapf(err, "Error marshalling JSON"), ""
+		return "", errors.Wrapf(err, "Error marshalling JSON")
 	}
 	file = filepath.Join(dir, file)
-	if err := ioutil.WriteFile(file, fileJSON, 0o644); err != nil {
-		return errors.Wrapf(err, "Error writing to %q", file), ""
+	if err := ioutil.WriteFile(file, fileJSON, 0o600); err != nil {
+		return "", errors.Wrapf(err, "Error writing to %q", file)
 	}
 
-	return nil, file
+	return file, nil
 }
 
-func ReadJSONFile(v interface{}, dir, file string) (error, string) {
+func ReadJSONFile(v interface{}, dir, file string) (string, error) {
 	file = filepath.Join(dir, file)
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
-		return errors.Wrapf(err, "failed to read %s", file), ""
+		return "", errors.Wrapf(err, "failed to read %s", file)
 	}
 	if err = json.Unmarshal(content, v); err != nil {
-		return errors.Wrapf(err, "failed to unmarshal %s", file), ""
+		return "", errors.Wrapf(err, "failed to unmarshal %s", file)
 	}
 
-	return nil, file
+	return file, nil
 }
 
 func WriteKubeletCheckpointsMetadata(checkpointMetadata *CheckpointMetadata, dir string) error {
-	err, _ := WriteJSONFile(checkpointMetadata, dir, CheckpointedPodsFile)
+	_, err := WriteJSONFile(checkpointMetadata, dir, CheckpointedPodsFile)
+
 	return err
 }
 
@@ -213,6 +215,7 @@ func ByteToString(b int64) string {
 		div *= unit
 		exp++
 	}
+
 	return fmt.Sprintf("%.1f %ciB",
 		float64(b)/float64(div), "KMGTPE"[exp])
 }

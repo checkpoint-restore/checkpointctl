@@ -10,21 +10,21 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/checkpoint-restore/checkpointctl/lib"
+	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 )
 
 func showContainerCheckpoint(checkpointDirectory string) error {
-	err, containerConfig, configDumpFile := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
+	containerConfig, configDumpFile, err := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", configDumpFile)
 	}
-	err, specDump, specDumpFile := metadata.ReadContainerCheckpointSpecDump(checkpointDirectory)
+	specDump, specDumpFile, err := metadata.ReadContainerCheckpointSpecDump(checkpointDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", specDumpFile)
 	}
-	err, networkStatus, networkStatusFile := metadata.ReadContainerCheckpointNetworkStatus(checkpointDirectory)
+	networkStatus, networkStatusFile, err := metadata.ReadContainerCheckpointNetworkStatus(checkpointDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", networkStatusFile)
 	}
@@ -51,8 +51,10 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	} else {
 		row = append(row, containerConfig.ID)
 	}
+
 	row = append(row, containerConfig.OCIRuntime)
 	row = append(row, containerConfig.CreatedTime.Format(time.RFC3339))
+
 	if specDump.Annotations["io.container.manager"] == "libpod" {
 		row = append(row, "Podman")
 	} else {
@@ -71,7 +73,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		row = append(row, "Unknown")
 	}
 
-	err, size := getCheckpointSize(checkpointDirectory)
+	size, err := getCheckpointSize(checkpointDirectory)
 	if err != nil {
 		return err
 	}
@@ -97,7 +99,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	return nil
 }
 
-func dirSize(path string) (err error, size int64) {
+func dirSize(path string) (size int64, err error) {
 	err = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -105,12 +107,15 @@ func dirSize(path string) (err error, size int64) {
 		if !info.IsDir() {
 			size += info.Size()
 		}
+
 		return err
 	})
-	return err, size
+
+	return size, err
 }
 
-func getCheckpointSize(path string) (err error, size int64) {
+func getCheckpointSize(path string) (size int64, err error) {
 	dir := filepath.Join(path, metadata.CheckpointDirectory)
+
 	return dirSize(dir)
 }

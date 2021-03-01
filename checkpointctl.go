@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/checkpoint-restore/checkpointctl/lib"
+	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
@@ -30,9 +30,10 @@ var (
 
 func main() {
 	rootCommand := &cobra.Command{
-		Use:          name,
-		Short:        name + " is a tool to read and manipulate checkpoint archives",
-		Long:         name + " is a tool to read and manipulate checkpoint archives as created by Podman, CRI-O and Kubernetes",
+		Use:   name,
+		Short: name + " is a tool to read and manipulate checkpoint archives",
+		Long: name + " is a tool to read and manipulate checkpoint archives as " +
+			"created by Podman, CRI-O and Kubernetes",
 		SilenceUsage: true,
 	}
 
@@ -45,8 +46,7 @@ func main() {
 	insertCommand := setupInsert()
 	rootCommand.AddCommand(insertCommand)
 
-	err := rootCommand.Execute()
-	if err != nil {
+	if err := rootCommand.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -93,18 +93,20 @@ func show(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "Creating temporary directory failed\n")
 		}
+
 		defer func() {
 			if err := os.RemoveAll(dir); err != nil {
 				fmt.Fprintf(os.Stderr, "Could not recursively remove %s: %q", dir, err)
 			}
 		}()
+
 		if err := archive.UntarPath(kubeletCheckpointsDirectory, dir); err != nil {
 			return errors.Wrapf(err, "Unpacking of checkpoint archive %s failed\n", kubeletCheckpointsDirectory)
 		}
 		checkpointDirectory = dir
 	}
 
-	err, archiveType := metadata.DetectCheckpointArchiveType(checkpointDirectory)
+	archiveType, err := metadata.DetectCheckpointArchiveType(checkpointDirectory)
 	if err != nil {
 		return err
 	}
@@ -114,13 +116,15 @@ func show(cmd *cobra.Command, args []string) error {
 		return showKubeletCheckpoint(checkpointDirectory)
 	case metadata.Container:
 		return showContainerCheckpoint(checkpointDirectory)
+	case metadata.Pod, metadata.Unknown:
+		fmt.Printf("%q contains unknown archive type\n", kubeletCheckpointsDirectory)
 	}
-	fmt.Printf("%q contains unknown archive type\n", kubeletCheckpointsDirectory)
+
 	return nil
 }
 
 func showKubeletCheckpoint(checkpointDirectory string) error {
-	err, checkpointMetadata, checkpointMetadataPath := metadata.ReadKubeletCheckpoints(checkpointDirectory)
+	checkpointMetadata, checkpointMetadataPath, err := metadata.ReadKubeletCheckpoints(checkpointDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", checkpointMetadataPath)
 	}
@@ -180,8 +184,10 @@ func validateExtract(c *cobra.Command, args []string) error {
 			return errors.Wrapf(err, "Printing help failed")
 		}
 		fmt.Println()
+
 		return errors.Errorf("Specifying an output file (-o|--output) is required\n")
 	}
+
 	return nil
 }
 
@@ -190,9 +196,7 @@ func setupExtract() *cobra.Command {
 		Use:   "extract",
 		Short: "Extract all kubelet checkpoints",
 		RunE:  extract,
-		Args: func(cmd *cobra.Command, args []string) error {
-			return validateExtract(cmd, args)
-		},
+		Args:  validateExtract,
 	}
 	flags := cmd.Flags()
 	flags.StringVarP(
@@ -230,7 +234,7 @@ func extract(cmd *cobra.Command, args []string) error {
 	default:
 		return errors.Errorf("Select compression algorithm (%q) not supported\n", compress)
 	}
-	err, checkpointMetadata, checkpointMetadataPath := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
+	checkpointMetadata, checkpointMetadataPath, err := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
 	if err != nil {
 		return errors.Wrapf(err, "Reading %q failed\n", checkpointMetadataPath)
 	}
@@ -318,8 +322,7 @@ func insert(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "Unpacking of checkpoint archive %s failed\n", input)
 	}
 
-	err, insertData, _ := metadata.ReadKubeletCheckpoints(dir)
-
+	insertData, _, err := metadata.ReadKubeletCheckpoints(dir)
 	if err != nil {
 		return errors.Wrapf(err, "%s not a kubelet checkpoint archive\n", input)
 	}
@@ -332,7 +335,7 @@ func insert(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	err, kubeletData, _ := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
+	kubeletData, _, err := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
 	if os.IsNotExist(errors.Unwrap(errors.Unwrap(err))) {
 		// There is no existing checkpointed.pods file
 		kubeletData = insertData

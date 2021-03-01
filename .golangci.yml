@@ -1,0 +1,16 @@
+---
+run:
+  concurrency: 6
+  deadline: 5m
+linters:
+  enable-all: true
+  disable:
+    - gochecknoglobals
+    - godot
+    - forbidigo
+    - wrapcheck
+    - exhaustivestruct
+    - unparam
+    - funlen
+    - wsl
+    - gomnd
