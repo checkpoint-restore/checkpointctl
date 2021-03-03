@@ -166,5 +166,5 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[4]} == *"Unknown"* ]]
+	[[ ${lines[4]} == *"Podman"* ]]
 }
