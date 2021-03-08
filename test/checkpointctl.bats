@@ -168,3 +168,37 @@ function teardown() {
 	[ "$status" -eq 0 ]
 	[[ ${lines[4]} == *"Podman"* ]]
 }
+
+@test "Run checkpointctl show with tar file with empty pod.dump" {
+	touch "$TEST_TMP_DIR1"/pod.dump
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"pod.dump: unexpected end of JSON input" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid pod.dump and no pod.options" {
+	cp test/pod.dump "$TEST_TMP_DIR1"
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"pod.options: no such file or directory" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid pod.dump and empty pod.options" {
+	cp test/pod.dump "$TEST_TMP_DIR1"
+	touch "$TEST_TMP_DIR1"/pod.options
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"pod.options: unexpected end of JSON input" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid pod.dump and valid pod.options" {
+	cp test/pod.dump "$TEST_TMP_DIR1"
+	cp test/pod.options "$TEST_TMP_DIR1"
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[4]} == *"host-test-host"*"test-container-1"* ]]
+}
