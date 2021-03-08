@@ -91,16 +91,73 @@ type CheckpointedPodOptions struct {
 	ProcessLabel string   `json:"processLabel"`
 }
 
-func DetectCheckpointArchiveType(checkpointDirectory string) (CheckpointType, error) {
-	_, err := os.Stat(filepath.Join(checkpointDirectory, CheckpointedPodsFile))
+// This is metadata stored inside of Pod checkpoint archive
+type PodSandboxConfig struct {
+	Metadata SandboxMetadta `json:"metadata"`
+	Hostname string         `json:"hostname"`
+}
+
+type SandboxMetadta struct {
+	Name      string `json:"name"`
+	UID       string `json:"uid"`
+	Namespace string `json:"namespace"`
+}
+
+func checkForFile(checkpointDirectory, file string) (bool, error) {
+	_, err := os.Stat(filepath.Join(checkpointDirectory, file))
 	if err != nil && !os.IsNotExist(err) {
-		return Unknown, errors.Wrapf(err, "Failed to access %q\n", CheckpointedPodsFile)
+		return false, errors.Wrapf(err, "Failed to access %q\n", file)
 	}
 	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func DetectCheckpointArchiveType(checkpointDirectory string) (CheckpointType, error) {
+	kubelet, err := checkForFile(checkpointDirectory, CheckpointedPodsFile)
+	if os.IsNotExist(err) {
+		return Unknown, err
+	}
+
+	container, err := checkForFile(checkpointDirectory, ConfigDumpFile)
+	if os.IsNotExist(err) {
+		return Unknown, err
+	}
+
+	pod, err := checkForFile(checkpointDirectory, PodDumpFile)
+	if os.IsNotExist(err) {
+		return Unknown, err
+	}
+
+	if pod && !container && !kubelet {
+		return Pod, nil
+	}
+
+	if !pod && container && !kubelet {
 		return Container, nil
 	}
 
-	return Kubelet, nil
+	if !pod && !container && kubelet {
+		return Kubelet, nil
+	}
+
+	return Unknown, nil
+}
+
+func ReadPodCheckpointDumpFile(checkpointDirectory string) (*PodSandboxConfig, string, error) {
+	var podSandboxConfig PodSandboxConfig
+	podDumpFile, err := ReadJSONFile(&podSandboxConfig, checkpointDirectory, PodDumpFile)
+
+	return &podSandboxConfig, podDumpFile, err
+}
+
+func ReadPodCheckpointOptionsFile(checkpointDirectory string) (*CheckpointedPodOptions, string, error) {
+	var checkpointedPodOptions CheckpointedPodOptions
+	podOptionsFile, err := ReadJSONFile(&checkpointedPodOptions, checkpointDirectory, PodOptionsFile)
+
+	return &checkpointedPodOptions, podOptionsFile, err
 }
 
 func ReadContainerCheckpointSpecDump(checkpointDirectory string) (*spec.Spec, string, error) {

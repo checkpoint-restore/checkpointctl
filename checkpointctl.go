@@ -116,8 +116,10 @@ func show(cmd *cobra.Command, args []string) error {
 		return showKubeletCheckpoint(checkpointDirectory)
 	case metadata.Container:
 		return showContainerCheckpoint(checkpointDirectory)
-	case metadata.Pod, metadata.Unknown:
-		fmt.Printf("%q contains unknown archive type\n", kubeletCheckpointsDirectory)
+	case metadata.Pod:
+		return showPodCheckpoint(checkpointDirectory)
+	case metadata.Unknown:
+		return errors.Errorf("%q contains unknown archive type\n", kubeletCheckpointsDirectory)
 	}
 
 	return nil

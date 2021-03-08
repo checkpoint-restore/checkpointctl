@@ -101,7 +101,7 @@ function teardown() {
 	touch "$TEST_TMP_DIR1"/empty.tar
 	checkpointctl show -t "$TEST_TMP_DIR1"/empty.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} =~ config.dump ]]
+	[[ ${lines[0]} == *"contains unknown archive type"* ]]
 }
 
 @test "Run checkpointctl show with tar file with empty config.dump" {
