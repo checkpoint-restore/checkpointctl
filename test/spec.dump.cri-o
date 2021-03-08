@@ -1,0 +1,6 @@
+{
+  "annotations": {
+    "io.container.manager": "cri-o",
+    "io.kubernetes.cri-o.Metadata" : "{}"
+  }
+}

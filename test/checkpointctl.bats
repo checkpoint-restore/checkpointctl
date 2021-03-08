@@ -202,3 +202,22 @@ function teardown() {
 	[ "$status" -eq 0 ]
 	[[ ${lines[4]} == *"host-test-host"*"test-container-1"* ]]
 }
+
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and no checkpoint directory" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[1]} == *"checkpoint: no such file or directory" ]]
+}
+
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and checkpoint directory" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[4]} == *"CRI-O"* ]]
+}
