@@ -1,9 +1,15 @@
-CHECKPOINTCTL="./checkpointctl"
+if [ -n "$COVERAGE" ]; then
+	CHECKPOINTCTL="./checkpointctl.coverage"
+	ARGS="-test.coverprofile=coverprofile.integration.$RANDOM -test.outputdir=${COVERAGE_PATH} COVERAGE"
+else
+	CHECKPOINTCTL="./checkpointctl"
+fi
 TEST_TMP_DIR1=""
 TEST_TMP_DIR2=""
 
 function checkpointctl() {
-	run "$CHECKPOINTCTL" "$@"
+	# shellcheck disable=SC2086
+	run $CHECKPOINTCTL $ARGS "$@"
 	echo "$output"
 }
 
