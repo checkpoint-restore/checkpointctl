@@ -5,14 +5,25 @@ GOBIN := $(shell $(GO) env GOBIN)
 GO_SRC = $(shell find . -name \*.go)
 GO_BUILD = $(GO) build
 NAME = checkpointctl
+COVERAGE_PATH ?= $(shell pwd)/.coverage
 
 all: $(NAME)
 
 $(NAME): $(GO_SRC)
 	$(GO_BUILD) -buildmode=pie -o $@ -ldflags "-X main.name=$(NAME)"
 
+$(NAME).coverage: $(GO_SRC)
+	$(GO) test \
+		-covermode=count \
+		-coverpkg=./... \
+		-mod=vendor \
+		-tags coverage \
+		-buildmode=pie -c -o $@ \
+		-ldflags "-X main.name=$(NAME)"
+
 clean:
-	rm -f $(NAME)
+	rm -f $(NAME) $(NAME).coverage $(COVERAGE_PATH)/*
+	rmdir $(COVERAGE_PATH)
 
 golang-lint:
 	golangci-lint run
@@ -24,6 +35,13 @@ lint: golang-lint shellcheck
 
 test: $(NAME)
 	bats test/*bats
+
+coverage: $(NAME).coverage
+	mkdir -p $(COVERAGE_PATH)
+	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 bats test/*bats
+
+codecov:
+	bash <(curl -s https://codecov.io/bash) -f "*.coverage/coverprofile*"
 
 vendor:
 	GO111MODULE=on go mod tidy
