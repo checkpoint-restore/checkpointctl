@@ -5,13 +5,13 @@
 The Kubernetes kubelet creates checkpoints which consists of metadata (`checkpointed.pods`)
 and tar archives containing the actual pod checkpoints.
 
-With the help of this tool (`checkpointctl`) it is possible to display, extract or insert
+With the help of this tool, `checkpointctl`, it is possible to display, extract or insert
 checkpoints.
 
 To display the checkpoints which are currently in the kubelet's default checkpoint directory
 just use `checkpointctl show`:
 
-```shell
+```console
 $ checkpointctl show
 
 Displaying data from /var/lib/kubelet/checkpoints/checkpointed.pods
@@ -29,17 +29,16 @@ Displaying data from /var/lib/kubelet/checkpoints/checkpointed.pods
 
 To extract all checkpoints from the kubelet use:
 
-```shell
+```console
 $ checkpointctl extract -o /tmp/checkpoints.tar
 
 Extracting checkpoint data from /var/lib/kubelet/checkpoints/checkpointed.pods
-
 ```
 
 Resulting in a tar archive at `/tmp/checkpoints.tar` which can then be used to insert
 this checkpoint archive into another kubelet:
 
-```shell
+```console
 $ checkpointctl insert -i /tmp/checkpoints.tar
 ```
 
@@ -51,7 +50,7 @@ the `--target` parameter.
 The command `checkpointctl show` can also be used on an exported tar archive to see
 which checkpoints are part of an exported tar archive:
 
-```
+```console
 $ checkpointctl show --target /tmp/checkpoints.tar
 ```
 
@@ -67,9 +66,10 @@ break-up larger PRs into smaller ones - it's easier to review smaller
 code changes. But only if those smaller ones make sense as stand-alone PRs.
 
 Regardless of the type of PR, all PRs should include:
-* well documented code changes
-* additional testcases. Ideally, they should fail w/o your code change applied
-* documentation changes
+
+* well documented code changes;
+* additional testcases: ideally, they should fail w/o your code change applied;
+* documentation changes.
 
 Squash your commits into logical pieces of work that might want to be reviewed
 separate from the rest of the PRs. Ideally, each commit should implement a
