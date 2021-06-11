@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	cnitypes "github.com/containernetworking/cni/pkg/types/current"
+	cnitypes "github.com/containernetworking/cni/pkg/types/100"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
