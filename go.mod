@@ -3,7 +3,7 @@ module github.com/checkpoint-restore/checkpointctl
 go 1.15
 
 require (
-	github.com/containernetworking/cni v0.8.1
+	github.com/containernetworking/cni v1.0.0-rc1.0.20210616152823-57cf1cee7d07
 	github.com/containers/storage v1.23.5
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/onsi/ginkgo v1.15.0 // indirect
