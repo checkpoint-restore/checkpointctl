@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"time"
 
-	cnitypes "github.com/containernetworking/cni/pkg/types/100"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
+	cnicreate "github.com/containernetworking/cni/pkg/types/create"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -181,9 +183,24 @@ func ReadContainerCheckpointDeletedFiles(checkpointDirectory string) ([]string, 
 	return deletedFiles, deletedFilesFile, err
 }
 
-func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) ([]*cnitypes.Result, string, error) {
-	var networkStatus []*cnitypes.Result
-	networkStatusFile, err := ReadJSONFile(&networkStatus, checkpointDirectory, NetworkStatusFile)
+func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) ([]cnitypes.Result, string, error) {
+	var networkStatusRaw []interface{}
+	networkStatusFile, err := ReadJSONFile(&networkStatusRaw, checkpointDirectory, NetworkStatusFile)
+
+	networkStatus := make([]cnitypes.Result, 0, len(networkStatusRaw))
+	for _, statusRaw := range networkStatusRaw {
+		// Remarshal each raw status to bytes so libcni can unmarshal
+		// to the right Result version
+		bytes, err := json.Marshal(statusRaw)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to marshal %v", statusRaw)
+		}
+		result, err := cnicreate.CreateFromBytes(bytes)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to create CNI Result from %s", string(bytes))
+		}
+		networkStatus = append(networkStatus, result)
+	}
 
 	return networkStatus, networkStatusFile, err
 }
@@ -195,38 +212,46 @@ func ReadKubeletCheckpoints(checkpointsDirectory string) (*CheckpointMetadata, s
 	return &checkpointMetadata, checkpointMetadataPath, err
 }
 
-func GetIPFromNetworkStatus(networkStatus []*cnitypes.Result) net.IP {
+func GetIPFromNetworkStatus(networkStatus []cnitypes.Result) net.IP {
 	if len(networkStatus) == 0 {
 		return nil
 	}
-	// Take the first IP address
-	if len(networkStatus[0].IPs) == 0 {
+
+	// Convert to a concrete Result
+	r, err := cni100.NewResultFromResult(networkStatus[0])
+	if err != nil {
 		return nil
 	}
-	IP := networkStatus[0].IPs[0].Address.IP
 
-	return IP
+	// Take the first IP address
+	if len(r.IPs) == 0 {
+		return nil
+	}
+
+	return r.IPs[0].Address.IP
 }
 
-func GetMACFromNetworkStatus(networkStatus []*cnitypes.Result) net.HardwareAddr {
+func GetMACFromNetworkStatus(networkStatus []cnitypes.Result) net.HardwareAddr {
 	if len(networkStatus) == 0 {
 		return nil
 	}
-	// Take the first device with a defined sandbox
-	if len(networkStatus[0].Interfaces) == 0 {
+
+	// Convert to a concrete Result
+	r, err := cni100.NewResultFromResult(networkStatus[0])
+	if err != nil {
 		return nil
 	}
-	var MAC net.HardwareAddr
-	MAC = nil
-	for _, n := range networkStatus[0].Interfaces {
-		if n.Sandbox != "" {
-			MAC, _ = net.ParseMAC(n.Mac)
 
-			break
+	// Take the first device with a defined sandbox
+	for _, n := range r.Interfaces {
+		if n.Sandbox != "" {
+			MAC, _ := net.ParseMAC(n.Mac)
+
+			return MAC
 		}
 	}
 
-	return MAC
+	return nil
 }
 
 // WriteJSONFile marshalls and writes the given data to a JSON file
