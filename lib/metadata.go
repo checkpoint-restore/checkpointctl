@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"time"
 
-	cnitypes "github.com/containernetworking/cni/pkg/types/current"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
@@ -181,52 +179,11 @@ func ReadContainerCheckpointDeletedFiles(checkpointDirectory string) ([]string, 
 	return deletedFiles, deletedFilesFile, err
 }
 
-func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) ([]*cnitypes.Result, string, error) {
-	var networkStatus []*cnitypes.Result
-	networkStatusFile, err := ReadJSONFile(&networkStatus, checkpointDirectory, NetworkStatusFile)
-
-	return networkStatus, networkStatusFile, err
-}
-
 func ReadKubeletCheckpoints(checkpointsDirectory string) (*CheckpointMetadata, string, error) {
 	var checkpointMetadata CheckpointMetadata
 	checkpointMetadataPath, err := ReadJSONFile(&checkpointMetadata, checkpointsDirectory, CheckpointedPodsFile)
 
 	return &checkpointMetadata, checkpointMetadataPath, err
-}
-
-func GetIPFromNetworkStatus(networkStatus []*cnitypes.Result) net.IP {
-	if len(networkStatus) == 0 {
-		return nil
-	}
-	// Take the first IP address
-	if len(networkStatus[0].IPs) == 0 {
-		return nil
-	}
-	IP := networkStatus[0].IPs[0].Address.IP
-
-	return IP
-}
-
-func GetMACFromNetworkStatus(networkStatus []*cnitypes.Result) net.HardwareAddr {
-	if len(networkStatus) == 0 {
-		return nil
-	}
-	// Take the first device with a defined sandbox
-	if len(networkStatus[0].Interfaces) == 0 {
-		return nil
-	}
-	var MAC net.HardwareAddr
-	MAC = nil
-	for _, n := range networkStatus[0].Interfaces {
-		if n.Sandbox != "" {
-			MAC, _ = net.ParseMAC(n.Mac)
-
-			break
-		}
-	}
-
-	return MAC
 }
 
 // WriteJSONFile marshalls and writes the given data to a JSON file

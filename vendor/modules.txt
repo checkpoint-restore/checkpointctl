@@ -1,8 +1,3 @@
-# github.com/containernetworking/cni v0.8.1
-## explicit
-github.com/containernetworking/cni/pkg/types
-github.com/containernetworking/cni/pkg/types/020
-github.com/containernetworking/cni/pkg/types/current
 # github.com/containers/storage v1.23.5
 ## explicit
 github.com/containers/storage/pkg/archive
@@ -36,10 +31,6 @@ github.com/moby/sys/mountinfo
 # github.com/olekukonko/tablewriter v0.0.4
 ## explicit
 github.com/olekukonko/tablewriter
-# github.com/onsi/ginkgo v1.15.0
-## explicit
-# github.com/onsi/gomega v1.10.5
-## explicit
 # github.com/opencontainers/runc v1.0.0-rc91
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
@@ -60,8 +51,10 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
 # golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
+## explicit
 golang.org/x/net/context
 # golang.org/x/sys v0.0.0-20210112080510-489259a85091
+## explicit
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
