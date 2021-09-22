@@ -135,39 +135,18 @@ function teardown() {
 	[[ ${lines[1]} == *"spec.dump: unexpected end of JSON input" ]]
 }
 
-@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and no network.status" {
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and no checkpoint directory" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"
-	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
-	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"network.status: no such file or directory" ]]
-}
-
-@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and empty network.status" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
-	touch "$TEST_TMP_DIR1"/network.status
-	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
-	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"network.status: unexpected end of JSON input" ]]
-}
-
-@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and valid network.status and no checkpoint directory" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
-	cp test/network.status "$TEST_TMP_DIR1"
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
 	[[ ${lines[1]} == *"checkpoint: no such file or directory" ]]
 }
 
-@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and valid network.status and checkpoint directory" {
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and checkpoint directory" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"
-	cp test/network.status "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar

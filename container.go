@@ -36,19 +36,6 @@ func getPodmanInfo(
 ) (*containerInfo, error) {
 	ci := &containerInfo{}
 
-	networkStatus, networkStatusFile, err := metadata.ReadContainerCheckpointNetworkStatus(checkpointDirectory)
-	if err != nil {
-		return ci, errors.Wrapf(err, "Reading %q failed\n", networkStatusFile)
-	}
-
-	if IP := metadata.GetIPFromNetworkStatus(networkStatus); IP != nil {
-		ci.IP = IP.String()
-	}
-
-	if MAC := metadata.GetMACFromNetworkStatus(networkStatus); MAC != nil {
-		ci.MAC = MAC.String()
-	}
-
 	ci.Name = containerConfig.Name
 	ci.Created = containerConfig.CreatedTime.Format(time.RFC3339)
 	ci.Engine = "Podman"
