@@ -1,4 +1,4 @@
-# github.com/containers/storage v1.23.5
+# github.com/containers/storage v1.37.0
 ## explicit
 github.com/containers/storage/pkg/archive
 github.com/containers/storage/pkg/fileutils
@@ -8,53 +8,56 @@ github.com/containers/storage/pkg/longpath
 github.com/containers/storage/pkg/mount
 github.com/containers/storage/pkg/pools
 github.com/containers/storage/pkg/promise
+github.com/containers/storage/pkg/reexec
 github.com/containers/storage/pkg/system
+github.com/containers/storage/pkg/unshare
 # github.com/docker/go-units v0.4.0
 github.com/docker/go-units
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
-# github.com/klauspost/compress v1.11.0
+# github.com/klauspost/compress v1.13.6
+github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
-github.com/klauspost/compress/snappy
+github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/pgzip v1.2.5
 github.com/klauspost/pgzip
-# github.com/konsorten/go-windows-terminal-sequences v1.0.3
-github.com/konsorten/go-windows-terminal-sequences
-# github.com/mattn/go-runewidth v0.0.7
+# github.com/mattn/go-runewidth v0.0.9
 github.com/mattn/go-runewidth
-# github.com/moby/sys/mountinfo v0.1.3
+# github.com/moby/sys/mountinfo v0.4.1
 github.com/moby/sys/mountinfo
-# github.com/olekukonko/tablewriter v0.0.4
+# github.com/olekukonko/tablewriter v0.0.5
 ## explicit
 github.com/olekukonko/tablewriter
-# github.com/opencontainers/runc v1.0.0-rc91
-github.com/opencontainers/runc/libcontainer/system
+# github.com/opencontainers/runc v1.0.2
 github.com/opencontainers/runc/libcontainer/user
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
+github.com/opencontainers/runc/libcontainer/userns
+# github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/pquerna/ffjson v0.0.0-20181028064349-e517b90714f7
-github.com/pquerna/ffjson/fflib/v1
-github.com/pquerna/ffjson/fflib/v1/internal
-# github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.8.1
 github.com/sirupsen/logrus
-# github.com/spf13/cobra v1.1.1
+# github.com/spf13/cobra v1.2.1
 ## explicit
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
-## explicit
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
+github.com/syndtr/gocapability/capability
+# github.com/ulikunitz/xz v0.5.10
+github.com/ulikunitz/xz
+github.com/ulikunitz/xz/internal/hash
+github.com/ulikunitz/xz/internal/xlog
+github.com/ulikunitz/xz/lzma
+# golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 golang.org/x/net/context
-# golang.org/x/sys v0.0.0-20210112080510-489259a85091
-## explicit
+# golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows

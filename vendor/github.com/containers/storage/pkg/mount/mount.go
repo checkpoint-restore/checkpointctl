@@ -41,6 +41,11 @@ func (e *mountError) Cause() error {
 	return e.err
 }
 
+// Unwrap returns the underlying cause of the error
+func (e *mountError) Unwrap() error {
+	return e.err
+}
+
 // Mount will mount filesystem according to the specified configuration, on the
 // condition that the target path is *not* already mounted. Options must be
 // specified like the mount or fstab unix commands: "opt1=val1,opt2=val2". See
@@ -90,7 +95,7 @@ func RecursiveUnmount(target string) error {
 		if err := Unmount(m.Mountpoint); err != nil && i == len(mounts)-1 {
 			return err
 			// Ignore errors for submounts and continue trying to unmount others
-			// The final unmount should fail if there ane any submounts remaining
+			// The final unmount should fail if there are any submounts remaining
 		}
 	}
 	return nil

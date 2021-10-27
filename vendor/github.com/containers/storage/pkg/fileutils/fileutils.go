@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PatternMatcher allows checking paths agaist a list of patterns
+// PatternMatcher allows checking paths against a list of patterns
 type PatternMatcher struct {
 	patterns   []*Pattern
 	exclusions bool
@@ -38,7 +38,7 @@ func NewPatternMatcher(patterns []string) (*PatternMatcher, error) {
 				return nil, errors.New("illegal exclusion pattern: \"!\"")
 			}
 			newp.exclusion = true
-			p = p[1:]
+			p = strings.TrimPrefix(filepath.Clean(p[1:]), "/")
 			pm.exclusions = true
 		}
 		// Do some syntax checking on the pattern.
