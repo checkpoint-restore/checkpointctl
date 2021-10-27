@@ -41,7 +41,9 @@ coverage: $(NAME).coverage
 	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 bats test/*bats
 
 codecov:
-	bash <(curl -s https://codecov.io/bash) -f "*.coverage/coverprofile*"
+	curl -Os https://uploader.codecov.io/latest/linux/codecov
+	chmod +x codecov
+	./codecov -f '.coverage/*'
 
 vendor:
 	GO111MODULE=on go mod tidy
