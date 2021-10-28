@@ -57,6 +57,9 @@ const (
 	// pod archive
 	PodOptionsFile = "pod.options"
 	PodDumpFile    = "pod.dump"
+
+	StatsDump    = "stats-dump"
+	StatsRestore = "stats-restore"
 )
 
 type CheckpointType int
