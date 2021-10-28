@@ -97,7 +97,6 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		"Runtime",
 		"Created",
 		"Engine",
-		"IP",
 	}
 
 	row = append(row, ci.Name)
@@ -112,7 +111,10 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	row = append(row, ci.Created)
 
 	row = append(row, ci.Engine)
-	row = append(row, ci.IP)
+	if ci.IP != "" {
+		header = append(header, "IP")
+		row = append(row, ci.IP)
+	}
 	if ci.MAC != "" {
 		header = append(header, "MAC")
 		row = append(row, ci.MAC)
