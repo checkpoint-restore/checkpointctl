@@ -154,6 +154,40 @@ function teardown() {
 	[[ ${lines[4]} == *"Podman"* ]]
 }
 
+@test "Run checkpointctl show with tar file and --print-stats and missing stats-dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar --print-stats
+	[ "$status" -eq 1 ]
+	[[ ${lines[6]} == *"Displaying checkpointing statistics"* ]]
+}
+
+@test "Run checkpointctl show with tar file and --print-stats and invalid stats-dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"/stats-dump
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar --print-stats
+	[ "$status" -eq 1 ]
+	[[ ${lines[6]} == *"Primary magic not found"* ]]
+}
+
+@test "Run checkpointctl show with tar file and --print-stats and valid stats-dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp test/stats-dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar --print-stats
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[8]} == *"MEMWRITE TIME"* ]]
+	[[ ${lines[10]} == *"446571 us"* ]]
+}
+
 @test "Run checkpointctl show with tar file with empty pod.dump" {
 	touch "$TEST_TMP_DIR1"/pod.dump
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
