@@ -12,6 +12,7 @@ import (
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
+	"github.com/checkpoint-restore/go-criu/v5/stats"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -141,6 +142,41 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	table.SetRowLine(true)
 	table.SetHeader(header)
 	table.Append(row)
+	table.Render()
+
+	if !printStats {
+		return nil
+	}
+
+	cpDir, err := os.Open(checkpointDirectory)
+	if err != nil {
+		return errors.Wrapf(err, "Not able to open %q", checkpointDirectory)
+	}
+	defer cpDir.Close()
+
+	dumpStatistics, err := stats.CriuGetDumpStats(cpDir)
+	if err != nil {
+		return errors.Wrap(err, "Displaying checkpointing statistics not possible")
+	}
+
+	table = tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{
+		"Freezing Time",
+		"Frozen Time",
+		"Memdump Time",
+		"Memwrite Time",
+		"Pages Scanned",
+		"Pages Written",
+	})
+	table.Append([]string{
+		fmt.Sprintf("%d us", dumpStatistics.GetFreezingTime()),
+		fmt.Sprintf("%d us", dumpStatistics.GetFrozenTime()),
+		fmt.Sprintf("%d us", dumpStatistics.GetMemdumpTime()),
+		fmt.Sprintf("%d us", dumpStatistics.GetMemwriteTime()),
+		fmt.Sprintf("%d", dumpStatistics.GetPagesScanned()),
+		fmt.Sprintf("%d", dumpStatistics.GetPagesWritten()),
+	})
+	fmt.Println("CRIU dump statistics")
 	table.Render()
 
 	return nil

@@ -26,6 +26,7 @@ var (
 	output                      string
 	input                       string
 	compress                    string
+	printStats                  bool
 )
 
 func main() {
@@ -75,6 +76,12 @@ func setupShow() *cobra.Command {
 		"show-pod-ip",
 		false,
 		"Show Pod IP in output",
+	)
+	flags.BoolVar(
+		&printStats,
+		"print-stats",
+		false,
+		"Print checkpointing statistics if available",
 	)
 
 	return cmd
