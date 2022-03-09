@@ -55,6 +55,8 @@ const (
 	DevShmCheckpointTar = "devshm-checkpoint.tar"
 	RootFsDiffTar       = "rootfs-diff.tar"
 	DeletedFilesFile    = "deleted.files"
+	DumpLogFile         = "dump.log"
+	RestoreLogFile      = "restore.log"
 	// pod archive
 	PodOptionsFile = "pod.options"
 	PodDumpFile    = "pod.dump"
