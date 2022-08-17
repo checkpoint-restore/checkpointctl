@@ -1,7 +1,8 @@
-# github.com/checkpoint-restore/go-criu/v5 v5.3.0
+# github.com/checkpoint-restore/go-criu/v6 v6.2.0
 ## explicit
-github.com/checkpoint-restore/go-criu/v5/magic
-github.com/checkpoint-restore/go-criu/v5/stats
+github.com/checkpoint-restore/go-criu/v6/crit
+github.com/checkpoint-restore/go-criu/v6/crit/images
+github.com/checkpoint-restore/go-criu/v6/magic
 # github.com/containers/storage v1.42.0
 ## explicit
 github.com/containers/storage/pkg/archive
@@ -66,13 +67,15 @@ golang.org/x/net/context
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# google.golang.org/protobuf v1.27.1
+# google.golang.org/protobuf v1.28.1
+google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/json
 google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text
@@ -92,3 +95,4 @@ google.golang.org/protobuf/reflect/protoreflect
 google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
+google.golang.org/protobuf/types/descriptorpb

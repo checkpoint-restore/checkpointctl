@@ -120,7 +120,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --print-stats
 	[ "$status" -eq 1 ]
-	[[ ${lines[6]} == *"Primary magic not found"* ]]
+	[[ ${lines[6]} == *"Unknown magic"* ]]
 }
 
 @test "Run checkpointctl show with tar file and --print-stats and valid stats-dump" {
