@@ -18,12 +18,12 @@ import (
 func showPodCheckpoint(checkpointDirectory string) error {
 	podSandboxConfig, podSandboxConfigFile, err := metadata.ReadPodCheckpointDumpFile(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Reading %q failed\n", podSandboxConfigFile)
+		return errors.Wrapf(err, "reading %q failed", podSandboxConfigFile)
 	}
 
 	checkpointedPodOptions, checkpointedPodOptionsFile, err := metadata.ReadPodCheckpointOptionsFile(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Reading %q failed\n", checkpointedPodOptionsFile)
+		return errors.Wrapf(err, "reading %q failed", checkpointedPodOptionsFile)
 	}
 
 	fmt.Printf("\nDisplaying pod checkpoint data from %s\n\n", kubeletCheckpointsDirectory)

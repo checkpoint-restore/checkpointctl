@@ -68,11 +68,11 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	)
 	containerConfig, configDumpFile, err := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Reading %q failed\n", configDumpFile)
+		return errors.Wrapf(err, "reading %q failed", configDumpFile)
 	}
 	specDump, specDumpFile, err := metadata.ReadContainerCheckpointSpecDump(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Reading %q failed\n", specDumpFile)
+		return errors.Wrapf(err, "reading %q failed", specDumpFile)
 	}
 
 	switch specDump.Annotations["io.container.manager"] {
