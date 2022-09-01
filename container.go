@@ -106,7 +106,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		return errors.Wrap(err, "Getting container checkpoint information failed")
 	}
 
-	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", kubeletCheckpointsDirectory)
+	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", checkpointDirectory)
 
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
