@@ -44,6 +44,19 @@ func getPodmanInfo(
 	return ci, nil
 }
 
+func getContainerdInfo(
+	containerdStatus *metadata.ContainerdStatus,
+	specDump *spec.Spec,
+) (*containerInfo, error) {
+	ci := &containerInfo{}
+
+	ci.Name = specDump.Annotations["io.kubernetes.cri.container-name"]
+	ci.Created = time.Unix(0, containerdStatus.CreatedAt).Format(time.RFC3339)
+	ci.Engine = "containerd"
+
+	return ci, nil
+}
+
 func getCRIOInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) (*containerInfo, error) {
 	ci := &containerInfo{}
 
@@ -75,13 +88,18 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		return errors.Wrapf(err, "reading %q failed", specDumpFile)
 	}
 
+	containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
+
 	switch specDump.Annotations["io.container.manager"] {
 	case "libpod":
 		ci, err = getPodmanInfo(containerConfig, specDump, checkpointDirectory)
 	case "cri-o":
 		ci, err = getCRIOInfo(containerConfig, specDump)
 	default:
-		return errors.Errorf("Unknown container manager found: %s", specDump.Annotations["io.container.manager"])
+		if containerdStatus == nil {
+			return errors.Errorf("Unknown container manager found: %s", specDump.Annotations["io.container.manager"])
+		}
+		ci, err = getContainerdInfo(containerdStatus, specDump)
 	}
 
 	if err != nil {

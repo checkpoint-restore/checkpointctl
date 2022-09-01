@@ -58,6 +58,8 @@ const (
 	DeletedFilesFile           = "deleted.files"
 	DumpLogFile                = "dump.log"
 	RestoreLogFile             = "restore.log"
+	// containerd only
+	StatusFile = "status"
 	// pod archive
 	PodOptionsFile = "pod.options"
 	PodDumpFile    = "pod.dump"
@@ -103,6 +105,16 @@ type SandboxMetadta struct {
 	Name      string `json:"name"`
 	UID       string `json:"uid"`
 	Namespace string `json:"namespace"`
+}
+
+type ContainerdStatus struct {
+	CreatedAt  int64
+	StartedAt  int64
+	FinishedAt int64
+	ExitCode   int32
+	Pid        uint32
+	Reason     string
+	Message    string
 }
 
 func checkForFile(checkpointDirectory, file string) (bool, error) {
@@ -181,6 +193,13 @@ func ReadContainerCheckpointDeletedFiles(checkpointDirectory string) ([]string, 
 	deletedFilesFile, err := ReadJSONFile(&deletedFiles, checkpointDirectory, DeletedFilesFile)
 
 	return deletedFiles, deletedFilesFile, err
+}
+
+func ReadContainerCheckpointStatusFile(checkpointDirectory string) (*ContainerdStatus, string, error) {
+	var containerdStatus ContainerdStatus
+	statusFile, err := ReadJSONFile(&containerdStatus, checkpointDirectory, StatusFile)
+
+	return &containerdStatus, statusFile, err
 }
 
 func ReadKubeletCheckpoints(checkpointsDirectory string) (*CheckpointMetadata, string, error) {
