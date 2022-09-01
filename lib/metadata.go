@@ -108,7 +108,7 @@ type SandboxMetadta struct {
 func checkForFile(checkpointDirectory, file string) (bool, error) {
 	_, err := os.Stat(filepath.Join(checkpointDirectory, file))
 	if err != nil && !os.IsNotExist(err) {
-		return false, errors.Wrapf(err, "Failed to access %q\n", file)
+		return false, errors.Wrapf(err, "failed to access %q", file)
 	}
 	if os.IsNotExist(err) {
 		return false, nil

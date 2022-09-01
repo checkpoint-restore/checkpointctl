@@ -92,13 +92,13 @@ func show(cmd *cobra.Command, args []string) error {
 
 	tar, err := os.Stat(kubeletCheckpointsDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Target %s access error\n", kubeletCheckpointsDirectory)
+		return errors.Wrapf(err, "target %s access error", kubeletCheckpointsDirectory)
 	}
 
 	if tar.Mode().IsRegular() {
 		dir, err := ioutil.TempDir("", "kubelet-checkpoint")
 		if err != nil {
-			return errors.Wrapf(err, "Creating temporary directory failed\n")
+			return errors.Wrapf(err, "creating temporary directory failed")
 		}
 
 		defer func() {
@@ -108,7 +108,7 @@ func show(cmd *cobra.Command, args []string) error {
 		}()
 
 		if err := archive.UntarPath(kubeletCheckpointsDirectory, dir); err != nil {
-			return errors.Wrapf(err, "Unpacking of checkpoint archive %s failed\n", kubeletCheckpointsDirectory)
+			return errors.Wrapf(err, "unpacking of checkpoint archive %s failed", kubeletCheckpointsDirectory)
 		}
 		checkpointDirectory = dir
 	}
@@ -126,7 +126,7 @@ func show(cmd *cobra.Command, args []string) error {
 	case metadata.Pod:
 		return showPodCheckpoint(checkpointDirectory)
 	case metadata.Unknown:
-		return errors.Errorf("%q contains unknown archive type\n", kubeletCheckpointsDirectory)
+		return errors.Errorf("%q contains unknown archive type", kubeletCheckpointsDirectory)
 	}
 
 	return nil
@@ -135,7 +135,7 @@ func show(cmd *cobra.Command, args []string) error {
 func showKubeletCheckpoint(checkpointDirectory string) error {
 	checkpointMetadata, checkpointMetadataPath, err := metadata.ReadKubeletCheckpoints(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Reading %q failed\n", checkpointMetadataPath)
+		return errors.Wrapf(err, "reading %q failed", checkpointMetadataPath)
 	}
 
 	fmt.Printf("\nDisplaying kubelet checkpoint data from %s\n\n", checkpointMetadataPath)
@@ -194,7 +194,7 @@ func validateExtract(c *cobra.Command, args []string) error {
 		}
 		fmt.Println()
 
-		return errors.Errorf("Specifying an output file (-o|--output) is required\n")
+		return errors.Errorf("specifying an output file (-o|--output) is required")
 	}
 
 	return nil
@@ -241,11 +241,11 @@ func extract(cmd *cobra.Command, args []string) error {
 	case "zstd":
 		compression = archive.Zstd
 	default:
-		return errors.Errorf("Select compression algorithm (%q) not supported\n", compress)
+		return errors.Errorf("select compression algorithm (%q) not supported", compress)
 	}
 	checkpointMetadata, checkpointMetadataPath, err := metadata.ReadKubeletCheckpoints(kubeletCheckpointsDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Reading %q failed\n", checkpointMetadataPath)
+		return errors.Wrapf(err, "reading %q failed", checkpointMetadataPath)
 	}
 
 	fmt.Printf("\nExtracting checkpoint data from %s\n\n", checkpointMetadataPath)
@@ -257,7 +257,7 @@ func extract(cmd *cobra.Command, args []string) error {
 	for _, p := range checkpointMetadata.CheckpointedPods {
 		checkpointArchive := filepath.Join(kubeletCheckpointsDirectory, p.ID+".tar")
 		if _, err := os.Stat(checkpointArchive); err != nil {
-			return errors.Wrapf(err, "Cannot access %q failed\n", checkpointArchive)
+			return errors.Wrapf(err, "cannot access %q failed", checkpointArchive)
 		}
 
 		includeFiles = append(includeFiles, p.ID+".tar")
@@ -268,18 +268,18 @@ func extract(cmd *cobra.Command, args []string) error {
 		IncludeFiles: includeFiles,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "Cannot create tar archive %q failed\n", output)
+		return errors.Wrapf(err, "cannot create tar archive %q failed", output)
 	}
 
 	outFile, err := os.Create(output)
 	if err != nil {
-		return errors.Wrapf(err, "Cannot create tar archive %q failed\n", output)
+		return errors.Wrapf(err, "cannot create tar archive %q failed", output)
 	}
 	defer outFile.Close()
 
 	_, err = io.Copy(outFile, input)
 	if err != nil {
-		return errors.Wrapf(err, "Cannot create tar archive %q failed\n", output)
+		return errors.Wrapf(err, "cannot create tar archive %q failed", output)
 	}
 
 	return nil
@@ -311,7 +311,7 @@ func setupInsert() *cobra.Command {
 func insert(cmd *cobra.Command, args []string) error {
 	dir, err := ioutil.TempDir("", "kubelet-checkpoint")
 	if err != nil {
-		return errors.Wrapf(err, "Creating temporary directory failed\n")
+		return errors.Wrapf(err, "creating temporary directory failed")
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
@@ -328,19 +328,19 @@ func insert(cmd *cobra.Command, args []string) error {
 	// and moving it later to the kubeletCheckpointsDirectory.
 
 	if err := archive.UntarPath(input, dir); err != nil {
-		return errors.Wrapf(err, "Unpacking of checkpoint archive %s failed\n", input)
+		return errors.Wrapf(err, "unpacking of checkpoint archive %s failed", input)
 	}
 
 	insertData, _, err := metadata.ReadKubeletCheckpoints(dir)
 	if err != nil {
-		return errors.Wrapf(err, "%s not a kubelet checkpoint archive\n", input)
+		return errors.Wrapf(err, "%s not a kubelet checkpoint archive", input)
 	}
 
 	// Remove the pod checkpoints immediately
 	for _, p := range insertData.CheckpointedPods {
 		archive := filepath.Join(dir, p.ID+".tar")
 		if err := os.Remove(archive); err != nil {
-			return errors.Wrapf(err, "Unable to delete %q. This should not happen", archive)
+			return errors.Wrapf(err, "unable to delete %q. This should not happen", archive)
 		}
 	}
 
@@ -350,7 +350,7 @@ func insert(cmd *cobra.Command, args []string) error {
 		kubeletData = insertData
 	} else {
 		if err != nil {
-			return errors.Wrapf(err, "could not read kubelet checkpoints metadata at %s\n", kubeletCheckpointsDirectory)
+			return errors.Wrapf(err, "could not read kubelet checkpoints metadata at %s", kubeletCheckpointsDirectory)
 		}
 
 		kubeletData.CheckpointedPods = append(kubeletData.CheckpointedPods, insertData.CheckpointedPods...)
@@ -365,12 +365,12 @@ func insert(cmd *cobra.Command, args []string) error {
 	}
 	archiveFile, err := os.Open(input)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to open checkpointed pods archive %s for import", input)
+		return errors.Wrapf(err, "failed to open checkpointed pods archive %s for import", input)
 	}
 
 	err = archive.Untar(archiveFile, kubeletCheckpointsDirectory, options)
 	if err != nil {
-		return errors.Wrapf(err, "Unpacking of checkpointed pods archive %s failed", input)
+		return errors.Wrapf(err, "unpacking of checkpointed pods archive %s failed", input)
 	}
 
 	if err := metadata.WriteKubeletCheckpointsMetadata(kubeletData, kubeletCheckpointsDirectory); err != nil {

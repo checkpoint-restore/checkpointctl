@@ -37,8 +37,7 @@ function teardown() {
 @test "Run checkpointctl show with non existing directory" {
 	checkpointctl show -t /does-not-exist
 	[ "$status" -eq 1 ]
-	[[ ${lines[0]} = "Error: Target /does-not-exist access error" ]]
-	[[ ${lines[1]} = ": stat /does-not-exist: no such file or directory" ]]
+	[[ ${lines[0]} = "Error: target /does-not-exist access error: stat /does-not-exist: no such file or directory" ]]
 }
 
 @test "Run checkpointctl show" {
@@ -54,14 +53,14 @@ function teardown() {
 	cp test/test.json "$TEST_TMP_DIR1"/checkpointed.pods
 	checkpointctl extract -t "$TEST_TMP_DIR1"
 	[ "$status" -eq 1 ]
-	[[ ${lines[8]} = "Error: Specifying an output file (-o|--output) is required" ]]
+	[[ ${lines[8]} = "Error: specifying an output file (-o|--output) is required" ]]
 }
 
 @test "Run checkpointctl extract with missing tar archives" {
 	cp test/test.json "$TEST_TMP_DIR1"/checkpointed.pods
 	checkpointctl extract -t "$TEST_TMP_DIR1" -o "$TEST_TMP_DIR1"/output.tar.zstd
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} =~ "Cannot access" ]]
+	[[ ${lines[1]} =~ "cannot access" ]]
 }
 
 @test "Run checkpointctl extract and show" {
@@ -115,7 +114,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"config.dump: unexpected end of JSON input" ]]
+	[[ ${lines[0]} == *"config.dump: unexpected end of JSON input" ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and no spec.dump" {
@@ -123,7 +122,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"spec.dump: no such file or directory" ]]
+	[[ ${lines[0]} == *"spec.dump: no such file or directory" ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and empty spec.dump" {
@@ -132,7 +131,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"spec.dump: unexpected end of JSON input" ]]
+	[[ ${lines[0]} == *"spec.dump: unexpected end of JSON input" ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and no checkpoint directory" {
@@ -193,7 +192,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"pod.dump: unexpected end of JSON input" ]]
+	[[ ${lines[0]} == *"pod.dump: unexpected end of JSON input" ]]
 }
 
 @test "Run checkpointctl show with tar file with valid pod.dump and no pod.options" {
@@ -201,7 +200,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"pod.options: no such file or directory" ]]
+	[[ ${lines[0]} == *"pod.options: no such file or directory" ]]
 }
 
 @test "Run checkpointctl show with tar file with valid pod.dump and empty pod.options" {
@@ -210,7 +209,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"pod.options: unexpected end of JSON input" ]]
+	[[ ${lines[0]} == *"pod.options: unexpected end of JSON input" ]]
 }
 
 @test "Run checkpointctl show with tar file with valid pod.dump and valid pod.options" {
@@ -228,7 +227,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show -t "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
-	[[ ${lines[1]} == *"checkpoint: no such file or directory" ]]
+	[[ ${lines[1]} == *"checkpoint: no such file or directory"* ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and checkpoint directory" {
