@@ -12,7 +12,7 @@ import (
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v5/stats"
+	"github.com/checkpoint-restore/go-criu/v6/crit"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
@@ -172,7 +172,8 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	}
 	defer cpDir.Close()
 
-	dumpStatistics, err := stats.CriuGetDumpStats(cpDir)
+	// Get dump statistics with crit
+	dumpStatistics, err := crit.GetDumpStats(cpDir.Name())
 	if err != nil {
 		return errors.Wrap(err, "Displaying checkpointing statistics not possible")
 	}
