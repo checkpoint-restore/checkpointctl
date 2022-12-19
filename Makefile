@@ -23,7 +23,7 @@ $(NAME).coverage: $(GO_SRC)
 
 clean:
 	rm -f $(NAME) $(NAME).coverage $(COVERAGE_PATH)/*
-	rmdir $(COVERAGE_PATH)
+	if [ -d $(COVERAGE_PATH) ]; then rmdir $(COVERAGE_PATH); fi
 
 golang-lint:
 	golangci-lint run
@@ -46,9 +46,9 @@ codecov:
 	./codecov -f '.coverage/*'
 
 vendor:
-	GO111MODULE=on go mod tidy
-	GO111MODULE=on go mod vendor
-	GO111MODULE=on go mod verify
+	go mod tidy
+	go mod vendor
+	go mod verify
 
 help:
 	@echo "Usage: make <target>"
