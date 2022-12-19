@@ -5,23 +5,13 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )
-
-type CheckpointedContainer struct {
-	Name                      string `json:"io.kubernetes.container.name,omitempty"`
-	ID                        string `json:"id,omitempty"`
-	TerminationMessagePath    string `json:"io.kubernetes.container.terminationMessagePath,omitempty"`
-	TerminationMessagePolicy  string `json:"io.kubernetes.container.terminationMessagePolicy,omitempty"`
-	RestartCounter            int32  `json:"io.kubernetes.container.restartCount,omitempty"`
-	TerminationMessagePathUID string `json:"terminationMessagePathUID,omitempty"`
-	Image                     string `json:"Image"`
-}
 
 const (
 	// container archive
@@ -43,29 +33,14 @@ const (
 type ContainerConfig struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
+	RootfsImage     string    `json:"rootfsImage,omitempty"`
+	RootfsImageRef  string    `json:"rootfsImageRef,omitempty"`
 	RootfsImageName string    `json:"rootfsImageName,omitempty"`
 	OCIRuntime      string    `json:"runtime,omitempty"`
 	CreatedTime     time.Time `json:"createdTime"`
-}
-
-// This is metadata stored inside of a Pod checkpoint archive
-type CheckpointedPodOptions struct {
-	Version      int      `json:"version"`
-	Containers   []string `json:"containers,omitempty"`
-	MountLabel   string   `json:"mountLabel"`
-	ProcessLabel string   `json:"processLabel"`
-}
-
-// This is metadata stored inside of Pod checkpoint archive
-type PodSandboxConfig struct {
-	Metadata SandboxMetadta `json:"metadata"`
-	Hostname string         `json:"hostname"`
-}
-
-type SandboxMetadta struct {
-	Name      string `json:"name"`
-	UID       string `json:"uid"`
-	Namespace string `json:"namespace"`
+	CheckpointedAt  time.Time `json:"checkpointedTime"`
+	RestoredAt      time.Time `json:"restoredTime"`
+	Restored        bool      `json:"restored"`
 }
 
 type ContainerdStatus struct {
@@ -113,7 +88,7 @@ func WriteJSONFile(v interface{}, dir, file string) (string, error) {
 		return "", errors.Wrapf(err, "Error marshalling JSON")
 	}
 	file = filepath.Join(dir, file)
-	if err := ioutil.WriteFile(file, fileJSON, 0o600); err != nil {
+	if err := os.WriteFile(file, fileJSON, 0o600); err != nil {
 		return "", errors.Wrapf(err, "Error writing to %q", file)
 	}
 
@@ -122,7 +97,7 @@ func WriteJSONFile(v interface{}, dir, file string) (string, error) {
 
 func ReadJSONFile(v interface{}, dir, file string) (string, error) {
 	file = filepath.Join(dir, file)
-	content, err := ioutil.ReadFile(file)
+	content, err := os.ReadFile(file)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to read %s", file)
 	}
