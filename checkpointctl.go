@@ -55,18 +55,18 @@ func show(cmd *cobra.Command, args []string) error {
 	input := args[0]
 	tar, err := os.Stat(input)
 	if err != nil {
-		return errors.Wrapf(err, "input %s access error", input)
+		return err
 	}
 	if !tar.Mode().IsRegular() {
 		return errors.Wrapf(err, "input %s not a regular file", input)
 	}
 	dir, err := os.MkdirTemp("", "checkpointctl")
 	if err != nil {
-		return errors.Wrapf(err, "creating temporary directory failed")
+		return err
 	}
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
-			fmt.Fprintf(os.Stderr, "Could not recursively remove %s: %q", dir, err)
+			fmt.Fprintln(os.Stderr, err)
 		}
 	}()
 

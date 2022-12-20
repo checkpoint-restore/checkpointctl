@@ -92,7 +92,7 @@ func WriteJSONFile(v interface{}, dir, file string) (string, error) {
 	}
 	file = filepath.Join(dir, file)
 	if err := os.WriteFile(file, fileJSON, 0o600); err != nil {
-		return "", errors.Wrapf(err, "Error writing to %q", file)
+		return "", err
 	}
 
 	return file, nil
@@ -102,7 +102,7 @@ func ReadJSONFile(v interface{}, dir, file string) (string, error) {
 	file = filepath.Join(dir, file)
 	content, err := os.ReadFile(file)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read %s", file)
+		return "", err
 	}
 	if err = json.Unmarshal(content, v); err != nil {
 		return "", errors.Wrapf(err, "failed to unmarshal %s", file)

@@ -79,13 +79,13 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		row []string
 		ci  *containerInfo
 	)
-	containerConfig, configDumpFile, err := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
+	containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "reading %q failed", configDumpFile)
+		return err
 	}
-	specDump, specDumpFile, err := metadata.ReadContainerCheckpointSpecDump(checkpointDirectory)
+	specDump, _, err := metadata.ReadContainerCheckpointSpecDump(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "reading %q failed", specDumpFile)
+		return err
 	}
 
 	switch specDump.Annotations["io.container.manager"] {
@@ -167,7 +167,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 
 	cpDir, err := os.Open(checkpointDirectory)
 	if err != nil {
-		return errors.Wrapf(err, "Not able to open %q", checkpointDirectory)
+		return err
 	}
 	defer cpDir.Close()
 
