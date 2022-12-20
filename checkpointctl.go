@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/containers/storage/pkg/archive"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +57,7 @@ func show(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !tar.Mode().IsRegular() {
-		return errors.Wrapf(err, "input %s not a regular file", input)
+		return fmt.Errorf("input %s not a regular file", input)
 	}
 	dir, err := os.MkdirTemp("", "checkpointctl")
 	if err != nil {
@@ -71,7 +70,7 @@ func show(cmd *cobra.Command, args []string) error {
 	}()
 
 	if err := archive.UntarPath(input, dir); err != nil {
-		return errors.Wrapf(err, "unpacking of checkpoint archive %s failed", input)
+		return fmt.Errorf("unpacking of checkpoint archive %s failed: %w", input, err)
 	}
 
 	return showContainerCheckpoint(dir)

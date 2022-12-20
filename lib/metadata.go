@@ -10,7 +10,6 @@ import (
 	"time"
 
 	spec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -88,7 +87,7 @@ func ReadContainerCheckpointStatusFile(checkpointDirectory string) (*ContainerdS
 func WriteJSONFile(v interface{}, dir, file string) (string, error) {
 	fileJSON, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return "", errors.Wrapf(err, "Error marshalling JSON")
+		return "", fmt.Errorf("error marshalling JSON: %w", err)
 	}
 	file = filepath.Join(dir, file)
 	if err := os.WriteFile(file, fileJSON, 0o600); err != nil {
@@ -105,7 +104,7 @@ func ReadJSONFile(v interface{}, dir, file string) (string, error) {
 		return "", err
 	}
 	if err = json.Unmarshal(content, v); err != nil {
-		return "", errors.Wrapf(err, "failed to unmarshal %s", file)
+		return "", fmt.Errorf("failed to unmarshal %s: %w", file, err)
 	}
 
 	return file, nil

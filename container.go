@@ -15,7 +15,6 @@ import (
 	"github.com/checkpoint-restore/go-criu/v6/crit"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 type containerMetadata struct {
@@ -64,7 +63,7 @@ func getCRIOInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec)
 
 	cm := containerMetadata{}
 	if err := json.Unmarshal([]byte(specDump.Annotations["io.kubernetes.cri-o.Metadata"]), &cm); err != nil {
-		return ci, errors.Wrapf(err, "Failed to read io.kubernetes.cri-o.Metadata")
+		return ci, fmt.Errorf("failed to read io.kubernetes.cri-o.Metadata: %w", err)
 	}
 
 	ci.Name = cm.Name
@@ -96,13 +95,13 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	default:
 		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
 		if containerdStatus == nil {
-			return errors.Errorf("Unknown container manager found: %s", specDump.Annotations["io.container.manager"])
+			return fmt.Errorf("unknown container manager found: %s", specDump.Annotations["io.container.manager"])
 		}
 		ci, err = getContainerdInfo(containerdStatus, specDump)
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "Getting container checkpoint information failed")
+		return fmt.Errorf("getting container checkpoint information failed: %w", err)
 	}
 
 	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", checkpointDirectory)
@@ -174,7 +173,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	// Get dump statistics with crit
 	dumpStatistics, err := crit.GetDumpStats(cpDir.Name())
 	if err != nil {
-		return errors.Wrap(err, "Displaying checkpointing statistics not possible")
+		return fmt.Errorf("unable to display checkpointing statistics: %w", err)
 	}
 
 	table = tablewriter.NewWriter(os.Stdout)
