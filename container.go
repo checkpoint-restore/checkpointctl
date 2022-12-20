@@ -88,14 +88,13 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		return errors.Wrapf(err, "reading %q failed", specDumpFile)
 	}
 
-	containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
-
 	switch specDump.Annotations["io.container.manager"] {
 	case "libpod":
 		ci, err = getPodmanInfo(containerConfig, specDump, checkpointDirectory)
 	case "cri-o":
 		ci, err = getCRIOInfo(containerConfig, specDump)
 	default:
+		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
 		if containerdStatus == nil {
 			return errors.Errorf("Unknown container manager found: %s", specDump.Annotations["io.container.manager"])
 		}
