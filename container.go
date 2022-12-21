@@ -87,7 +87,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		return err
 	}
 
-	switch specDump.Annotations["io.container.manager"] {
+	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
 		ci, err = getPodmanInfo(containerConfig, specDump, checkpointDirectory)
 	case "cri-o":
@@ -95,7 +95,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	default:
 		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
 		if containerdStatus == nil {
-			return fmt.Errorf("unknown container manager found: %s", specDump.Annotations["io.container.manager"])
+			return fmt.Errorf("unknown container manager found: %s", m)
 		}
 		ci, err = getContainerdInfo(containerdStatus, specDump)
 	}
