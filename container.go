@@ -30,47 +30,34 @@ type containerInfo struct {
 	Engine  string
 }
 
-func getPodmanInfo(
-	containerConfig *metadata.ContainerConfig,
-	specDump *spec.Spec, checkpointDirectory string,
-) (*containerInfo, error) {
-	ci := &containerInfo{}
-
-	ci.Name = containerConfig.Name
-	ci.Created = containerConfig.CreatedTime.Format(time.RFC3339)
-	ci.Engine = "Podman"
-
-	return ci, nil
+func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *containerInfo {
+	return &containerInfo{
+		Name:    containerConfig.Name,
+		Created: containerConfig.CreatedTime.Format(time.RFC3339),
+		Engine:  "Podman",
+	}
 }
 
-func getContainerdInfo(
-	containerdStatus *metadata.ContainerdStatus,
-	specDump *spec.Spec,
-) (*containerInfo, error) {
-	ci := &containerInfo{}
-
-	ci.Name = specDump.Annotations["io.kubernetes.cri.container-name"]
-	ci.Created = time.Unix(0, containerdStatus.CreatedAt).Format(time.RFC3339)
-	ci.Engine = "containerd"
-
-	return ci, nil
+func getContainerdInfo(containerdStatus *metadata.ContainerdStatus, specDump *spec.Spec) *containerInfo {
+	return &containerInfo{
+		Name:    specDump.Annotations["io.kubernetes.cri.container-name"],
+		Created: time.Unix(0, containerdStatus.CreatedAt).Format(time.RFC3339),
+		Engine:  "containerd",
+	}
 }
 
-func getCRIOInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) (*containerInfo, error) {
-	ci := &containerInfo{}
-
-	ci.IP = specDump.Annotations["io.kubernetes.cri-o.IP.0"]
-
+func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerInfo, error) {
 	cm := containerMetadata{}
 	if err := json.Unmarshal([]byte(specDump.Annotations["io.kubernetes.cri-o.Metadata"]), &cm); err != nil {
-		return ci, fmt.Errorf("failed to read io.kubernetes.cri-o.Metadata: %w", err)
+		return nil, fmt.Errorf("failed to read io.kubernetes.cri-o.Metadata: %w", err)
 	}
 
-	ci.Name = cm.Name
-	ci.Created = specDump.Annotations["io.kubernetes.cri-o.Created"]
-	ci.Engine = "CRI-O"
-
-	return ci, nil
+	return &containerInfo{
+		IP:      specDump.Annotations["io.kubernetes.cri-o.IP.0"],
+		Name:    cm.Name,
+		Created: specDump.Annotations["io.kubernetes.cri-o.Created"],
+		Engine:  "CRI-O",
+	}, nil
 }
 
 func showContainerCheckpoint(checkpointDirectory string) error {
@@ -89,7 +76,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 
 	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
-		ci, err = getPodmanInfo(containerConfig, specDump, checkpointDirectory)
+		ci = getPodmanInfo(containerConfig, specDump)
 	case "cri-o":
 		ci, err = getCRIOInfo(containerConfig, specDump)
 	default:
@@ -97,7 +84,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		if containerdStatus == nil {
 			return fmt.Errorf("unknown container manager found: %s", m)
 		}
-		ci, err = getContainerdInfo(containerdStatus, specDump)
+		ci = getContainerdInfo(containerdStatus, specDump)
 	}
 
 	if err != nil {
