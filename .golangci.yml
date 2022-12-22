@@ -3,19 +3,8 @@ run:
   concurrency: 6
   deadline: 5m
 linters:
-  enable-all: true
-  disable:
-    - gochecknoglobals
-    - godot
-    - forbidigo
-    - wrapcheck
-    - exhaustivestruct
+  enable:
+    - errorlint
+    - unconvert
+    - gofumpt
     - unparam
-    - funlen
-    - wsl
-    - gomnd
-    - tagliatelle
-    - cyclop
-    - exhaustruct
-    - varnamelen
-    - nonamedreturns

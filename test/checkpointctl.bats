@@ -37,7 +37,7 @@ function teardown() {
 @test "Run checkpointctl show with non existing directory" {
 	checkpointctl show /does-not-exist
 	[ "$status" -eq 1 ]
-	[[ ${lines[0]} = "Error: input /does-not-exist access error: stat /does-not-exist: no such file or directory" ]]
+	[[ ${lines[0]} = "Error: stat /does-not-exist: no such file or directory" ]]
 }
 
 @test "Run checkpointctl show with empty tar file" {
@@ -109,7 +109,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --print-stats
 	[ "$status" -eq 1 ]
-	[[ ${lines[6]} == *"Displaying checkpointing statistics"* ]]
+	[[ ${lines[6]} == *"unable to display checkpointing statistics"* ]]
 }
 
 @test "Run checkpointctl show with tar file and --print-stats and invalid stats-dump" {
