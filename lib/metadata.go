@@ -55,6 +55,22 @@ type ContainerdStatus struct {
 	Message    string
 }
 
+// This structure is used by the KubernetesContainerCheckpointMetadata structure
+type KubernetesCheckpoint struct {
+	Archive   string `json:"archive,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Timestamp int64  `json:"timestamp,omitempty"`
+}
+
+// This structure is the basis for Kubernetes to track how many checkpoints
+// for a certain container have been created.
+type KubernetesContainerCheckpointMetadata struct {
+	PodFullName   string                 `json:"podFullName,omitempty"`
+	ContainerName string                 `json:"containerName,omitempty"`
+	TotalSize     int64                  `json:"totalSize,omitempty"`
+	Checkpoints   []KubernetesCheckpoint `json:"checkpoints"`
+}
+
 func ReadContainerCheckpointSpecDump(checkpointDirectory string) (*spec.Spec, string, error) {
 	var specDump spec.Spec
 	specDumpFile, err := ReadJSONFile(&specDump, checkpointDirectory, SpecDumpFile)
