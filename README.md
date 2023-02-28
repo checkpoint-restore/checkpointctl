@@ -1,60 +1,64 @@
-[![main](https://github.com/checkpoint-restore/checkpointctl/workflows/Run%20Tests/badge.svg?branch=main)](https://github.com/checkpoint-restore/checkpointctl/actions)
+<!-- markdownlint-disable MD013 -->
+# checkpointctl -- Show information about checkpoint archives
 
-## checkpointctl -- Work with Kubernetes checkpoints
+[![Run Tests](https://github.com/checkpoint-restore/checkpointctl/actions/workflows/tests.yml/badge.svg)](https://github.com/checkpoint-restore/checkpointctl/actions/workflows/tests.yml)
 
-The Kubernetes kubelet creates checkpoints which consists of metadata (`checkpointed.pods`)
-and tar archives containing the actual pod checkpoints.
+Container engines like *Podman* and *CRI-O* have the ability to checkpoint a
+container.  All data related to a checkpoint is collected in a checkpoint
+archive. With the help of this tool, `checkpointctl`, it is possible to display
+information about these checkpoint archives.
 
-With the help of this tool, `checkpointctl`, it is possible to display, extract or insert
-checkpoints.
+Details on how to create checkpoints with the help of [CRIU][criu] can be found at:
 
-To display the checkpoints which are currently in the kubelet's default checkpoint directory
-just use `checkpointctl show`:
+* [Forensic container checkpointing in Kubernetes][forensic]
+* [Podman checkpoint][podman]
 
-```console
-$ checkpointctl show
-
-Displaying data from /var/lib/kubelet/checkpoints/checkpointed.pods
-
-+-----------+-----------+-----------+-----------------------------------+---------------+
-|    POD    | NAMESPACE | CONTAINER |               IMAGE               | ARCHIVE FOUND |
-+-----------+-----------+-----------+-----------------------------------+---------------+
-| my-redis  | default   | redis     | redis                             | true          |
-+-----------+           +-----------+-----------------------------------+               +
-| counters  |           | counter   | quay.io/adrianreber/counter       |               |
-+           +           +-----------+-----------------------------------+               +
-|           |           | wildfly   | quay.io/adrianreber/wildfly-hello |               |
-+-----------+-----------+-----------+-----------------------------------+---------------+
-```
-
-To extract all checkpoints from the kubelet use:
+To display information about a checkpoint archive you can just use
+`checkpointctl show`:
 
 ```console
-$ checkpointctl extract -o /tmp/checkpoints.tar
+$ checkpointctl show /tmp/dump.tar
 
-Extracting checkpoint data from /var/lib/kubelet/checkpoints/checkpointed.pods
++-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+|    CONTAINER    |                  IMAGE                   |      ID      | RUNTIME |       CREATED        | ENGINE | CHKPT SIZE | ROOT FS DIFF SIZE |
++-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+| magical_murdock | quay.io/adrianreber/wildfly-hello:latest | f11d11844af0 | crun    | 2023-02-28T09:43:52Z | Podman | 338.2 MiB  | 177.0 KiB         |
++-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
 ```
 
-Resulting in a tar archive at `/tmp/checkpoints.tar` which can then be used to insert
-this checkpoint archive into another kubelet:
+For a checkpoint archive created by Kubernetes with *CRI-O* the output would
+look like this:
 
 ```console
-$ checkpointctl insert -i /tmp/checkpoints.tar
+$ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-counter-2023-02-13T16\:20\:09Z.tar
+
++-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
+| CONTAINER |               IMAGE                |      ID      | RUNTIME |            CREATED             | ENGINE |     IP     | CHKPT SIZE |
++-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
+| counter   | quay.io/adrianreber/counter:latest | 7eb9680287f1 | runc    | 2023-02-13T16:12:25.843774934Z | CRI-O  | 10.88.0.24 | 8.5 MiB    |
++-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
 ```
 
-Inserting a checkpoint archive will add the new checkpoints to existing checkpoints.
-
-All operations default to `/var/lib/kubelet/checkpoints` which can be changed using
-the `--target` parameter.
-
-The command `checkpointctl show` can also be used on an exported tar archive to see
-which checkpoints are part of an exported tar archive:
+It is also possible to display additional checkpoint related information
+with the parameter `--print-stats`:
 
 ```console
-$ checkpointctl show --target /tmp/checkpoints.tar
+$ checkpointctl show /tmp/dump.tar --print-stats
+
++-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+|    CONTAINER    |                  IMAGE                   |      ID      | RUNTIME |       CREATED        | ENGINE | CHKPT SIZE | ROOT FS DIFF SIZE |
++-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+| magical_murdock | quay.io/adrianreber/wildfly-hello:latest | f11d11844af0 | crun    | 2023-02-28T09:43:52Z | Podman | 338.2 MiB  | 177.0 KiB         |
++-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+CRIU dump statistics
++---------------+-------------+--------------+---------------+---------------+---------------+
+| FREEZING TIME | FROZEN TIME | MEMDUMP TIME | MEMWRITE TIME | PAGES SCANNED | PAGES WRITTEN |
++---------------+-------------+--------------+---------------+---------------+---------------+
+| 104450 us     | 442148 us   | 212281 us    | 148292 us     |        495649 |         86510 |
++---------------+-------------+--------------+---------------+---------------+---------------+
 ```
 
-### How to contribute
+## How to contribute
 
 While bug fixes can first be identified via an "issue", that is not required.
 It's ok to just open up a PR with the fix, but make sure you include the same
@@ -87,7 +91,7 @@ by adding a "Signed-off-by" line containing the contributor's name and e-mail
 to every commit message. Your signature certifies that you wrote the patch or
 otherwise have the right to pass it on as an open-source patch.
 
-### License and copyright
+## License and copyright
 
 Unless mentioned otherwise in a specific file's header, all code in
 this project is released under the Apache 2.0 license.
@@ -95,3 +99,7 @@ this project is released under the Apache 2.0 license.
 The author of a change remains the copyright holder of their code
 (no copyright assignment). The list of authors and contributors can be
 retrieved from the git commit history and in some cases, the file headers.
+
+[forensic]: https://kubernetes.io/blog/2022/12/05/forensic-container-checkpointing-alpha/
+[podman]: https://podman.io/getting-started/checkpoint
+[criu]: https://criu.org/
