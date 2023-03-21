@@ -5,12 +5,19 @@ GOBIN := $(shell $(GO) env GOBIN)
 GO_SRC = $(shell find . -name \*.go)
 GO_BUILD = $(GO) build
 NAME = checkpointctl
+
+VERSION_MAJOR := 0
+VERSION_MINOR := 1
+VERSION_SUBLEVEL := 0
+VERSION_EXTRA :=
+VERSION := $(VERSION_MAJOR)$(if $(VERSION_MINOR),.$(VERSION_MINOR))$(if $(VERSION_SUBLEVEL),.$(VERSION_SUBLEVEL))$(if $(VERSION_EXTRA),.$(VERSION_EXTRA))
+
 COVERAGE_PATH ?= $(shell pwd)/.coverage
 
 all: $(NAME)
 
 $(NAME): $(GO_SRC)
-	$(GO_BUILD) -buildmode=pie -o $@ -ldflags "-X main.name=$(NAME)"
+	$(GO_BUILD) -buildmode=pie -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 $(NAME).coverage: $(GO_SRC)
 	$(GO) test \
@@ -19,7 +26,7 @@ $(NAME).coverage: $(GO_SRC)
 		-mod=vendor \
 		-tags coverage \
 		-buildmode=pie -c -o $@ \
-		-ldflags "-X main.name=$(NAME)"
+		-ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 clean:
 	rm -f $(NAME) $(NAME).coverage $(COVERAGE_PATH)/*

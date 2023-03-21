@@ -12,6 +12,7 @@ import (
 
 var (
 	name       string
+	version    string
 	printStats bool
 )
 
@@ -26,6 +27,7 @@ func main() {
 
 	showCommand := setupShow()
 	rootCommand.AddCommand(showCommand)
+	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {
 		os.Exit(1)
