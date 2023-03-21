@@ -58,6 +58,63 @@ CRIU dump statistics
 +---------------+-------------+--------------+---------------+---------------+---------------+
 ```
 
+## Installing from source code
+
+1. Clone the repository.
+
+    ```console
+    git clone https://github.com/checkpoint-restore/checkpointctl.git
+    ```
+
+2. Install dependencies.
+
+    On Fedora, CentOS and related distributions:
+
+    ```console
+    sudo yum install -y go make
+    ```
+
+    On Debian, Ubuntu, and related distributions:
+
+    ```console
+    sudo apt-get install -y golang make
+    ```
+
+3. Build.
+
+    ```console
+    make
+    ```
+
+4. Once checkpointctl has been compiled, it can be installed on a system by simply typing
+
+    ```console
+    sudo make install
+    ```
+
+    This command accepts the following variables:
+
+     * **DESTDIR**, to specify global root where all components will be placed under (empty by default);
+     * **PREFIX**, to specify additional prefix for path of every component installed (`/usr/local` by default);
+     * **BINDIR**, to specify where to install the checkpointctl tool (`$(PREFIX)/bin` by default);
+
+    Thus, to install everything under `/some/new/place`, use the following command:
+
+    ```console
+    make DESTDIR=/some/new/place install
+    ```
+
+## Uninstalling
+
+The following command can be used to clean up a previously installed checkpointctl instance.
+
+```console
+make uninstall
+```
+
+Note that if some variable (e.g., **DESTDIR**, **BINDIR**) has been used during installation,
+the same *must* be passed with uninstall action.
+
 ## How to contribute
 
 While bug fixes can first be identified via an "issue", that is not required.
