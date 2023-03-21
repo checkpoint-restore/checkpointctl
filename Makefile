@@ -1,4 +1,6 @@
 SHELL = /bin/bash
+PREFIX ?= $(DESTDIR)/usr/local
+BINDIR ?= $(PREFIX)/bin
 GO ?= go
 GOPATH := $(shell $(GO) env GOPATH)
 GOBIN := $(shell $(GO) env GOBIN)
@@ -20,6 +22,16 @@ $(NAME).coverage: $(GO_SRC)
 		-tags coverage \
 		-buildmode=pie -c -o $@ \
 		-ldflags "-X main.name=$(NAME)"
+
+
+install: $(NAME)
+	@echo "  INSTALL " $<
+	@mkdir -p $(DESTDIR)$(BINDIR)
+	@install -m0755 $< $(DESTDIR)$(BINDIR)
+
+uninstall:
+	@echo " UNINSTALL" $(NAME)
+	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME))
 
 clean:
 	rm -f $(NAME) $(NAME).coverage $(COVERAGE_PATH)/*
@@ -60,4 +72,4 @@ help:
 	@echo " * test - run tests"
 	@echo " * help - show help"
 
-.PHONY: clean lint golang-lint shellcheck vendor test help
+.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help
