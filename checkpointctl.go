@@ -14,6 +14,7 @@ var (
 	name       string
 	version    string
 	printStats bool
+	showMounts bool
 )
 
 func main() {
@@ -47,6 +48,12 @@ func setupShow() *cobra.Command {
 		"print-stats",
 		false,
 		"Print checkpointing statistics if available",
+	)
+	flags.BoolVar(
+		&showMounts,
+		"mounts",
+		false,
+		"Print overview about mounts used in the checkpoints",
 	)
 
 	return cmd
