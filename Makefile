@@ -16,18 +16,33 @@ VERSION := $(VERSION_MAJOR)$(if $(VERSION_MINOR),.$(VERSION_MINOR))$(if $(VERSIO
 
 COVERAGE_PATH ?= $(shell pwd)/.coverage
 
+GO_MAJOR_VER = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f1)
+GO_MINOR_VER = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f2)
+MIN_GO_MAJOR_VER = 1
+MIN_GO_MINOR_VER = 20
+GO_VALIDATION_ERR = Go version is not supported. Please update to at least $(MIN_GO_MAJOR_VER).$(MIN_GO_MINOR_VER)
+
 all: $(NAME)
+
+check-go-version:
+	@if [ $(GO_MAJOR_VER) -gt $(MIN_GO_MAJOR_VER) ]; then \
+		exit 0 ;\
+	elif [ $(GO_MAJOR_VER) -lt $(MIN_GO_MAJOR_VER) ]; then \
+		echo '$(GO_VALIDATION_ERR)';\
+		exit 1; \
+	elif [ $(GO_MINOR_VER) -lt $(MIN_GO_MINOR_VER) ] ; then \
+		echo '$(GO_VALIDATION_ERR)';\
+		exit 1; \
+	fi
+
 
 $(NAME): $(GO_SRC)
 	$(GO_BUILD) -buildmode=pie -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
-$(NAME).coverage: $(GO_SRC)
-	$(GO) test \
-		-covermode=count \
-		-coverpkg=./... \
-		-mod=vendor \
-		-tags coverage \
-		-buildmode=pie -c -o $@ \
+$(NAME).coverage: check-go-version $(GO_SRC)
+	$(GO) build \
+		-cover \
+		-buildmode=pie -o $@ \
 		-ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 
@@ -55,14 +70,17 @@ lint: golang-lint shellcheck
 test: $(NAME)
 	bats test/*bats
 
-coverage: $(NAME).coverage
+coverage: check-go-version $(NAME).coverage
 	mkdir -p $(COVERAGE_PATH)
 	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 bats test/*bats
+	# Print coverage from this run
+	$(GO) tool covdata percent -i=${COVERAGE_PATH}
+	$(GO) tool covdata textfmt -i=${COVERAGE_PATH} -o ${COVERAGE_PATH}/coverage.out
 
 codecov:
 	curl -Os https://uploader.codecov.io/latest/linux/codecov
 	chmod +x codecov
-	./codecov -f '.coverage/*'
+	./codecov -f "$(COVERAGE_PATH)"/coverage.out
 
 vendor:
 	go mod tidy
@@ -79,4 +97,4 @@ help:
 	@echo " * test - run tests"
 	@echo " * help - show help"
 
-.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help
+.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help check-go-version

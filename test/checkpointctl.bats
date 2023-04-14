@@ -1,6 +1,6 @@
 if [ -n "$COVERAGE" ]; then
+	export GOCOVERDIR="${COVERAGE_PATH}"
 	CHECKPOINTCTL="./checkpointctl.coverage"
-	ARGS="-test.coverprofile=coverprofile.integration.$RANDOM -test.outputdir=${COVERAGE_PATH} COVERAGE"
 else
 	CHECKPOINTCTL="./checkpointctl"
 fi
@@ -9,7 +9,7 @@ TEST_TMP_DIR2=""
 
 function checkpointctl() {
 	# shellcheck disable=SC2086
-	run $CHECKPOINTCTL $ARGS "$@"
+	run $CHECKPOINTCTL "$@"
 	echo "$output"
 }
 

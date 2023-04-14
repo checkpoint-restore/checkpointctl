@@ -1,1 +1,3 @@
 checkpointctl
+checkpointctl.coverage
+.coverage
