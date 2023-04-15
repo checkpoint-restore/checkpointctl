@@ -136,6 +136,41 @@ function teardown() {
 	[[ ${lines[10]} == *"446571 us"* ]]
 }
 
+@test "Run checkpointctl show with tar file and --mounts and valid spec.dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --mounts
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Overview of Mounts"* ]]
+	[[ ${lines[8]} == *"DESTINATION"* ]]
+	[[ ${lines[10]} == *"/proc"* ]]
+}
+
+@test "Run checkpointctl show with tar file and --mounts and --full-paths and valid spec.dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --mounts --full-paths
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Overview of Mounts"* ]]
+	[[ ${lines[8]} == *"DESTINATION"* ]]
+	[[ ${lines[10]} == *"/proc"* ]]
+}
+
+
+@test "Run checkpointctl show with tar file and missing --mounts and --full-paths" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --full-paths
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"Error: Cannot use --full-paths without --mounts option"* ]]
+}
+
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and no checkpoint directory" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump

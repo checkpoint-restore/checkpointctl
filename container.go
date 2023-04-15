@@ -160,7 +160,12 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 			table.Append([]string{
 				data.Destination,
 				data.Type,
-				shortenPath(data.Source),
+				func() string {
+					if fullPaths {
+						return data.Source
+					}
+					return shortenPath(data.Source)
+				}(),
 			})
 		}
 		fmt.Println("\nOverview of Mounts")
