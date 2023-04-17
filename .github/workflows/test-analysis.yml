@@ -2,7 +2,7 @@ name: Analyze Test Results
 
 on:
   workflow_run:
-    workflows: [Validate]
+    workflows: ["Run Tests"]
     types:
       - completed
 permissions: {}
