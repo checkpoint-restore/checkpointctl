@@ -56,7 +56,7 @@ uninstall:
 	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME))
 
 clean:
-	rm -f $(NAME) $(NAME).coverage $(COVERAGE_PATH)/*
+	rm -f $(NAME) junit.xml $(NAME).coverage $(COVERAGE_PATH)/*
 	if [ -d $(COVERAGE_PATH) ]; then rmdir $(COVERAGE_PATH); fi
 
 golang-lint:
@@ -69,6 +69,9 @@ lint: golang-lint shellcheck
 
 test: $(NAME)
 	bats test/*bats
+
+test-junit: $(NAME)
+	bats -F junit test/*bats > junit.xml
 
 coverage: check-go-version $(NAME).coverage
 	mkdir -p $(COVERAGE_PATH)
@@ -95,6 +98,7 @@ help:
 	@echo " * shellcheck - run shellecheck"
 	@echo " * vendor - update go.mod, go.sum and vendor directory"
 	@echo " * test - run tests"
+	@echo " * test-junit - run tests and create junit output"
 	@echo " * help - show help"
 
-.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help check-go-version
+.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help check-go-version test-junit
