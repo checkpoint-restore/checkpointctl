@@ -14,6 +14,8 @@ var (
 	name       string
 	version    string
 	printStats bool
+	showMounts bool
+	fullPaths  bool
 )
 
 func main() {
@@ -48,11 +50,27 @@ func setupShow() *cobra.Command {
 		false,
 		"Print checkpointing statistics if available",
 	)
+	flags.BoolVar(
+		&showMounts,
+		"mounts",
+		false,
+		"Print overview about mounts used in the checkpoints",
+	)
+	flags.BoolVar(
+		&fullPaths,
+		"full-paths",
+		false,
+		"Display mounts with full paths",
+	)
 
 	return cmd
 }
 
 func show(cmd *cobra.Command, args []string) error {
+	if fullPaths && !showMounts {
+		return fmt.Errorf("Cannot use --full-paths without --mounts option")
+	}
+
 	input := args[0]
 	tar, err := os.Stat(input)
 	if err != nil {
@@ -74,6 +92,5 @@ func show(cmd *cobra.Command, args []string) error {
 	if err := archive.UntarPath(input, dir); err != nil {
 		return fmt.Errorf("unpacking of checkpoint archive %s failed: %w", input, err)
 	}
-
 	return showContainerCheckpoint(dir)
 }

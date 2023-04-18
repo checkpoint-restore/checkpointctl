@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -147,41 +148,63 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 	table.Append(row)
 	table.Render()
 
-	if !printStats {
-		return nil
+	if showMounts {
+		table = tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{
+			"Destination",
+			"Type",
+			"Source",
+		})
+		// Get overview of mounts from spec.dump
+		for _, data := range specDump.Mounts {
+			table.Append([]string{
+				data.Destination,
+				data.Type,
+				func() string {
+					if fullPaths {
+						return data.Source
+					}
+					return shortenPath(data.Source)
+				}(),
+			})
+		}
+		fmt.Println("\nOverview of Mounts")
+		table.Render()
 	}
 
-	cpDir, err := os.Open(checkpointDirectory)
-	if err != nil {
-		return err
-	}
-	defer cpDir.Close()
+	if printStats {
+		cpDir, err := os.Open(checkpointDirectory)
+		if err != nil {
+			return err
+		}
+		defer cpDir.Close()
 
-	// Get dump statistics with crit
-	dumpStatistics, err := crit.GetDumpStats(cpDir.Name())
-	if err != nil {
-		return fmt.Errorf("unable to display checkpointing statistics: %w", err)
-	}
+		// Get dump statistics with crit
+		dumpStatistics, err := crit.GetDumpStats(cpDir.Name())
+		if err != nil {
+			return fmt.Errorf("unable to display checkpointing statistics: %w", err)
+		}
 
-	table = tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{
-		"Freezing Time",
-		"Frozen Time",
-		"Memdump Time",
-		"Memwrite Time",
-		"Pages Scanned",
-		"Pages Written",
-	})
-	table.Append([]string{
-		fmt.Sprintf("%d us", dumpStatistics.GetFreezingTime()),
-		fmt.Sprintf("%d us", dumpStatistics.GetFrozenTime()),
-		fmt.Sprintf("%d us", dumpStatistics.GetMemdumpTime()),
-		fmt.Sprintf("%d us", dumpStatistics.GetMemwriteTime()),
-		fmt.Sprintf("%d", dumpStatistics.GetPagesScanned()),
-		fmt.Sprintf("%d", dumpStatistics.GetPagesWritten()),
-	})
-	fmt.Println("CRIU dump statistics")
-	table.Render()
+		table = tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{
+			"Freezing Time",
+			"Frozen Time",
+			"Memdump Time",
+			"Memwrite Time",
+			"Pages Scanned",
+			"Pages Written",
+		})
+		table.Append([]string{
+			fmt.Sprintf("%d us", dumpStatistics.GetFreezingTime()),
+			fmt.Sprintf("%d us", dumpStatistics.GetFrozenTime()),
+			fmt.Sprintf("%d us", dumpStatistics.GetMemdumpTime()),
+			fmt.Sprintf("%d us", dumpStatistics.GetMemwriteTime()),
+			fmt.Sprintf("%d", dumpStatistics.GetPagesScanned()),
+			fmt.Sprintf("%d", dumpStatistics.GetPagesWritten()),
+		})
+		fmt.Println("\nCRIU dump statistics")
+		table.Render()
+	}
 
 	return nil
 }
@@ -205,4 +228,12 @@ func getCheckpointSize(path string) (size int64, err error) {
 	dir := filepath.Join(path, metadata.CheckpointDirectory)
 
 	return dirSize(dir)
+}
+
+func shortenPath(path string) string {
+	parts := strings.Split(path, string(filepath.Separator))
+	if len(parts) <= 2 {
+		return path
+	}
+	return filepath.Join("..", filepath.Join(parts[len(parts)-2:]...))
 }

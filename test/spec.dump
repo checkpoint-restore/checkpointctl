@@ -1,3 +1,17 @@
 {
-"annotations": {"io.container.manager": "libpod"}
+  "mounts": [
+    {
+      "destination": "/proc",
+      "type": "proc",
+      "source": "proc"
+    },
+    {
+      "destination": "/etc/hostname",
+      "type": "bind",
+      "source": "/run/containers/storage/overlay-containers/d5eee7931a29b2d6bf51469e3ab7284bb22a9e6dad073277e30e2a29256efc84/userdata/hostname"
+    }
+  ],
+  "annotations": {
+    "io.container.manager": "libpod"
+  }  
 }
