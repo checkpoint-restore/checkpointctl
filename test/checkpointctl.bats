@@ -168,7 +168,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --full-paths
 	[ "$status" -eq 1 ]
-	[[ ${lines[0]} == *"Error: Cannot use --full-paths without --mounts option"* ]]
+	[[ ${lines[0]} == *"Error: Cannot use --full-paths without --mounts/-all option"* ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and no checkpoint directory" {

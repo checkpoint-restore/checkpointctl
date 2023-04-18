@@ -16,6 +16,7 @@ var (
 	printStats bool
 	showMounts bool
 	fullPaths  bool
+	showAll    bool
 )
 
 func main() {
@@ -72,14 +73,24 @@ func setupShow() (*cobra.Command, error) {
 		false,
 		"Display mounts with full paths",
 	)
+	flags.BoolVar(
+		&showAll,
+		"all",
+		false,
+		"Display all additional information about the checkpoints",
+	)
 
 	err := flags.MarkHidden("print-stats")
 	return cmd, err
 }
 
 func show(cmd *cobra.Command, args []string) error {
+	if showAll {
+		printStats = true
+		showMounts = true
+	}
 	if fullPaths && !showMounts {
-		return fmt.Errorf("Cannot use --full-paths without --mounts option")
+		return fmt.Errorf("Cannot use --full-paths without --mounts/-all option")
 	}
 
 	input := args[0]
