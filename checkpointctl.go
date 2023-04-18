@@ -27,16 +27,20 @@ func main() {
 		SilenceUsage: true,
 	}
 
-	showCommand := setupShow()
+	showCommand, err := setupShow()
+	if err != nil {
+		os.Exit(1)
+	}
+	
 	rootCommand.AddCommand(showCommand)
 	rootCommand.Version = version
 
-	if err := rootCommand.Execute(); err != nil {
+	if err = rootCommand.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func setupShow() *cobra.Command {
+func setupShow() (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show information about available checkpoints",
@@ -47,6 +51,12 @@ func setupShow() *cobra.Command {
 	flags.BoolVar(
 		&printStats,
 		"print-stats",
+		false,
+		"Print checkpointing statistics if available",
+	)
+	flags.BoolVar(
+		&printStats,
+		"stats",
 		false,
 		"Print checkpointing statistics if available",
 	)
@@ -63,7 +73,8 @@ func setupShow() *cobra.Command {
 		"Display mounts with full paths",
 	)
 
-	return cmd
+	err := flags.MarkHidden("print-stats")
+	return cmd, err
 }
 
 func show(cmd *cobra.Command, args []string) error {
