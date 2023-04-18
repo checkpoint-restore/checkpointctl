@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/containers/storage/pkg/archive"
@@ -28,20 +29,16 @@ func main() {
 		SilenceUsage: true,
 	}
 
-	showCommand, err := setupShow()
-	if err != nil {
-		os.Exit(1)
-	}
-	
+	showCommand := setupShow()
 	rootCommand.AddCommand(showCommand)
 	rootCommand.Version = version
 
-	if err = rootCommand.Execute(); err != nil {
+	if err := rootCommand.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func setupShow() (*cobra.Command, error) {
+func setupShow() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show information about available checkpoints",
@@ -81,7 +78,10 @@ func setupShow() (*cobra.Command, error) {
 	)
 
 	err := flags.MarkHidden("print-stats")
-	return cmd, err
+	if err != nil {
+		log.Fatal(err)
+	}
+	return cmd
 }
 
 func show(cmd *cobra.Command, args []string) error {
@@ -90,7 +90,7 @@ func show(cmd *cobra.Command, args []string) error {
 		showMounts = true
 	}
 	if fullPaths && !showMounts {
-		return fmt.Errorf("Cannot use --full-paths without --mounts/-all option")
+		return fmt.Errorf("Cannot use --full-paths without --mounts/--all option")
 	}
 
 	input := args[0]
