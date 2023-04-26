@@ -102,34 +102,34 @@ function teardown() {
 	[[ ${lines[4]} == *"containerd"* ]]
 }
 
-@test "Run checkpointctl show with tar file and --print-stats and missing stats-dump" {
+@test "Run checkpointctl show with tar file and --stats and missing stats-dump" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl show "$TEST_TMP_DIR2"/test.tar --print-stats
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 1 ]
 	[[ ${lines[6]} == *"unable to display checkpointing statistics"* ]]
 }
 
-@test "Run checkpointctl show with tar file and --print-stats and invalid stats-dump" {
+@test "Run checkpointctl show with tar file and --stats and invalid stats-dump" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"/stats-dump
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl show "$TEST_TMP_DIR2"/test.tar --print-stats
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 1 ]
 	[[ ${lines[6]} == *"Unknown magic"* ]]
 }
 
-@test "Run checkpointctl show with tar file and --print-stats and valid stats-dump" {
+@test "Run checkpointctl show with tar file and --stats and valid stats-dump" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"
 	cp test/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl show "$TEST_TMP_DIR2"/test.tar --print-stats
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 0 ]
 	[[ ${lines[6]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[8]} == *"MEMWRITE TIME"* ]]
@@ -160,15 +160,31 @@ function teardown() {
 	[[ ${lines[10]} == *"/proc"* ]]
 }
 
+@test "Run checkpointctl show with tar file and --all and valid spec.dump and valid stats-dump" {
+	cp test/config.dump "$TEST_TMP_DIR1"
+	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp test/stats-dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --all
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Overview of Mounts"* ]]
+	[[ ${lines[8]} == *"DESTINATION"* ]]
+	[[ ${lines[10]} == *"/proc"* ]]
+	[[ ${lines[11]} == *"/etc/hostname"* ]]
+	[[ ${lines[13]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[15]} == *"MEMWRITE TIME"* ]]
+	[[ ${lines[17]} == *"446571 us"* ]]
+}
 
-@test "Run checkpointctl show with tar file and missing --mounts and --full-paths" {
+@test "Run checkpointctl show with tar file and missing --mounts/--all and --full-paths" {
 	cp test/config.dump "$TEST_TMP_DIR1"
 	cp test/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --full-paths
 	[ "$status" -eq 1 ]
-	[[ ${lines[0]} == *"Error: Cannot use --full-paths without --mounts option"* ]]
+	[[ ${lines[0]} == *"Error: Cannot use --full-paths without --mounts/--all option"* ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and no checkpoint directory" {

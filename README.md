@@ -40,16 +40,17 @@ $ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-co
 ```
 
 It is also possible to display additional checkpoint related information
-with the parameter `--print-stats`:
+with the parameter `--stats`:
 
 ```console
-$ checkpointctl show /tmp/dump.tar --print-stats
+$ checkpointctl show /tmp/dump.tar --stats
 
 +-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
 |    CONTAINER    |                  IMAGE                   |      ID      | RUNTIME |       CREATED        | ENGINE | CHKPT SIZE | ROOT FS DIFF SIZE |
 +-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
 | magical_murdock | quay.io/adrianreber/wildfly-hello:latest | f11d11844af0 | crun    | 2023-02-28T09:43:52Z | Podman | 338.2 MiB  | 177.0 KiB         |
 +-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+
 CRIU dump statistics
 +---------------+-------------+--------------+---------------+---------------+---------------+
 | FREEZING TIME | FROZEN TIME | MEMDUMP TIME | MEMWRITE TIME | PAGES SCANNED | PAGES WRITTEN |
