@@ -7,12 +7,12 @@ require (
 	github.com/containers/storage v1.45.4
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/runtime-spec v1.1.0-rc.1
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 )
 
 require (
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/inconshreveable/mousetrap v1.0.1 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
