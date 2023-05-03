@@ -20,7 +20,7 @@ github.com/containers/storage/pkg/unshare
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/inconshreveable/mousetrap v1.0.1
+# github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
 # github.com/klauspost/compress v1.15.15
@@ -54,7 +54,7 @@ github.com/opencontainers/runtime-spec/specs-go
 # github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/spf13/cobra v1.6.1
+# github.com/spf13/cobra v1.7.0
 ## explicit; go 1.15
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
