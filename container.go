@@ -61,7 +61,7 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 	}, nil
 }
 
-func showContainerCheckpoint(checkpointDirectory string) error {
+func showContainerCheckpoint(checkpointDirectory, input string) error {
 	var (
 		row []string
 		ci  *containerInfo
@@ -92,7 +92,7 @@ func showContainerCheckpoint(checkpointDirectory string) error {
 		return fmt.Errorf("getting container checkpoint information failed: %w", err)
 	}
 
-	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", checkpointDirectory)
+	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", input)
 
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{

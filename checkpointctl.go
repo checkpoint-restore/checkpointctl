@@ -114,5 +114,5 @@ func show(cmd *cobra.Command, args []string) error {
 	if err := archive.UntarPath(input, dir); err != nil {
 		return fmt.Errorf("unpacking of checkpoint archive %s failed: %w", input, err)
 	}
-	return showContainerCheckpoint(dir)
+	return showContainerCheckpoint(dir, input)
 }
