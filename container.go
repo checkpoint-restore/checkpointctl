@@ -5,8 +5,11 @@
 package main
 
 import (
+	"archive/tar"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +17,7 @@ import (
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v6/crit"
+	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -125,21 +129,18 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 		row = append(row, ci.MAC)
 	}
 
-	size, err := getCheckpointSize(checkpointDirectory)
+	archiveSizes, err := getArchiveSizes(input)
 	if err != nil {
 		return err
 	}
 
 	header = append(header, "CHKPT Size")
-	row = append(row, metadata.ByteToString(size))
+	row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
 
 	// Display root fs diff size if available
-	fi, err := os.Lstat(filepath.Join(checkpointDirectory, metadata.RootFsDiffTar))
-	if err == nil {
-		if fi.Size() != 0 {
-			header = append(header, "Root Fs Diff Size")
-			row = append(row, metadata.ByteToString(fi.Size()))
-		}
+	if archiveSizes.rootFsDiffTarSize != 0 {
+		header = append(header, "Root Fs Diff Size")
+		row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
 	}
 
 	table.SetAutoMergeCells(true)
@@ -209,25 +210,31 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 	return nil
 }
 
-func dirSize(path string) (size int64, err error) {
-	err = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-
-		return err
-	})
-
-	return size, err
+func hasPrefix(path, prefix string) bool {
+	return strings.HasPrefix(strings.TrimPrefix(path, "./"), prefix)
 }
 
-func getCheckpointSize(path string) (size int64, err error) {
-	dir := filepath.Join(path, metadata.CheckpointDirectory)
+type archiveSizes struct {
+	checkpointSize    int64
+	rootFsDiffTarSize int64
+}
 
-	return dirSize(dir)
+// getArchiveSizes calculates the sizes of different components within a container checkpoint.
+func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
+	result := &archiveSizes{}
+
+	err := iterateTarArchive(archiveInput, func(hdr *tar.Header) {
+		if hdr.FileInfo().Mode().IsRegular() {
+			if hasPrefix(hdr.Name, metadata.CheckpointDirectory) {
+				// Add the file size to the total checkpoint size
+				result.checkpointSize += hdr.Size
+			} else if hasPrefix(hdr.Name, metadata.RootFsDiffTar) {
+				// Read the size of rootfs diff
+				result.rootFsDiffTarSize = hdr.Size
+			}
+		}
+	})
+	return result, err
 }
 
 func shortenPath(path string) string {
@@ -236,4 +243,94 @@ func shortenPath(path string) string {
 		return path
 	}
 	return filepath.Join("..", filepath.Join(parts[len(parts)-2:]...))
+}
+
+// untarFiles unpack only specified files from an archive to the destination directory.
+func untarFiles(src, dest string, files ...string) error {
+	archiveFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer archiveFile.Close()
+
+	options := archive.TarOptions{
+		ExcludePatterns: []string{
+			"artifacts",
+			"ctr.log",
+			metadata.RootFsDiffTar,
+			metadata.NetworkStatusFile,
+			metadata.DeletedFilesFile,
+			metadata.CheckpointDirectory,
+			metadata.CheckpointVolumesDirectory,
+			metadata.ConfigDumpFile,
+			metadata.SpecDumpFile,
+			metadata.DevShmCheckpointTar,
+			metadata.DumpLogFile,
+			metadata.RestoreLogFile,
+		},
+	}
+
+	// Remove files from ExcludePatterns if they are present
+	for _, file := range files {
+		for i, pattern := range options.ExcludePatterns {
+			if pattern == file {
+				options.ExcludePatterns = append(options.ExcludePatterns[:i], options.ExcludePatterns[i+1:]...)
+				break
+			}
+		}
+	}
+
+	if err := archive.Untar(archiveFile, dest, &options); err != nil {
+		return fmt.Errorf("unpacking of checkpoint archive failed: %w", err)
+	}
+
+	return nil
+}
+
+// isFileInArchive checks if a file or directory with the specified pattern exists in the archive.
+// It returns true if the file or directory is found, and false otherwise.
+func isFileInArchive(archiveInput, pattern string, isDir bool) (bool, error) {
+	found := false
+
+	err := iterateTarArchive(archiveInput, func(hdr *tar.Header) {
+		// Check if the current file or directory matches the pattern and type
+		if hasPrefix(hdr.Name, pattern) && hdr.FileInfo().Mode().IsDir() == isDir {
+			found = true
+		}
+	})
+	return found, err
+}
+
+// iterateTarArchive reads a tar archive from the specified input file,
+// decompresses it, and iterates through each entry, invoking the provided callback function.
+func iterateTarArchive(archiveInput string, callback func(hdr *tar.Header)) error {
+	archiveFile, err := os.Open(archiveInput)
+	if err != nil {
+		return err
+	}
+	defer archiveFile.Close()
+
+	// Decompress the archive
+	stream, err := archive.DecompressStream(archiveFile)
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	// Create a tar reader to read the files from the decompressed archive
+	tarReader := tar.NewReader(stream)
+
+	for {
+		hdr, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		callback(hdr)
+	}
+
+	return nil
 }
