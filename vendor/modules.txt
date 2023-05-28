@@ -23,7 +23,7 @@ github.com/docker/go-units
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/klauspost/compress v1.16.4
+# github.com/klauspost/compress v1.16.5
 ## explicit; go 1.18
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
@@ -33,10 +33,10 @@ github.com/klauspost/compress/internal/cpuinfo
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/pgzip v1.2.5
+# github.com/klauspost/pgzip v1.2.6
 ## explicit
 github.com/klauspost/pgzip
-# github.com/mattn/go-runewidth v0.0.9
+# github.com/mattn/go-runewidth v0.0.14
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
 # github.com/moby/sys/mountinfo v0.6.2
@@ -45,13 +45,16 @@ github.com/moby/sys/mountinfo
 # github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
-# github.com/opencontainers/runc v1.1.5
-## explicit; go 1.16
+# github.com/opencontainers/runc v1.1.7
+## explicit; go 1.17
 github.com/opencontainers/runc/libcontainer/user
 # github.com/opencontainers/runtime-spec v1.1.0-rc.2
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/sirupsen/logrus v1.9.0
+# github.com/rivo/uniseg v0.4.4
+## explicit; go 1.18
+github.com/rivo/uniseg
+# github.com/sirupsen/logrus v1.9.2
 ## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/spf13/cobra v1.7.0
@@ -69,14 +72,14 @@ github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-# golang.org/x/sys v0.7.0
+# golang.org/x/sys v0.8.0
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 ## explicit; go 1.11
-# google.golang.org/protobuf v1.28.1
+# google.golang.org/protobuf v1.30.0
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
