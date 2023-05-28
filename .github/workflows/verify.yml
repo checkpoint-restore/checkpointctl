@@ -1,0 +1,33 @@
+name: verify
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          only-new-issues: true
+
+  lint_markdown:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          md:
+            - 'README.md'
+    - name: Lint markdown
+      if: steps.changes.outputs.md == 'true'
+      uses: DavidAnson/markdownlint-cli2-action@v9
+      with:
+        globs: |
+          README.md
