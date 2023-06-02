@@ -169,6 +169,8 @@ function teardown() {
 	cp data/spec.dump "$TEST_TMP_DIR1"
 	cp test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
@@ -179,6 +181,8 @@ function teardown() {
 	[[ ${lines[13]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[15]} == *"MEMWRITE TIME"* ]]
 	[[ ${lines[17]} =~ [1-9]+" us" ]]
+	[[ ${lines[19]} == *"Process tree"* ]]
+	[[ ${lines[21]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl show with tar file and missing --mounts/--all and --full-paths" {
@@ -254,3 +258,14 @@ function teardown() {
 	[[ ${lines[2]} == *"ROOT FS DIFF SIZE"* ]]
 }
 
+@test "Run checkpointctl show with tar file and --ps-tree" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar --ps-tree
+	[ "$status" -eq 0 ]
+	[[ ${lines[8]} == *"piggie"* ]]
+}

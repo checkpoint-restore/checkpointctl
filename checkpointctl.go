@@ -96,6 +96,7 @@ func show(cmd *cobra.Command, args []string) error {
 	if showAll {
 		stats = true
 		mounts = true
+		psTree = true
 	}
 	if fullPaths && !mounts {
 		return fmt.Errorf("Cannot use --full-paths without --mounts/--all option")
