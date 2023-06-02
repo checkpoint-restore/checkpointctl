@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/containers/storage/pkg/archive"
+	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/spf13/cobra"
 )
 
@@ -101,6 +101,17 @@ func show(cmd *cobra.Command, args []string) error {
 	if !tar.Mode().IsRegular() {
 		return fmt.Errorf("input %s not a regular file", input)
 	}
+
+	// Check if there is a checkpoint directory in the archive file
+	checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
+	if err != nil {
+		return err
+	}
+
+	if !checkpointDirExists {
+		return fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
+	}
+
 	dir, err := os.MkdirTemp("", "checkpointctl")
 	if err != nil {
 		return err
@@ -111,8 +122,9 @@ func show(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	if err := archive.UntarPath(input, dir); err != nil {
-		return fmt.Errorf("unpacking of checkpoint archive %s failed: %w", input, err)
+	if err := untarFiles(input, dir, metadata.SpecDumpFile, metadata.ConfigDumpFile); err != nil {
+		return err
 	}
+
 	return showContainerCheckpoint(dir, input)
 }
