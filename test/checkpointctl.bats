@@ -113,7 +113,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 1 ]
-	[[ ${lines[6]} == *"unable to display checkpointing statistics"* ]]
+	[[ ${lines[6]} == *"failed to get dump statistics"* ]]
 }
 
 @test "Run checkpointctl show with tar file and --stats and invalid stats-dump" {

@@ -21,6 +21,7 @@ import (
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/xlab/treeprint"
 )
 
 type containerMetadata struct {
@@ -108,19 +109,25 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 	}
 
 	if stats {
-		cpDir, err := os.Open(checkpointDirectory)
-		if err != nil {
-			return err
-		}
-		defer cpDir.Close()
-
 		// Get dump statistics with crit
-		dumpStats, err := crit.GetDumpStats(cpDir.Name())
+		dumpStats, err := crit.GetDumpStats(checkpointDirectory)
 		if err != nil {
-			return fmt.Errorf("unable to display checkpointing statistics: %w", err)
+			return fmt.Errorf("failed to get dump statistics: %w", err)
 		}
 
 		renderDumpStats(dumpStats)
+	}
+
+	if psTree {
+		// The image files reside in a subdirectory called "checkpoint"
+		c := crit.New("", "", filepath.Join(checkpointDirectory, "checkpoint"), false, false)
+		// Get process tree with CRIT
+		psTree, err := c.ExplorePs()
+		if err != nil {
+			return fmt.Errorf("failed to get process tree: %w", err)
+		}
+
+		renderPsTree(psTree, ci.Name)
 	}
 
 	return nil
@@ -219,6 +226,30 @@ func renderDumpStats(dumpStats *images.DumpStatsEntry) {
 	})
 	fmt.Println("\nCRIU dump statistics")
 	table.Render()
+}
+
+func renderPsTree(psTree *crit.PsTree, containerName string) {
+	var tree treeprint.Tree
+	if containerName == "" {
+		containerName = "Container"
+	}
+	tree = treeprint.NewWithRoot(containerName)
+	// processNodes is a recursive function to create
+	// a new branch for each process and add its child
+	// processes as child nodes of the branch.
+	var processNodes func(treeprint.Tree, *crit.PsTree)
+	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
+		node := tree.AddMetaBranch(root.PId, root.Comm)
+		for _, child := range root.Children {
+			node.AddMetaNode(child.PId, root.Comm)
+			processNodes(node, child)
+		}
+	}
+
+	processNodes(tree, psTree)
+
+	fmt.Print("\nProcess tree\n\n")
+	fmt.Println(tree.String())
 }
 
 func hasPrefix(path, prefix string) bool {
