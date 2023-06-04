@@ -17,6 +17,7 @@ import (
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v6/crit"
+	"github.com/checkpoint-restore/go-criu/v6/crit/images"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
@@ -66,10 +67,6 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 }
 
 func showContainerCheckpoint(checkpointDirectory, input string) error {
-	var (
-		row []string
-		ci  *containerInfo
-	)
 	containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
 	if err != nil {
 		return err
@@ -79,11 +76,15 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 		return err
 	}
 
+	var ci *containerInfo
 	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
 		ci = getPodmanInfo(containerConfig, specDump)
 	case "cri-o":
 		ci, err = getCRIOInfo(containerConfig, specDump)
+		if err != nil {
+			return fmt.Errorf("getting container checkpoint information failed: %w", err)
+		}
 	default:
 		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
 		if containerdStatus == nil {
@@ -92,12 +93,40 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 		ci = getContainerdInfo(containerdStatus, specDump)
 	}
 
+	// Fetch root fs diff size if available
+	archiveSizes, err := getArchiveSizes(input)
 	if err != nil {
-		return fmt.Errorf("getting container checkpoint information failed: %w", err)
+		return fmt.Errorf("failed to get archive sizes: %w", err)
 	}
 
 	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", input)
 
+	renderCheckpoint(ci, containerConfig, archiveSizes)
+
+	if showMounts {
+		renderMounts(specDump)
+	}
+
+	if printStats {
+		cpDir, err := os.Open(checkpointDirectory)
+		if err != nil {
+			return err
+		}
+		defer cpDir.Close()
+
+		// Get dump statistics with crit
+		dumpStats, err := crit.GetDumpStats(cpDir.Name())
+		if err != nil {
+			return fmt.Errorf("unable to display checkpointing statistics: %w", err)
+		}
+
+		renderDumpStats(dumpStats)
+	}
+
+	return nil
+}
+
+func renderCheckpoint(ci *containerInfo, containerConfig *metadata.ContainerConfig, archiveSizes *archiveSizes) {
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
 		"Container",
@@ -108,6 +137,7 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 		"Engine",
 	}
 
+	var row []string
 	row = append(row, ci.Name)
 	row = append(row, containerConfig.RootfsImageName)
 	if len(containerConfig.ID) > 12 {
@@ -129,11 +159,6 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 		row = append(row, ci.MAC)
 	}
 
-	archiveSizes, err := getArchiveSizes(input)
-	if err != nil {
-		return err
-	}
-
 	header = append(header, "CHKPT Size")
 	row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
 
@@ -148,66 +173,52 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 	table.SetHeader(header)
 	table.Append(row)
 	table.Render()
+}
 
-	if showMounts {
-		table = tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{
-			"Destination",
-			"Type",
-			"Source",
-		})
-		// Get overview of mounts from spec.dump
-		for _, data := range specDump.Mounts {
-			table.Append([]string{
-				data.Destination,
-				data.Type,
-				func() string {
-					if fullPaths {
-						return data.Source
-					}
-					return shortenPath(data.Source)
-				}(),
-			})
-		}
-		fmt.Println("\nOverview of Mounts")
-		table.Render()
-	}
-
-	if printStats {
-		cpDir, err := os.Open(checkpointDirectory)
-		if err != nil {
-			return err
-		}
-		defer cpDir.Close()
-
-		// Get dump statistics with crit
-		dumpStatistics, err := crit.GetDumpStats(cpDir.Name())
-		if err != nil {
-			return fmt.Errorf("unable to display checkpointing statistics: %w", err)
-		}
-
-		table = tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{
-			"Freezing Time",
-			"Frozen Time",
-			"Memdump Time",
-			"Memwrite Time",
-			"Pages Scanned",
-			"Pages Written",
-		})
+func renderMounts(specDump *spec.Spec) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{
+		"Destination",
+		"Type",
+		"Source",
+	})
+	// Get overview of mounts from spec.dump
+	for _, data := range specDump.Mounts {
 		table.Append([]string{
-			fmt.Sprintf("%d us", dumpStatistics.GetFreezingTime()),
-			fmt.Sprintf("%d us", dumpStatistics.GetFrozenTime()),
-			fmt.Sprintf("%d us", dumpStatistics.GetMemdumpTime()),
-			fmt.Sprintf("%d us", dumpStatistics.GetMemwriteTime()),
-			fmt.Sprintf("%d", dumpStatistics.GetPagesScanned()),
-			fmt.Sprintf("%d", dumpStatistics.GetPagesWritten()),
+			data.Destination,
+			data.Type,
+			func() string {
+				if fullPaths {
+					return data.Source
+				}
+				return shortenPath(data.Source)
+			}(),
 		})
-		fmt.Println("\nCRIU dump statistics")
-		table.Render()
 	}
+	fmt.Println("\nOverview of Mounts")
+	table.Render()
+}
 
-	return nil
+func renderDumpStats(dumpStats *images.DumpStatsEntry) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{
+		"Freezing Time",
+		"Frozen Time",
+		"Memdump Time",
+		"Memwrite Time",
+		"Pages Scanned",
+		"Pages Written",
+	})
+	table.Append([]string{
+		fmt.Sprintf("%d us", dumpStats.GetFreezingTime()),
+		fmt.Sprintf("%d us", dumpStats.GetFrozenTime()),
+		fmt.Sprintf("%d us", dumpStats.GetMemdumpTime()),
+		fmt.Sprintf("%d us", dumpStats.GetMemwriteTime()),
+		fmt.Sprintf("%d", dumpStats.GetPagesScanned()),
+		fmt.Sprintf("%d", dumpStats.GetPagesWritten()),
+	})
+	fmt.Println("\nCRIU dump statistics")
+	table.Render()
 }
 
 func hasPrefix(path, prefix string) bool {
