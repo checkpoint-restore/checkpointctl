@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# A shell script to check if the binary size
+# has increased beyond a certain threshold
+# across commits. Meant to be used in CI with
+# git rebase <base branch>^ -x check-size.sh
+
+# Fail fast on errors
+set -e
+
+BIN_NAME=checkpointctl
+PREV_SIZE_FILE=prev_size
+# Maximum allowable size difference, in bytes
+MAX_DIFF=51200
+
+# Build the checkpointctl binary. If the commit is not self-contained,
+# the build will fail, in which case there is no point checking for a
+# change in the size of the binary.
+make
+# Store the binary size
+BIN_SIZE=$(stat -c%s "$BIN_NAME")
+
+if [[ -f "$PREV_SIZE_FILE" ]]; then
+	# Read the previous size from the file
+	PREV_SIZE=$(cat "$PREV_SIZE_FILE")
+	# Calculate the difference between current and previous size
+	DIFF=$((BIN_SIZE - PREV_SIZE))
+	if [[ $DIFF -gt $MAX_DIFF ]]; then
+		echo "FAIL: size difference of \"$DIFF\" B exceeds limit \"$MAX_DIFF\" B"
+		exit 1
+	else
+		echo "PASS: size difference of \"$DIFF\" B within limit \"$MAX_DIFF\" B"
+	fi
+else
+	# This means this is the first run of the script.
+	# The original file size will be stored, and used
+	# to compare against subsequent values ahead.
+	echo "No previous size present, storing current size"
+	echo "$BIN_SIZE" > "$PREV_SIZE_FILE"
+fi
