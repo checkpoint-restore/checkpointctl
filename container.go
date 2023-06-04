@@ -103,11 +103,11 @@ func showContainerCheckpoint(checkpointDirectory, input string) error {
 
 	renderCheckpoint(ci, containerConfig, archiveSizes)
 
-	if showMounts {
+	if mounts {
 		renderMounts(specDump)
 	}
 
-	if printStats {
+	if stats {
 		cpDir, err := os.Open(checkpointDirectory)
 		if err != nil {
 			return err

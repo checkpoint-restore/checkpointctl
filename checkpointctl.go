@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	name       string
-	version    string
-	printStats bool
-	showMounts bool
-	fullPaths  bool
-	showAll    bool
+	name      string
+	version   string
+	stats     bool
+	mounts    bool
+	fullPaths bool
+	showAll   bool
 )
 
 func main() {
@@ -47,19 +47,19 @@ func setupShow() *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(
-		&printStats,
+		&stats,
 		"print-stats",
 		false,
 		"Print checkpointing statistics if available",
 	)
 	flags.BoolVar(
-		&printStats,
+		&stats,
 		"stats",
 		false,
 		"Print checkpointing statistics if available",
 	)
 	flags.BoolVar(
-		&showMounts,
+		&mounts,
 		"mounts",
 		false,
 		"Print overview about mounts used in the checkpoints",
@@ -86,10 +86,10 @@ func setupShow() *cobra.Command {
 
 func show(cmd *cobra.Command, args []string) error {
 	if showAll {
-		printStats = true
-		showMounts = true
+		stats = true
+		mounts = true
 	}
-	if fullPaths && !showMounts {
+	if fullPaths && !mounts {
 		return fmt.Errorf("Cannot use --full-paths without --mounts/--all option")
 	}
 
