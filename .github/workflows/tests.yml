@@ -5,12 +5,14 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    container:
-      image: registry.fedoraproject.org/fedora:latest
     steps:
       - uses: actions/checkout@v3
       - name: Install tools
-        run: sudo dnf -y install ShellCheck bats golang
+        run: |
+          sudo apt-get install -qqy shellcheck
+          # Install bats from the NPM registry as the version
+          # in the Ubuntu package repository is outdated
+          npm install -g bats
       - name: Run make shellcheck
         run: make shellcheck
       - name: Run make all
