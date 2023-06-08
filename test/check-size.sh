@@ -5,9 +5,6 @@
 # across commits. Meant to be used in CI with
 # git rebase <base branch>^ -x check-size.sh
 
-# Fail fast on errors
-set -e
-
 BIN_NAME=checkpointctl
 PREV_SIZE_FILE=prev_size
 # Maximum allowable size difference, in bytes
@@ -16,7 +13,15 @@ MAX_DIFF=51200
 # Build the checkpointctl binary. If the commit is not self-contained,
 # the build will fail, in which case there is no point checking for a
 # change in the size of the binary.
-make
+if ! make; then
+	echo "ERROR: Compilation failed at $(git rev-parse --short HEAD)"
+	echo "Make sure that the compilation is successful for each commit."
+	exit 1
+fi
+
+# Fail fast on errors
+set -e
+
 # Store the binary size
 BIN_SIZE=$(stat -c%s "$BIN_NAME")
 # Print the size along with the commit hash
