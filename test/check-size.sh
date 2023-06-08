@@ -19,6 +19,8 @@ MAX_DIFF=51200
 make
 # Store the binary size
 BIN_SIZE=$(stat -c%s "$BIN_NAME")
+# Print the size along with the commit hash
+echo "BINARY SIZE ($(git rev-parse --short HEAD)): $BIN_SIZE"
 
 if [[ -f "$PREV_SIZE_FILE" ]]; then
 	# Read the previous size from the file
@@ -26,10 +28,10 @@ if [[ -f "$PREV_SIZE_FILE" ]]; then
 	# Calculate the difference between current and previous size
 	DIFF=$((BIN_SIZE - PREV_SIZE))
 	if [[ $DIFF -gt $MAX_DIFF ]]; then
-		echo "FAIL: size difference of \"$DIFF\" B exceeds limit \"$MAX_DIFF\" B"
+		echo "FAIL: size difference of $DIFF B exceeds limit $MAX_DIFF B"
 		exit 1
 	else
-		echo "PASS: size difference of \"$DIFF\" B within limit \"$MAX_DIFF\" B"
+		echo "PASS: size difference of $DIFF B within limit $MAX_DIFF B"
 	fi
 else
 	# This means this is the first run of the script.
@@ -38,3 +40,7 @@ else
 	echo "No previous size present, storing current size"
 	echo "$BIN_SIZE" > "$PREV_SIZE_FILE"
 fi
+
+# Remove the binary to ensure it is
+# built again with the next commit
+rm -f $BIN_NAME

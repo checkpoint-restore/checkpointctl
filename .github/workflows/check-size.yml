@@ -12,11 +12,13 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        # Use HEAD from the PR instead of the merge commit
-        ref: ${{ github.event.pull_request.head.sha }}
         # Needed to rebase against the base branch
         fetch-depth: 0
+    - name: Configure git user details
+      run: |
+        git config --global user.email "bloatchecker@example.com"
+        git config --global user.name "Bloat Checker"
     - name: Configure base branch without switching current branch
       run: git fetch origin ${GITHUB_BASE_REF}:${GITHUB_BASE_REF}
     - name: Compare binary size change across each commit
-      run: git rebase ${GITHUB_BASE_REF}^ -x test/check-size.sh
+      run: git rebase -v ${GITHUB_BASE_REF}^ -x test/check-size.sh
