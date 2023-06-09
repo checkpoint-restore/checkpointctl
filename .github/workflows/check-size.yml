@@ -14,10 +14,12 @@ jobs:
       with:
         # Needed to rebase against the base branch
         fetch-depth: 0
+        # Checkout pull request HEAD commit instead of merge commit
+        ref: ${{ github.event.pull_request.head.sha }}
     - name: Configure git user details
       run: |
-        git config --global user.email "bloatchecker@example.com"
-        git config --global user.name "Bloat Checker"
+        git config --global user.email "checkpoint-restore@users.noreply.github.com"
+        git config --global user.name "checkpoint-restore"
     - name: Configure base branch without switching current branch
       run: git fetch origin ${GITHUB_BASE_REF}:${GITHUB_BASE_REF}
     - name: Compare binary size change across each commit
