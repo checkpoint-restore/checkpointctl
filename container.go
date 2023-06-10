@@ -67,73 +67,12 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 	}, nil
 }
 
-func showContainerCheckpoint(checkpointDirectory, input string) error {
-	containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(checkpointDirectory)
-	if err != nil {
-		return err
-	}
-	specDump, _, err := metadata.ReadContainerCheckpointSpecDump(checkpointDirectory)
-	if err != nil {
-		return err
+func showContainerCheckpoints(tasks []task) error {
+	// Return an error early when attempting to display multiple checkpoints with additional flags
+	if (len(tasks) > 1) && (mounts || stats || psTree) {
+		return fmt.Errorf("displaying multiple checkpoints with additional flags is not supported")
 	}
 
-	var ci *containerInfo
-	switch m := specDump.Annotations["io.container.manager"]; m {
-	case "libpod":
-		ci = getPodmanInfo(containerConfig, specDump)
-	case "cri-o":
-		ci, err = getCRIOInfo(containerConfig, specDump)
-		if err != nil {
-			return fmt.Errorf("getting container checkpoint information failed: %w", err)
-		}
-	default:
-		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDirectory)
-		if containerdStatus == nil {
-			return fmt.Errorf("unknown container manager found: %s", m)
-		}
-		ci = getContainerdInfo(containerdStatus, specDump)
-	}
-
-	// Fetch root fs diff size if available
-	archiveSizes, err := getArchiveSizes(input)
-	if err != nil {
-		return fmt.Errorf("failed to get archive sizes: %w", err)
-	}
-
-	fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", input)
-
-	renderCheckpoint(ci, containerConfig, archiveSizes)
-
-	if mounts {
-		renderMounts(specDump)
-	}
-
-	if stats {
-		// Get dump statistics with crit
-		dumpStats, err := crit.GetDumpStats(checkpointDirectory)
-		if err != nil {
-			return fmt.Errorf("failed to get dump statistics: %w", err)
-		}
-
-		renderDumpStats(dumpStats)
-	}
-
-	if psTree {
-		// The image files reside in a subdirectory called "checkpoint"
-		c := crit.New("", "", filepath.Join(checkpointDirectory, "checkpoint"), false, false)
-		// Get process tree with CRIT
-		psTree, err := c.ExplorePs()
-		if err != nil {
-			return fmt.Errorf("failed to get process tree: %w", err)
-		}
-
-		renderPsTree(psTree, ci.Name)
-	}
-
-	return nil
-}
-
-func renderCheckpoint(ci *containerInfo, containerConfig *metadata.ContainerConfig, archiveSizes *archiveSizes) {
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
 		"Container",
@@ -143,43 +82,134 @@ func renderCheckpoint(ci *containerInfo, containerConfig *metadata.ContainerConf
 		"Created",
 		"Engine",
 	}
-
-	var row []string
-	row = append(row, ci.Name)
-	row = append(row, containerConfig.RootfsImageName)
-	if len(containerConfig.ID) > 12 {
-		row = append(row, containerConfig.ID[:12])
-	} else {
-		row = append(row, containerConfig.ID)
+	// Set all columns in the table header upfront when displaying more than one checkpoint
+	if len(tasks) > 1 {
+		header = append(header, "IP", "MAC", "CHKPT Size", "Root Fs Diff Size")
 	}
 
-	row = append(row, containerConfig.OCIRuntime)
-	row = append(row, ci.Created)
+	var specDump *spec.Spec
+	var ci *containerInfo
 
-	row = append(row, ci.Engine)
-	if ci.IP != "" {
-		header = append(header, "IP")
-		row = append(row, ci.IP)
+	for _, task := range tasks {
+		containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(task.outputDir)
+		if err != nil {
+			return err
+		}
+		specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.outputDir)
+		if err != nil {
+			return err
+		}
+
+		ci, err = getContainerInfo(task.outputDir, specDump, containerConfig)
+		if err != nil {
+			return err
+		}
+
+		archiveSizes, err := getArchiveSizes(task.checkpointFilePath)
+		if err != nil {
+			return err
+		}
+
+		var row []string
+		row = append(row, ci.Name)
+		row = append(row, containerConfig.RootfsImageName)
+		if len(containerConfig.ID) > 12 {
+			row = append(row, containerConfig.ID[:12])
+		} else {
+			row = append(row, containerConfig.ID)
+		}
+
+		row = append(row, containerConfig.OCIRuntime)
+		row = append(row, ci.Created)
+		row = append(row, ci.Engine)
+
+		if len(tasks) == 1 {
+			fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", task.checkpointFilePath)
+
+			if ci.IP != "" {
+				header = append(header, "IP")
+				row = append(row, ci.IP)
+			}
+			if ci.MAC != "" {
+				header = append(header, "MAC")
+				row = append(row, ci.MAC)
+			}
+
+			header = append(header, "CHKPT Size")
+			row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
+
+			// Display root fs diff size if available
+			if archiveSizes.rootFsDiffTarSize != 0 {
+				header = append(header, "Root Fs Diff Size")
+				row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
+			}
+		} else {
+			row = append(row, ci.IP)
+			row = append(row, ci.MAC)
+			row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
+			row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
+		}
+
+		table.Append(row)
 	}
-	if ci.MAC != "" {
-		header = append(header, "MAC")
-		row = append(row, ci.MAC)
-	}
 
-	header = append(header, "CHKPT Size")
-	row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
-
-	// Display root fs diff size if available
-	if archiveSizes.rootFsDiffTarSize != 0 {
-		header = append(header, "Root Fs Diff Size")
-		row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
-	}
-
-	table.SetAutoMergeCells(true)
-	table.SetRowLine(true)
 	table.SetHeader(header)
-	table.Append(row)
+	table.SetAutoMergeCells(false)
+	table.SetRowLine(true)
 	table.Render()
+
+	// If there is only one checkpoint to show, check the mounts and stats flags
+	if len(tasks) == 1 {
+		if mounts {
+			renderMounts(specDump)
+		}
+
+		if stats {
+			// Get dump statistics with crit
+			dumpStats, err := crit.GetDumpStats(tasks[0].outputDir)
+			if err != nil {
+				return fmt.Errorf("failed to get dump statistics: %w", err)
+			}
+
+			renderDumpStats(dumpStats)
+		}
+
+		if psTree {
+			// The image files reside in a subdirectory called "checkpoint"
+			c := crit.New("", "", filepath.Join(tasks[0].outputDir, "checkpoint"), false, false)
+			// Get process tree with CRIT
+			psTree, err := c.ExplorePs()
+			if err != nil {
+				return fmt.Errorf("failed to get process tree: %w", err)
+			}
+
+			renderPsTree(psTree, ci.Name)
+		}
+	}
+
+	return nil
+}
+
+func getContainerInfo(checkpointDir string, specDump *spec.Spec, containerConfig *metadata.ContainerConfig) (*containerInfo, error) {
+	var ci *containerInfo
+	switch m := specDump.Annotations["io.container.manager"]; m {
+	case "libpod":
+		ci = getPodmanInfo(containerConfig, specDump)
+	case "cri-o":
+		var err error
+		ci, err = getCRIOInfo(containerConfig, specDump)
+		if err != nil {
+			return nil, fmt.Errorf("getting container checkpoint information failed: %w", err)
+		}
+	default:
+		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDir)
+		if containerdStatus == nil {
+			return nil, fmt.Errorf("unknown container manager found: %s", m)
+		}
+		ci = getContainerdInfo(containerdStatus, specDump)
+	}
+
+	return ci, nil
 }
 
 func renderMounts(specDump *spec.Spec) {

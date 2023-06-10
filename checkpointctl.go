@@ -102,55 +102,65 @@ func show(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Cannot use --full-paths without --mounts/--all option")
 	}
 
-	input := args[0]
-	tar, err := os.Stat(input)
-	if err != nil {
-		return err
-	}
-	if !tar.Mode().IsRegular() {
-		return fmt.Errorf("input %s not a regular file", input)
-	}
+	tasks := make([]task, 0, len(args))
 
-	// Check if there is a checkpoint directory in the archive file
-	checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
-	if err != nil {
-		return err
-	}
-
-	if !checkpointDirExists {
-		return fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
-	}
-
-	dir, err := os.MkdirTemp("", "checkpointctl")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+	for _, input := range args {
+		tar, err := os.Stat(input)
+		if err != nil {
+			return err
 		}
-	}()
+		if !tar.Mode().IsRegular() {
+			return fmt.Errorf("input %s not a regular file", input)
+		}
 
-	// A list of files that need to be unarchived. The files need not be
-	// full paths. Even a substring of the file name is valid.
-	files := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+		// A list of files that need to be unarchived. The files need not be
+		// full paths. Even a substring of the file name is valid.
+		files := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
 
-	if stats {
-		files = append(files, "stats-dump")
+		if stats {
+			files = append(files, "stats-dump")
+		}
+
+		if psTree {
+			files = append(
+				files,
+				filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+				// All core-*.img files
+				filepath.Join(metadata.CheckpointDirectory, "core-"),
+			)
+		}
+
+		// Check if there is a checkpoint directory in the archive file
+		checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
+		if err != nil {
+			return err
+		}
+
+		if !checkpointDirExists {
+			return fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
+		}
+
+		dir, err := os.MkdirTemp("", "checkpointctl")
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := os.RemoveAll(dir); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
+		}()
+
+		if err := untarFiles(input, dir, files); err != nil {
+			return err
+		}
+
+		tasks = append(tasks, task{checkpointFilePath: input, outputDir: dir})
 	}
 
-	if psTree {
-		files = append(
-			files,
-			filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
-			// All core-*.img files
-			filepath.Join(metadata.CheckpointDirectory, "core-"),
-		)
-	}
+	return showContainerCheckpoints(tasks)
+}
 
-	if err := untarFiles(input, dir, files); err != nil {
-		return err
-	}
-
-	return showContainerCheckpoint(dir, input)
+type task struct {
+	checkpointFilePath string
+	outputDir          string
 }
