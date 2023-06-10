@@ -52,27 +52,31 @@ func setupShow() *cobra.Command {
 		false,
 		"Print checkpointing statistics if available",
 	)
-	flags.BoolVar(
+	flags.BoolVarP(
 		&stats,
 		"stats",
+		"s",
 		false,
 		"Print checkpointing statistics if available",
 	)
-	flags.BoolVar(
+	flags.BoolVarP(
 		&mounts,
 		"mounts",
+		"m",
 		false,
 		"Print overview about mounts used in the checkpoints",
 	)
-	flags.BoolVar(
+	flags.BoolVarP(
 		&fullPaths,
 		"full-paths",
+		"F",
 		false,
 		"Display mounts with full paths",
 	)
-	flags.BoolVar(
+	flags.BoolVarP(
 		&showAll,
 		"all",
+		"A",
 		false,
 		"Display all additional information about the checkpoints",
 	)
