@@ -1,9 +1,10 @@
 if [ -n "$COVERAGE" ]; then
 	export GOCOVERDIR="${COVERAGE_PATH}"
-	CHECKPOINTCTL="./checkpointctl.coverage"
+	CHECKPOINTCTL="../checkpointctl.coverage"
 else
-	CHECKPOINTCTL="./checkpointctl"
+	CHECKPOINTCTL="../checkpointctl"
 fi
+
 TEST_TMP_DIR1=""
 TEST_TMP_DIR2=""
 
@@ -57,7 +58,7 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and no spec.dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
@@ -66,7 +67,7 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and empty spec.dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	touch "$TEST_TMP_DIR1"/spec.dump
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
@@ -76,8 +77,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and no checkpoint directory" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
@@ -85,8 +86,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and checkpoint directory" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
@@ -95,7 +96,7 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file from containerd with valid config.dump and valid spec.dump and checkpoint directory" {
-	cp test/config.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	echo "{}" > "$TEST_TMP_DIR1"/status
 	echo "{}" >  "$TEST_TMP_DIR1"/spec.dump
@@ -106,8 +107,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file and --stats and missing stats-dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
@@ -116,9 +117,9 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file and --stats and invalid stats-dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"/stats-dump
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"/stats-dump
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
@@ -127,21 +128,21 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file and --stats and valid stats-dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
-	cp test/stats-dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 0 ]
 	[[ ${lines[6]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[8]} == *"MEMWRITE TIME"* ]]
-	[[ ${lines[10]} == *"446571 us"* ]]
+	[[ ${lines[10]} =~ [1-9]+" us" ]]
 }
 
 @test "Run checkpointctl show with tar file and --mounts and valid spec.dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --mounts
@@ -152,8 +153,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file and --mounts and --full-paths and valid spec.dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --mounts --full-paths
@@ -164,9 +165,9 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file and --all and valid spec.dump and valid stats-dump" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
-	cp test/stats-dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --all
@@ -177,12 +178,12 @@ function teardown() {
 	[[ ${lines[11]} == *"/etc/hostname"* ]]
 	[[ ${lines[13]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[15]} == *"MEMWRITE TIME"* ]]
-	[[ ${lines[17]} == *"446571 us"* ]]
+	[[ ${lines[17]} =~ [1-9]+" us" ]]
 }
 
 @test "Run checkpointctl show with tar file and missing --mounts/--all and --full-paths" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --full-paths
@@ -191,8 +192,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and no checkpoint directory" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 1 ]
@@ -200,8 +201,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and checkpoint directory" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
@@ -210,8 +211,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file compressed" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test.tar.gz . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar.gz
@@ -220,8 +221,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file corrupted" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	dd if=/dev/urandom of="$TEST_TMP_DIR2"/test.tar bs=1 count=10 seek=2 conv=notrunc
@@ -231,8 +232,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file compressed and corrupted" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test.tar.gz . )
 	dd if=/dev/urandom of="$TEST_TMP_DIR2"/test.tar.gz bs=1 count=10 seek=2 conv=notrunc
@@ -242,8 +243,8 @@ function teardown() {
 }
 
 @test "Run checkpointctl show with tar file and rootfs-diff tar file" {
-	cp test/config.dump "$TEST_TMP_DIR1"
-	cp test/spec.dump "$TEST_TMP_DIR1"
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	echo 1 > "$TEST_TMP_DIR1"/test.pid
 	tar -cf "$TEST_TMP_DIR1"/rootfs-diff.tar -C "$TEST_TMP_DIR1" test.pid

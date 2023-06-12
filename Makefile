@@ -68,14 +68,14 @@ shellcheck:
 lint: golang-lint shellcheck
 
 test: $(NAME)
-	bats test/*bats
+	make -C test
 
 test-junit: $(NAME)
-	bats -F junit test/*bats > junit.xml
+	make -C test test-junit clean
 
 coverage: check-go-version $(NAME).coverage
 	mkdir -p $(COVERAGE_PATH)
-	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 bats test/*bats
+	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 make -C test
 	# Print coverage from this run
 	$(GO) tool covdata percent -i=${COVERAGE_PATH}
 	$(GO) tool covdata textfmt -i=${COVERAGE_PATH} -o ${COVERAGE_PATH}/coverage.out
