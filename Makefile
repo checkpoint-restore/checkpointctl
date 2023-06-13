@@ -37,12 +37,12 @@ check-go-version:
 
 
 $(NAME): $(GO_SRC)
-	$(GO_BUILD) -buildmode=pie -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
+	$(GO_BUILD) -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 $(NAME).coverage: check-go-version $(GO_SRC)
 	$(GO) build \
 		-cover \
-		-buildmode=pie -o $@ \
+		-o $@ \
 		-ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 release:
