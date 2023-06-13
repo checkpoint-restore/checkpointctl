@@ -45,6 +45,8 @@ $(NAME).coverage: check-go-version $(GO_SRC)
 		-buildmode=pie -o $@ \
 		-ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
+release:
+	CGO_ENABLED=0 $(GO_BUILD) -o $(NAME) -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 install: $(NAME)
 	@echo "  INSTALL " $<
@@ -103,6 +105,7 @@ help:
 	@echo " * codecov - upload coverage report to codecov.io"
 	@echo " * install - install the binary to $(BINDIR)"
 	@echo " * uninstall - remove the installed binary from $(BINDIR)"
+	@echo " * release - build a static binary"
 	@echo " * help - show help"
 
-.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help check-go-version test-junit
+.PHONY: clean install uninstall release lint golang-lint shellcheck vendor test help check-go-version test-junit
