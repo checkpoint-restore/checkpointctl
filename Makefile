@@ -94,11 +94,15 @@ help:
 	@echo "Usage: make <target>"
 	@echo " * clean - remove artifacts"
 	@echo " * lint - verify the source code (shellcheck/golangci-lint)"
-	@echo " * golang-lint - run golang-lint"
-	@echo " * shellcheck - run shellecheck"
-	@echo " * vendor - update go.mod, go.sum and vendor directory"
+	@echo " * golang-lint - run golangci-lint"
+	@echo " * shellcheck - run shellcheck"
+	@echo " * vendor - update go.mod, go.sum, and vendor directory"
 	@echo " * test - run tests"
 	@echo " * test-junit - run tests and create junit output"
+	@echo " * coverage - generate test coverage report"
+	@echo " * codecov - upload coverage report to codecov.io"
+	@echo " * install - install the binary to $(BINDIR)"
+	@echo " * uninstall - remove the installed binary from $(BINDIR)"
 	@echo " * help - show help"
 
 .PHONY: clean install uninstall lint golang-lint shellcheck vendor test help check-go-version test-junit
