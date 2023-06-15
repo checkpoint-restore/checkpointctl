@@ -234,16 +234,17 @@ type archiveSizes struct {
 func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 	result := &archiveSizes{}
 
-	err := iterateTarArchive(archiveInput, func(hdr *tar.Header) {
-		if hdr.FileInfo().Mode().IsRegular() {
-			if hasPrefix(hdr.Name, metadata.CheckpointDirectory) {
+	err := iterateTarArchive(archiveInput, func(r *tar.Reader, header *tar.Header) error {
+		if header.FileInfo().Mode().IsRegular() {
+			if hasPrefix(header.Name, metadata.CheckpointDirectory) {
 				// Add the file size to the total checkpoint size
-				result.checkpointSize += hdr.Size
-			} else if hasPrefix(hdr.Name, metadata.RootFsDiffTar) {
+				result.checkpointSize += header.Size
+			} else if hasPrefix(header.Name, metadata.RootFsDiffTar) {
 				// Read the size of rootfs diff
-				result.rootFsDiffTarSize = hdr.Size
+				result.rootFsDiffTarSize = header.Size
 			}
 		}
+		return nil
 	})
 	return result, err
 }
@@ -257,41 +258,40 @@ func shortenPath(path string) string {
 }
 
 // untarFiles unpack only specified files from an archive to the destination directory.
-func untarFiles(src, dest string, files ...string) error {
+func untarFiles(src, dest string, files []string) error {
 	archiveFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer archiveFile.Close()
 
-	options := archive.TarOptions{
-		ExcludePatterns: []string{
-			"artifacts",
-			"ctr.log",
-			metadata.RootFsDiffTar,
-			metadata.NetworkStatusFile,
-			metadata.DeletedFilesFile,
-			metadata.CheckpointDirectory,
-			metadata.CheckpointVolumesDirectory,
-			metadata.ConfigDumpFile,
-			metadata.SpecDumpFile,
-			metadata.DevShmCheckpointTar,
-			metadata.DumpLogFile,
-			metadata.RestoreLogFile,
-		},
-	}
+	if err := iterateTarArchive(src, func(r *tar.Reader, header *tar.Header) error {
+		// Check if the current entry is one of the target files
+		for _, file := range files {
+			if strings.Contains(header.Name, file) {
+				// Create the destination folder
+				if err := os.MkdirAll(filepath.Join(dest, filepath.Dir(header.Name)), 0o644); err != nil {
+					return err
+				}
+				// Create the destination file
+				destFile, err := os.Create(filepath.Join(dest, header.Name))
+				if err != nil {
+					return err
+				}
+				defer destFile.Close()
 
-	// Remove files from ExcludePatterns if they are present
-	for _, file := range files {
-		for i, pattern := range options.ExcludePatterns {
-			if pattern == file {
-				options.ExcludePatterns = append(options.ExcludePatterns[:i], options.ExcludePatterns[i+1:]...)
+				// Copy the contents of the entry to the destination file
+				_, err = io.Copy(destFile, r)
+				if err != nil {
+					return err
+				}
+
+				// File successfully extracted, move to the next file
 				break
 			}
 		}
-	}
-
-	if err := archive.Untar(archiveFile, dest, &options); err != nil {
+		return nil
+	}); err != nil {
 		return fmt.Errorf("unpacking of checkpoint archive failed: %w", err)
 	}
 
@@ -303,18 +303,19 @@ func untarFiles(src, dest string, files ...string) error {
 func isFileInArchive(archiveInput, pattern string, isDir bool) (bool, error) {
 	found := false
 
-	err := iterateTarArchive(archiveInput, func(hdr *tar.Header) {
+	err := iterateTarArchive(archiveInput, func(_ *tar.Reader, header *tar.Header) error {
 		// Check if the current file or directory matches the pattern and type
-		if hasPrefix(hdr.Name, pattern) && hdr.FileInfo().Mode().IsDir() == isDir {
+		if hasPrefix(header.Name, pattern) && header.FileInfo().Mode().IsDir() == isDir {
 			found = true
 		}
+		return nil
 	})
 	return found, err
 }
 
 // iterateTarArchive reads a tar archive from the specified input file,
 // decompresses it, and iterates through each entry, invoking the provided callback function.
-func iterateTarArchive(archiveInput string, callback func(hdr *tar.Header)) error {
+func iterateTarArchive(archiveInput string, callback func(r *tar.Reader, header *tar.Header) error) error {
 	archiveFile, err := os.Open(archiveInput)
 	if err != nil {
 		return err
@@ -332,7 +333,7 @@ func iterateTarArchive(archiveInput string, callback func(hdr *tar.Header)) erro
 	tarReader := tar.NewReader(stream)
 
 	for {
-		hdr, err := tarReader.Next()
+		header, err := tarReader.Next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -340,7 +341,9 @@ func iterateTarArchive(archiveInput string, callback func(hdr *tar.Header)) erro
 			return err
 		}
 
-		callback(hdr)
+		if err = callback(tarReader, header); err != nil {
+			return err
+		}
 	}
 
 	return nil

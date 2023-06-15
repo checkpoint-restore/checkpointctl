@@ -122,7 +122,13 @@ func show(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	if err := untarFiles(input, dir, metadata.SpecDumpFile, metadata.ConfigDumpFile); err != nil {
+	files := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+
+	if stats {
+		files = append(files, "stats-dump")
+	}
+
+	if err := untarFiles(input, dir, files); err != nil {
 		return err
 	}
 
