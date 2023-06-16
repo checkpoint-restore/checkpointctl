@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ var (
 	stats     bool
 	mounts    bool
 	fullPaths bool
+	psTree    bool
 	showAll   bool
 )
 
@@ -65,6 +67,12 @@ func setupShow() *cobra.Command {
 		"Print overview about mounts used in the checkpoints",
 	)
 	flags.BoolVar(
+		&psTree,
+		"ps-tree",
+		false,
+		"Print overview about the process tree in the checkpoints",
+	)
+	flags.BoolVar(
 		&fullPaths,
 		"full-paths",
 		false,
@@ -88,6 +96,7 @@ func show(cmd *cobra.Command, args []string) error {
 	if showAll {
 		stats = true
 		mounts = true
+		psTree = true
 	}
 	if fullPaths && !mounts {
 		return fmt.Errorf("Cannot use --full-paths without --mounts/--all option")
@@ -122,7 +131,24 @@ func show(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	if err := untarFiles(input, dir, metadata.SpecDumpFile, metadata.ConfigDumpFile); err != nil {
+	// A list of files that need to be unarchived. The files need not be
+	// full paths. Even a substring of the file name is valid.
+	files := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+
+	if stats {
+		files = append(files, "stats-dump")
+	}
+
+	if psTree {
+		files = append(
+			files,
+			filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+			// All core-*.img files
+			filepath.Join(metadata.CheckpointDirectory, "core-"),
+		)
+	}
+
+	if err := untarFiles(input, dir, files); err != nil {
 		return err
 	}
 
