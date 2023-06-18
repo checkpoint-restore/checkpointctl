@@ -241,7 +241,6 @@ func renderPsTree(psTree *crit.PsTree, containerName string) {
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
 		node := tree.AddMetaBranch(root.PId, root.Comm)
 		for _, child := range root.Children {
-			node.AddMetaNode(child.PId, root.Comm)
 			processNodes(node, child)
 		}
 	}
