@@ -37,14 +37,16 @@ check-go-version:
 
 
 $(NAME): $(GO_SRC)
-	$(GO_BUILD) -buildmode=pie -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
+	$(GO_BUILD) -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 $(NAME).coverage: check-go-version $(GO_SRC)
 	$(GO) build \
 		-cover \
-		-buildmode=pie -o $@ \
+		-o $@ \
 		-ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
+release:
+	CGO_ENABLED=0 $(GO_BUILD) -o $(NAME) -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 install: $(NAME)
 	@echo "  INSTALL " $<
@@ -94,11 +96,16 @@ help:
 	@echo "Usage: make <target>"
 	@echo " * clean - remove artifacts"
 	@echo " * lint - verify the source code (shellcheck/golangci-lint)"
-	@echo " * golang-lint - run golang-lint"
-	@echo " * shellcheck - run shellecheck"
-	@echo " * vendor - update go.mod, go.sum and vendor directory"
+	@echo " * golang-lint - run golangci-lint"
+	@echo " * shellcheck - run shellcheck"
+	@echo " * vendor - update go.mod, go.sum, and vendor directory"
 	@echo " * test - run tests"
 	@echo " * test-junit - run tests and create junit output"
+	@echo " * coverage - generate test coverage report"
+	@echo " * codecov - upload coverage report to codecov.io"
+	@echo " * install - install the binary to $(BINDIR)"
+	@echo " * uninstall - remove the installed binary from $(BINDIR)"
+	@echo " * release - build a static binary"
 	@echo " * help - show help"
 
-.PHONY: clean install uninstall lint golang-lint shellcheck vendor test help check-go-version test-junit
+.PHONY: clean install uninstall release lint golang-lint shellcheck vendor test help check-go-version test-junit

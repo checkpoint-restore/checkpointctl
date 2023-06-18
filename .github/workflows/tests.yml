@@ -43,3 +43,23 @@ jobs:
         name: event-file
         retention-days: 1
         path: ${{ github.event_path }}
+
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Build release binary
+      run: make release
+
+    - name: Check static binary
+      run: |
+        file_output=$(file checkpointctl)
+        if [[ "$file_output" =~ .*statically\ linked.* ]]; then
+          echo "Binary is static"
+          exit 0
+        else
+          echo "Binary is not static"
+          exit 1
+        fi
