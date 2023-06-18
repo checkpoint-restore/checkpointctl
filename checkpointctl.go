@@ -18,6 +18,7 @@ var (
 	stats   bool
 	mounts  bool
 	psTree  bool
+	files   bool
 	showAll bool
 )
 
@@ -86,7 +87,7 @@ func setupInspect() *cobra.Command {
 		&mounts,
 		"mounts",
 		false,
-		"Display an overview of mounts used in the checkpoint",
+		"Display an overview of mounts used in the container checkpoint",
 	)
 	flags.BoolVar(
 		&psTree,
@@ -95,10 +96,16 @@ func setupInspect() *cobra.Command {
 		"Display an overview of processes in the container checkpoint",
 	)
 	flags.BoolVar(
+		&files,
+		"files",
+		false,
+		"Display the open file descriptors for processes in the container checkpoint",
+	)
+	flags.BoolVar(
 		&showAll,
 		"all",
 		false,
-		"Show all information about container checkpoint",
+		"Show all information about container checkpoints",
 	)
 	flags.StringVar(
 		&format,
@@ -115,6 +122,7 @@ func inspect(cmd *cobra.Command, args []string) error {
 		stats = true
 		mounts = true
 		psTree = true
+		files = true
 	}
 
 	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
@@ -123,11 +131,28 @@ func inspect(cmd *cobra.Command, args []string) error {
 		requiredFiles = append(requiredFiles, "stats-dump")
 	}
 
+	if files {
+		// Enable displaying process tree, even if it is not passed.
+		// This is necessary to attach the files to the processes
+		// that opened them and display this in the tree.
+		psTree = true
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "files.img"),
+			// fs-*.img
+			filepath.Join(metadata.CheckpointDirectory, "fs-"),
+			// ids-*.img
+			filepath.Join(metadata.CheckpointDirectory, "ids-"),
+			// fdinfo-*.img
+			filepath.Join(metadata.CheckpointDirectory, "fdinfo-"),
+		)
+	}
+
 	if psTree {
 		requiredFiles = append(
 			requiredFiles,
 			filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
-			// All core-*.img files
+			// core-*.img
 			filepath.Join(metadata.CheckpointDirectory, "core-"),
 		)
 	}

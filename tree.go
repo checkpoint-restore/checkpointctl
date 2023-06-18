@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v6/crit"
-	"github.com/checkpoint-restore/go-criu/v6/crit/images"
+	stats_pb "github.com/checkpoint-restore/go-criu/v6/crit/images/stats"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/xlab/treeprint"
 )
@@ -34,13 +35,23 @@ func renderTreeView(tasks []task) error {
 		}
 
 		if psTree {
-			c := crit.New("", "", filepath.Join(task.outputDir, "checkpoint"), false, false)
+			c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
 			psTree, err := c.ExplorePs()
 			if err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 
 			addPsTreeToTree(tree, psTree)
+		}
+
+		if files {
+			c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
+			fds, err := c.ExploreFds()
+			if err != nil {
+				return fmt.Errorf("failed to get file descriptors: %w", err)
+			}
+
+			addFdsToTree(tree, fds)
 		}
 
 		fmt.Printf("\nDisplaying container checkpoint tree view from %s\n\n", task.checkpointFilePath)
@@ -89,7 +100,7 @@ func addMountsToTree(tree treeprint.Tree, specDump *spec.Spec) {
 	}
 }
 
-func addDumpStatsToTree(tree treeprint.Tree, dumpStats *images.DumpStatsEntry) {
+func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry) {
 	statsTree := tree.AddBranch("CRIU dump statistics")
 	statsTree.AddBranch(fmt.Sprintf("Freezing time: %d us", dumpStats.GetFreezingTime()))
 	statsTree.AddBranch(fmt.Sprintf("Frozen time: %d us", dumpStats.GetFrozenTime()))
@@ -105,11 +116,21 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) {
 	// processes as child nodes of the branch.
 	var processNodes func(treeprint.Tree, *crit.PsTree)
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
-		node := tree.AddMetaBranch(root.PId, root.Comm)
+		node := tree.AddMetaBranch(root.PID, root.Comm)
 		for _, child := range root.Children {
 			processNodes(node, child)
 		}
 	}
 	psTreeNode := tree.AddBranch("Process tree")
 	processNodes(psTreeNode, psTree)
+}
+
+func addFdsToTree(tree treeprint.Tree, fds []*crit.Fd) {
+	var node treeprint.Tree
+	for _, fd := range fds {
+		node = tree.FindByMeta(fd.PId)
+		for _, file := range fd.Files {
+			node.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
+		}
+	}
 }
