@@ -16,7 +16,7 @@ jobs:
           # Add PPA for CRIU
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update
-          sudo apt-get install -qqy criu
+          sudo apt-get install -qqy criu podman
           # Use BATS with NPM as the version in the Ubuntu package registry is outdated
           npm install -g bats
       - name: Run make coverage

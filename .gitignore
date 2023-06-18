@@ -3,4 +3,6 @@ checkpointctl.coverage
 .coverage
 junit.xml
 test/piggie/piggie
-test/test-imgs
+test/piggie-test-imgs
+test/podman-test-imgs
+test/podman-chkpt.tar.gz

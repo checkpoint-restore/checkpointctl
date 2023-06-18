@@ -130,7 +130,7 @@ function teardown() {
 @test "Run checkpointctl show with tar file and --stats and valid stats-dump" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
-	cp test-imgs/stats-dump "$TEST_TMP_DIR1"
+	cp piggie-test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
@@ -167,10 +167,10 @@ function teardown() {
 @test "Run checkpointctl show with tar file and --all and valid spec.dump and valid stats-dump" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
-	cp test-imgs/stats-dump "$TEST_TMP_DIR1"
+	cp piggie-test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
-	cp test-imgs/pstree.img \
-		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	cp piggie-test-imgs/pstree.img \
+		piggie-test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
@@ -262,8 +262,8 @@ function teardown() {
 	cp data/config.dump \
 		data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
-	cp test-imgs/pstree.img \
-		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	cp piggie-test-imgs/pstree.img \
+		piggie-test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --ps-tree
 	[ "$status" -eq 0 ]
