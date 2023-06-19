@@ -124,7 +124,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 1 ]
-	[[ ${lines[6]} == *"Unknown magic"* ]]
+	[[ ${lines[6]} == *"unknown magic"* ]]
 }
 
 @test "Run checkpointctl show with tar file and --stats and valid stats-dump" {

@@ -17,12 +17,14 @@ import (
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v6/crit"
-	"github.com/checkpoint-restore/go-criu/v6/crit/images"
+	statsImg "github.com/checkpoint-restore/go-criu/v6/crit/images/stats"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/xlab/treeprint"
 )
+
+var pageSize = os.Getpagesize()
 
 type containerMetadata struct {
 	Name    string `json:"name,omitempty"`
@@ -176,7 +178,7 @@ func showContainerCheckpoints(tasks []task) error {
 
 		if psTree {
 			// The image files reside in a subdirectory called "checkpoint"
-			c := crit.New("", "", filepath.Join(tasks[0].outputDir, "checkpoint"), false, false)
+			c := crit.New(nil, nil, filepath.Join(tasks[0].outputDir, "checkpoint"), false, false)
 			// Get process tree with CRIT
 			psTree, err := c.ExplorePs()
 			if err != nil {
@@ -236,7 +238,7 @@ func renderMounts(specDump *spec.Spec) {
 	table.Render()
 }
 
-func renderDumpStats(dumpStats *images.DumpStatsEntry) {
+func renderDumpStats(dumpStats *statsImg.DumpStatsEntry) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{
 		"Freezing Time",
@@ -269,7 +271,7 @@ func renderPsTree(psTree *crit.PsTree, containerName string) {
 	// processes as child nodes of the branch.
 	var processNodes func(treeprint.Tree, *crit.PsTree)
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
-		node := tree.AddMetaBranch(root.PId, root.Comm)
+		node := tree.AddMetaBranch(root.PID, root.Comm)
 		for _, child := range root.Children {
 			processNodes(node, child)
 		}
