@@ -269,3 +269,24 @@ function teardown() {
 	[ "$status" -eq 0 ]
 	[[ ${lines[8]} == *"piggie"* ]]
 }
+
+@test "Run checkpointctl show with multiple tar files" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar .  && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/*.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[3]} == *"Podman"* ]]
+	[[ ${lines[5]} == *"Podman"* ]]
+}
+
+@test "Run checkpointctl show with multiple tar files with additional flags" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar .  && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/*.tar --all
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"displaying multiple checkpoints with additional flags is not supported"* ]]
+}
