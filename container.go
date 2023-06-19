@@ -185,7 +185,7 @@ func showContainerCheckpoints(tasks []task) error {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 
-			renderPsTree(psTree, ci.Name)
+			renderPsTree(psTree, ci.Name, tasks[0].outputDir)
 		}
 	}
 
@@ -260,7 +260,7 @@ func renderDumpStats(dumpStats *statsImg.DumpStatsEntry) {
 	table.Render()
 }
 
-func renderPsTree(psTree *crit.PsTree, containerName string) {
+func renderPsTree(psTree *crit.PsTree, containerName, checkpointDir string) {
 	var tree treeprint.Tree
 	if containerName == "" {
 		containerName = "Container"
@@ -271,7 +271,13 @@ func renderPsTree(psTree *crit.PsTree, containerName string) {
 	// processes as child nodes of the branch.
 	var processNodes func(treeprint.Tree, *crit.PsTree)
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
-		node := tree.AddMetaBranch(root.PID, root.Comm)
+		// Try to retrieve the full command-line from memory pages
+		cmdline, err := getCmdline(checkpointDir, root.PID)
+		if err != nil || cmdline == "" {
+			cmdline = root.Comm
+		}
+
+		node := tree.AddMetaBranch(root.PID, cmdline)
 		for _, child := range root.Children {
 			processNodes(node, child)
 		}
@@ -409,4 +415,19 @@ func iterateTarArchive(archiveInput string, callback func(r *tar.Reader, header 
 	}
 
 	return nil
+}
+
+func getCmdline(checkpointDir string, pid uint32) (cmdline string, err error) {
+	mr, err := crit.NewMemoryReader(filepath.Join(checkpointDir, metadata.CheckpointDirectory), pid, pageSize)
+	if err != nil {
+		return
+	}
+
+	buffer, err := mr.GetPsArgs()
+	if err != nil {
+		return
+	}
+
+	cmdline = strings.Join(strings.Split(buffer.String(), "\x00"), " ")
+	return
 }

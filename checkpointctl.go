@@ -125,8 +125,11 @@ func show(cmd *cobra.Command, args []string) error {
 			files = append(
 				files,
 				filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
-				// All core-*.img files
+				// All core-*.img, pagemap-*.img, mm-*.img, and pages-*.img files
 				filepath.Join(metadata.CheckpointDirectory, "core-"),
+				filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+				filepath.Join(metadata.CheckpointDirectory, "mm-"),
+				filepath.Join(metadata.CheckpointDirectory, "pages-"),
 			)
 		}
 
