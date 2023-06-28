@@ -34,6 +34,13 @@ type containerInfo struct {
 	Engine  string
 }
 
+type checkpointInfo struct {
+	containerInfo *containerInfo
+	specDump      *spec.Spec
+	configDump    *metadata.ContainerConfig
+	archiveSizes  *archiveSizes
+}
+
 func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *containerInfo {
 	return &containerInfo{
 		Name:    containerConfig.Name,
@@ -64,6 +71,32 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 	}, nil
 }
 
+func getCheckpointInfo(task task) (*checkpointInfo, error) {
+	info := &checkpointInfo{}
+	var err error
+
+	info.configDump, _, err = metadata.ReadContainerCheckpointConfigDump(task.outputDir)
+	if err != nil {
+		return nil, err
+	}
+	info.specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.outputDir)
+	if err != nil {
+		return nil, err
+	}
+
+	info.containerInfo, err = getContainerInfo(task.outputDir, info.specDump, info.configDump)
+	if err != nil {
+		return nil, err
+	}
+
+	info.archiveSizes, err = getArchiveSizes(task.checkpointFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
 func showContainerCheckpoints(tasks []task) error {
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
@@ -79,67 +112,50 @@ func showContainerCheckpoints(tasks []task) error {
 		header = append(header, "IP", "MAC", "CHKPT Size", "Root Fs Diff Size")
 	}
 
-	var specDump *spec.Spec
-	var ci *containerInfo
-
 	for _, task := range tasks {
-		containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(task.outputDir)
-		if err != nil {
-			return err
-		}
-		specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.outputDir)
-		if err != nil {
-			return err
-		}
-
-		ci, err = getContainerInfo(task.outputDir, specDump, containerConfig)
-		if err != nil {
-			return err
-		}
-
-		archiveSizes, err := getArchiveSizes(task.checkpointFilePath)
+		info, err := getCheckpointInfo(task)
 		if err != nil {
 			return err
 		}
 
 		var row []string
-		row = append(row, ci.Name)
-		row = append(row, containerConfig.RootfsImageName)
-		if len(containerConfig.ID) > 12 {
-			row = append(row, containerConfig.ID[:12])
+		row = append(row, info.containerInfo.Name)
+		row = append(row, info.configDump.RootfsImageName)
+		if len(info.configDump.ID) > 12 {
+			row = append(row, info.configDump.ID[:12])
 		} else {
-			row = append(row, containerConfig.ID)
+			row = append(row, info.configDump.ID)
 		}
 
-		row = append(row, containerConfig.OCIRuntime)
-		row = append(row, ci.Created)
-		row = append(row, ci.Engine)
+		row = append(row, info.configDump.OCIRuntime)
+		row = append(row, info.containerInfo.Created)
+		row = append(row, info.containerInfo.Engine)
 
 		if len(tasks) == 1 {
 			fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", task.checkpointFilePath)
 
-			if ci.IP != "" {
+			if info.containerInfo.IP != "" {
 				header = append(header, "IP")
-				row = append(row, ci.IP)
+				row = append(row, info.containerInfo.IP)
 			}
-			if ci.MAC != "" {
+			if info.containerInfo.MAC != "" {
 				header = append(header, "MAC")
-				row = append(row, ci.MAC)
+				row = append(row, info.containerInfo.MAC)
 			}
 
 			header = append(header, "CHKPT Size")
-			row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
+			row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
 
 			// Display root fs diff size if available
-			if archiveSizes.rootFsDiffTarSize != 0 {
+			if info.archiveSizes.rootFsDiffTarSize != 0 {
 				header = append(header, "Root Fs Diff Size")
-				row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
+				row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
 			}
 		} else {
-			row = append(row, ci.IP)
-			row = append(row, ci.MAC)
-			row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
-			row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
+			row = append(row, info.containerInfo.IP)
+			row = append(row, info.containerInfo.MAC)
+			row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
+			row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
 		}
 
 		table.Append(row)

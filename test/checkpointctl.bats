@@ -98,7 +98,6 @@ function teardown() {
 @test "Run checkpointctl show with tar file from containerd with valid config.dump and valid spec.dump and checkpoint directory" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
-	echo "{}" > "$TEST_TMP_DIR1"/status
 	echo "{}" >  "$TEST_TMP_DIR1"/spec.dump
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
@@ -184,7 +183,7 @@ function teardown() {
 	touch "$TEST_TMP_DIR1"/config.dump
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --format=xml
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --format=invalid
 	[ "$status" -eq 1 ]
 	[[ ${lines[0]} == *"invalid output format"* ]]
 }

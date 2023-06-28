@@ -13,30 +13,15 @@ import (
 
 func renderTreeView(tasks []task) error {
 	for _, task := range tasks {
-		containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(task.outputDir)
+		info, err := getCheckpointInfo(task)
 		if err != nil {
 			return err
 		}
 
-		specDump, _, err := metadata.ReadContainerCheckpointSpecDump(task.outputDir)
-		if err != nil {
-			return err
-		}
-
-		ci, err := getContainerInfo(task.outputDir, specDump, containerConfig)
-		if err != nil {
-			return err
-		}
-
-		archiveSizes, err := getArchiveSizes(task.checkpointFilePath)
-		if err != nil {
-			return err
-		}
-
-		tree := buildTree(ci, containerConfig, archiveSizes)
+		tree := buildTree(info.containerInfo, info.configDump, info.archiveSizes)
 
 		if mounts {
-			addMountsToTree(tree, specDump)
+			addMountsToTree(tree, info.specDump)
 		}
 
 		if stats {
