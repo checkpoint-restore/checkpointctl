@@ -4,7 +4,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/spf13/cobra"
@@ -13,6 +15,11 @@ import (
 var (
 	name    string
 	version string
+	format  string
+	stats   bool
+	mounts  bool
+	psTree  bool
+	showAll bool
 )
 
 func main() {
@@ -26,6 +33,10 @@ func main() {
 
 	showCommand := setupShow()
 	rootCommand.AddCommand(showCommand)
+
+	inspectCommand := setupInspect()
+	rootCommand.AddCommand(inspectCommand)
+
 	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {
@@ -36,7 +47,7 @@ func main() {
 func setupShow() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "show",
-		Short:                 "Show information about available checkpoints",
+		Short:                 "Show an overview of container checkpoints",
 		RunE:                  show,
 		Args:                  cobra.MinimumNArgs(1),
 		DisableFlagsInUseLine: true,
@@ -46,51 +57,156 @@ func setupShow() *cobra.Command {
 }
 
 func show(cmd *cobra.Command, args []string) error {
-	tasks := make([]task, 0, len(args))
-
-	for _, input := range args {
-		tar, err := os.Stat(input)
-		if err != nil {
-			return err
-		}
-		if !tar.Mode().IsRegular() {
-			return fmt.Errorf("input %s not a regular file", input)
-		}
-
-		// Check if there is a checkpoint directory in the archive file
-		checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
-		if err != nil {
-			return err
-		}
-
-		if !checkpointDirExists {
-			return fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
-		}
-
-		dir, err := os.MkdirTemp("", "checkpointctl")
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := os.RemoveAll(dir); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-		}()
-
-		// A list of files that need to be unarchived. The files need not be
-		// full paths. Even a substring of the file name is valid.
-		files := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
-		if err := untarFiles(input, dir, files); err != nil {
-			return err
-		}
-
-		tasks = append(tasks, task{checkpointFilePath: input, outputDir: dir})
+	// Only "spec.dump" and "config.dump" are need when for the show sub-command
+	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+	tasks, err := createTasks(args, requiredFiles)
+	if err != nil {
+		return err
 	}
+	defer cleanupTasks(tasks)
 
 	return showContainerCheckpoints(tasks)
+}
+
+func setupInspect() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "inspect",
+		Short: "Display low-level information about a container checkpoint",
+		RunE:  inspect,
+		Args:  cobra.MinimumNArgs(1),
+	}
+	flags := cmd.Flags()
+
+	flags.BoolVar(
+		&stats,
+		"print-stats",
+		false,
+		"Display checkpoint statistics",
+	)
+	flags.BoolVar(
+		&stats,
+		"stats",
+		false,
+		"Display checkpoint statistics",
+	)
+	flags.BoolVar(
+		&mounts,
+		"mounts",
+		false,
+		"Display an overview of mounts used in the checkpoint",
+	)
+	flags.BoolVar(
+		&psTree,
+		"ps-tree",
+		false,
+		"Display an overview of processes in the container checkpoint",
+	)
+	flags.BoolVar(
+		&showAll,
+		"all",
+		false,
+		"Show all information about container checkpoint",
+	)
+	flags.StringVar(
+		&format,
+		"format",
+		"tree",
+		"Specify the output format: tree or json",
+	)
+
+	err := flags.MarkHidden("print-stats")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return cmd
+}
+
+func inspect(cmd *cobra.Command, args []string) error {
+	if showAll {
+		stats = true
+		mounts = true
+		psTree = true
+	}
+
+	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+
+	if stats {
+		requiredFiles = append(requiredFiles, "stats-dump")
+	}
+
+	if psTree {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+			// All core-*.img files
+			filepath.Join(metadata.CheckpointDirectory, "core-"),
+		)
+	}
+
+	tasks, err := createTasks(args, requiredFiles)
+	if err != nil {
+		return err
+	}
+	defer cleanupTasks(tasks)
+
+	switch format {
+	case "tree":
+		return renderTreeView(tasks)
+	case "json":
+		return fmt.Errorf("json format is not supported yet")
+	default:
+		return fmt.Errorf("invalid output format: %s", format)
+	}
 }
 
 type task struct {
 	checkpointFilePath string
 	outputDir          string
+}
+
+func createTasks(args []string, requiredFiles []string) ([]task, error) {
+	tasks := make([]task, 0, len(args))
+
+	for _, input := range args {
+		tar, err := os.Stat(input)
+		if err != nil {
+			return nil, err
+		}
+		if !tar.Mode().IsRegular() {
+			return nil, fmt.Errorf("input %s not a regular file", input)
+		}
+
+		// Check if there is a checkpoint directory in the archive file
+		checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
+		if err != nil {
+			return nil, err
+		}
+
+		if !checkpointDirExists {
+			return nil, fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
+		}
+
+		dir, err := os.MkdirTemp("", "checkpointctl")
+		if err != nil {
+			return nil, err
+		}
+
+		if err := untarFiles(input, dir, requiredFiles); err != nil {
+			return nil, err
+		}
+
+		tasks = append(tasks, task{checkpointFilePath: input, outputDir: dir})
+	}
+
+	return tasks, nil
+}
+
+// cleanupTasks removes all output directories of given tasks
+func cleanupTasks(tasks []task) {
+	for _, task := range tasks {
+		if err := os.RemoveAll(task.outputDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+	}
 }
