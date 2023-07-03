@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	name      string
-	version   string
-	stats     bool
-	mounts    bool
-	fullPaths bool
-	psTree    bool
-	showAll   bool
+	name    string
+	version string
+	format  string
+	stats   bool
+	mounts  bool
+	psTree  bool
+	showAll bool
 )
 
 func main() {
@@ -33,6 +33,10 @@ func main() {
 
 	showCommand := setupShow()
 	rootCommand.AddCommand(showCommand)
+
+	inspectCommand := setupInspect()
+	rootCommand.AddCommand(inspectCommand)
+
 	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {
@@ -42,125 +46,167 @@ func main() {
 
 func setupShow() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "show",
-		Short: "Show information about available checkpoints",
-		RunE:  show,
+		Use:                   "show",
+		Short:                 "Show an overview of container checkpoints",
+		RunE:                  show,
+		Args:                  cobra.MinimumNArgs(1),
+		DisableFlagsInUseLine: true,
+	}
+
+	return cmd
+}
+
+func show(cmd *cobra.Command, args []string) error {
+	// Only "spec.dump" and "config.dump" are need when for the show sub-command
+	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+	tasks, err := createTasks(args, requiredFiles)
+	if err != nil {
+		return err
+	}
+	defer cleanupTasks(tasks)
+
+	return showContainerCheckpoints(tasks)
+}
+
+func setupInspect() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "inspect",
+		Short: "Display low-level information about a container checkpoint",
+		RunE:  inspect,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	flags := cmd.Flags()
+
 	flags.BoolVar(
 		&stats,
 		"print-stats",
 		false,
-		"Print checkpointing statistics if available",
+		"Display checkpoint statistics",
 	)
 	flags.BoolVar(
 		&stats,
 		"stats",
 		false,
-		"Print checkpointing statistics if available",
+		"Display checkpoint statistics",
 	)
 	flags.BoolVar(
 		&mounts,
 		"mounts",
 		false,
-		"Print overview about mounts used in the checkpoints",
+		"Display an overview of mounts used in the checkpoint",
 	)
 	flags.BoolVar(
 		&psTree,
 		"ps-tree",
 		false,
-		"Print overview about the process tree in the checkpoints",
-	)
-	flags.BoolVar(
-		&fullPaths,
-		"full-paths",
-		false,
-		"Display mounts with full paths",
+		"Display an overview of processes in the container checkpoint",
 	)
 	flags.BoolVar(
 		&showAll,
 		"all",
 		false,
-		"Display all additional information about the checkpoints",
+		"Show all information about container checkpoint",
+	)
+	flags.StringVar(
+		&format,
+		"format",
+		"tree",
+		"Specify the output format: tree or json",
 	)
 
 	err := flags.MarkHidden("print-stats")
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return cmd
 }
 
-func show(cmd *cobra.Command, args []string) error {
+func inspect(cmd *cobra.Command, args []string) error {
 	if showAll {
 		stats = true
 		mounts = true
 		psTree = true
 	}
-	if fullPaths && !mounts {
-		return fmt.Errorf("Cannot use --full-paths without --mounts/--all option")
+
+	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+
+	if stats {
+		requiredFiles = append(requiredFiles, "stats-dump")
 	}
 
-	tasks := make([]task, 0, len(args))
-
-	for _, input := range args {
-		tar, err := os.Stat(input)
-		if err != nil {
-			return err
-		}
-		if !tar.Mode().IsRegular() {
-			return fmt.Errorf("input %s not a regular file", input)
-		}
-
-		// A list of files that need to be unarchived. The files need not be
-		// full paths. Even a substring of the file name is valid.
-		files := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
-
-		if stats {
-			files = append(files, "stats-dump")
-		}
-
-		if psTree {
-			files = append(
-				files,
-				filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
-				// All core-*.img files
-				filepath.Join(metadata.CheckpointDirectory, "core-"),
-			)
-		}
-
-		// Check if there is a checkpoint directory in the archive file
-		checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
-		if err != nil {
-			return err
-		}
-
-		if !checkpointDirExists {
-			return fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
-		}
-
-		dir, err := os.MkdirTemp("", "checkpointctl")
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := os.RemoveAll(dir); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-		}()
-
-		if err := untarFiles(input, dir, files); err != nil {
-			return err
-		}
-
-		tasks = append(tasks, task{checkpointFilePath: input, outputDir: dir})
+	if psTree {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+			// All core-*.img files
+			filepath.Join(metadata.CheckpointDirectory, "core-"),
+		)
 	}
 
-	return showContainerCheckpoints(tasks)
+	tasks, err := createTasks(args, requiredFiles)
+	if err != nil {
+		return err
+	}
+	defer cleanupTasks(tasks)
+
+	switch format {
+	case "tree":
+		return renderTreeView(tasks)
+	case "json":
+		return fmt.Errorf("json format is not supported yet")
+	default:
+		return fmt.Errorf("invalid output format: %s", format)
+	}
 }
 
 type task struct {
 	checkpointFilePath string
 	outputDir          string
+}
+
+func createTasks(args []string, requiredFiles []string) ([]task, error) {
+	tasks := make([]task, 0, len(args))
+
+	for _, input := range args {
+		tar, err := os.Stat(input)
+		if err != nil {
+			return nil, err
+		}
+		if !tar.Mode().IsRegular() {
+			return nil, fmt.Errorf("input %s not a regular file", input)
+		}
+
+		// Check if there is a checkpoint directory in the archive file
+		checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
+		if err != nil {
+			return nil, err
+		}
+
+		if !checkpointDirExists {
+			return nil, fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
+		}
+
+		dir, err := os.MkdirTemp("", "checkpointctl")
+		if err != nil {
+			return nil, err
+		}
+
+		if err := untarFiles(input, dir, requiredFiles); err != nil {
+			return nil, err
+		}
+
+		tasks = append(tasks, task{checkpointFilePath: input, outputDir: dir})
+	}
+
+	return tasks, nil
+}
+
+// cleanupTasks removes all output directories of given tasks
+func cleanupTasks(tasks []task) {
+	for _, task := range tasks {
+		if err := os.RemoveAll(task.outputDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+	}
 }

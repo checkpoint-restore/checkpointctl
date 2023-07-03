@@ -16,12 +16,9 @@ import (
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v6/crit"
-	"github.com/checkpoint-restore/go-criu/v6/crit/images"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/xlab/treeprint"
 )
 
 type containerMetadata struct {
@@ -35,6 +32,13 @@ type containerInfo struct {
 	MAC     string
 	Created string
 	Engine  string
+}
+
+type checkpointInfo struct {
+	containerInfo *containerInfo
+	specDump      *spec.Spec
+	configDump    *metadata.ContainerConfig
+	archiveSizes  *archiveSizes
 }
 
 func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *containerInfo {
@@ -67,12 +71,33 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 	}, nil
 }
 
-func showContainerCheckpoints(tasks []task) error {
-	// Return an error early when attempting to display multiple checkpoints with additional flags
-	if (len(tasks) > 1) && (mounts || stats || psTree) {
-		return fmt.Errorf("displaying multiple checkpoints with additional flags is not supported")
+func getCheckpointInfo(task task) (*checkpointInfo, error) {
+	info := &checkpointInfo{}
+	var err error
+
+	info.configDump, _, err = metadata.ReadContainerCheckpointConfigDump(task.outputDir)
+	if err != nil {
+		return nil, err
+	}
+	info.specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.outputDir)
+	if err != nil {
+		return nil, err
 	}
 
+	info.containerInfo, err = getContainerInfo(task.outputDir, info.specDump, info.configDump)
+	if err != nil {
+		return nil, err
+	}
+
+	info.archiveSizes, err = getArchiveSizes(task.checkpointFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func showContainerCheckpoints(tasks []task) error {
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
 		"Container",
@@ -87,67 +112,50 @@ func showContainerCheckpoints(tasks []task) error {
 		header = append(header, "IP", "MAC", "CHKPT Size", "Root Fs Diff Size")
 	}
 
-	var specDump *spec.Spec
-	var ci *containerInfo
-
 	for _, task := range tasks {
-		containerConfig, _, err := metadata.ReadContainerCheckpointConfigDump(task.outputDir)
-		if err != nil {
-			return err
-		}
-		specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.outputDir)
-		if err != nil {
-			return err
-		}
-
-		ci, err = getContainerInfo(task.outputDir, specDump, containerConfig)
-		if err != nil {
-			return err
-		}
-
-		archiveSizes, err := getArchiveSizes(task.checkpointFilePath)
+		info, err := getCheckpointInfo(task)
 		if err != nil {
 			return err
 		}
 
 		var row []string
-		row = append(row, ci.Name)
-		row = append(row, containerConfig.RootfsImageName)
-		if len(containerConfig.ID) > 12 {
-			row = append(row, containerConfig.ID[:12])
+		row = append(row, info.containerInfo.Name)
+		row = append(row, info.configDump.RootfsImageName)
+		if len(info.configDump.ID) > 12 {
+			row = append(row, info.configDump.ID[:12])
 		} else {
-			row = append(row, containerConfig.ID)
+			row = append(row, info.configDump.ID)
 		}
 
-		row = append(row, containerConfig.OCIRuntime)
-		row = append(row, ci.Created)
-		row = append(row, ci.Engine)
+		row = append(row, info.configDump.OCIRuntime)
+		row = append(row, info.containerInfo.Created)
+		row = append(row, info.containerInfo.Engine)
 
 		if len(tasks) == 1 {
 			fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", task.checkpointFilePath)
 
-			if ci.IP != "" {
+			if info.containerInfo.IP != "" {
 				header = append(header, "IP")
-				row = append(row, ci.IP)
+				row = append(row, info.containerInfo.IP)
 			}
-			if ci.MAC != "" {
+			if info.containerInfo.MAC != "" {
 				header = append(header, "MAC")
-				row = append(row, ci.MAC)
+				row = append(row, info.containerInfo.MAC)
 			}
 
 			header = append(header, "CHKPT Size")
-			row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
+			row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
 
 			// Display root fs diff size if available
-			if archiveSizes.rootFsDiffTarSize != 0 {
+			if info.archiveSizes.rootFsDiffTarSize != 0 {
 				header = append(header, "Root Fs Diff Size")
-				row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
+				row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
 			}
 		} else {
-			row = append(row, ci.IP)
-			row = append(row, ci.MAC)
-			row = append(row, metadata.ByteToString(archiveSizes.checkpointSize))
-			row = append(row, metadata.ByteToString(archiveSizes.rootFsDiffTarSize))
+			row = append(row, info.containerInfo.IP)
+			row = append(row, info.containerInfo.MAC)
+			row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
+			row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
 		}
 
 		table.Append(row)
@@ -157,35 +165,6 @@ func showContainerCheckpoints(tasks []task) error {
 	table.SetAutoMergeCells(false)
 	table.SetRowLine(true)
 	table.Render()
-
-	// If there is only one checkpoint to show, check the mounts and stats flags
-	if len(tasks) == 1 {
-		if mounts {
-			renderMounts(specDump)
-		}
-
-		if stats {
-			// Get dump statistics with crit
-			dumpStats, err := crit.GetDumpStats(tasks[0].outputDir)
-			if err != nil {
-				return fmt.Errorf("failed to get dump statistics: %w", err)
-			}
-
-			renderDumpStats(dumpStats)
-		}
-
-		if psTree {
-			// The image files reside in a subdirectory called "checkpoint"
-			c := crit.New("", "", filepath.Join(tasks[0].outputDir, "checkpoint"), false, false)
-			// Get process tree with CRIT
-			psTree, err := c.ExplorePs()
-			if err != nil {
-				return fmt.Errorf("failed to get process tree: %w", err)
-			}
-
-			renderPsTree(psTree, ci.Name)
-		}
-	}
 
 	return nil
 }
@@ -210,75 +189,6 @@ func getContainerInfo(checkpointDir string, specDump *spec.Spec, containerConfig
 	}
 
 	return ci, nil
-}
-
-func renderMounts(specDump *spec.Spec) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{
-		"Destination",
-		"Type",
-		"Source",
-	})
-	// Get overview of mounts from spec.dump
-	for _, data := range specDump.Mounts {
-		table.Append([]string{
-			data.Destination,
-			data.Type,
-			func() string {
-				if fullPaths {
-					return data.Source
-				}
-				return shortenPath(data.Source)
-			}(),
-		})
-	}
-	fmt.Println("\nOverview of Mounts")
-	table.Render()
-}
-
-func renderDumpStats(dumpStats *images.DumpStatsEntry) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{
-		"Freezing Time",
-		"Frozen Time",
-		"Memdump Time",
-		"Memwrite Time",
-		"Pages Scanned",
-		"Pages Written",
-	})
-	table.Append([]string{
-		fmt.Sprintf("%d us", dumpStats.GetFreezingTime()),
-		fmt.Sprintf("%d us", dumpStats.GetFrozenTime()),
-		fmt.Sprintf("%d us", dumpStats.GetMemdumpTime()),
-		fmt.Sprintf("%d us", dumpStats.GetMemwriteTime()),
-		fmt.Sprintf("%d", dumpStats.GetPagesScanned()),
-		fmt.Sprintf("%d", dumpStats.GetPagesWritten()),
-	})
-	fmt.Println("\nCRIU dump statistics")
-	table.Render()
-}
-
-func renderPsTree(psTree *crit.PsTree, containerName string) {
-	var tree treeprint.Tree
-	if containerName == "" {
-		containerName = "Container"
-	}
-	tree = treeprint.NewWithRoot(containerName)
-	// processNodes is a recursive function to create
-	// a new branch for each process and add its child
-	// processes as child nodes of the branch.
-	var processNodes func(treeprint.Tree, *crit.PsTree)
-	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
-		node := tree.AddMetaBranch(root.PId, root.Comm)
-		for _, child := range root.Children {
-			processNodes(node, child)
-		}
-	}
-
-	processNodes(tree, psTree)
-
-	fmt.Print("\nProcess tree\n\n")
-	fmt.Println(tree.String())
 }
 
 func hasPrefix(path, prefix string) bool {
@@ -307,14 +217,6 @@ func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 		return nil
 	})
 	return result, err
-}
-
-func shortenPath(path string) string {
-	parts := strings.Split(path, string(filepath.Separator))
-	if len(parts) <= 2 {
-		return path
-	}
-	return filepath.Join("..", filepath.Join(parts[len(parts)-2:]...))
 }
 
 // untarFiles unpack only specified files from an archive to the destination directory.
