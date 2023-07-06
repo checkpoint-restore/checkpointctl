@@ -69,17 +69,17 @@ func buildTree(ci *containerInfo, containerConfig *metadata.ContainerConfig, arc
 		tree.AddBranch(fmt.Sprintf("MAC: %s", ci.MAC))
 	}
 
-	tree.AddBranch(fmt.Sprintf("Checkpoint Size: %s", metadata.ByteToString(archiveSizes.checkpointSize)))
+	tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(archiveSizes.checkpointSize)))
 
 	if archiveSizes.rootFsDiffTarSize != 0 {
-		tree.AddBranch(fmt.Sprintf("Root Fs Diff Size: %s", metadata.ByteToString(archiveSizes.rootFsDiffTarSize)))
+		tree.AddBranch(fmt.Sprintf("Root FS diff size: %s", metadata.ByteToString(archiveSizes.rootFsDiffTarSize)))
 	}
 
 	return tree
 }
 
 func addMountsToTree(tree treeprint.Tree, specDump *spec.Spec) {
-	mountsTree := tree.AddBranch("Overview of Mounts")
+	mountsTree := tree.AddBranch("Overview of mounts")
 	for _, data := range specDump.Mounts {
 		mountTree := mountsTree.AddBranch(fmt.Sprintf("Destination: %s", data.Destination))
 		mountTree.AddBranch(fmt.Sprintf("Type: %s", data.Type))
@@ -91,12 +91,12 @@ func addMountsToTree(tree treeprint.Tree, specDump *spec.Spec) {
 
 func addDumpStatsToTree(tree treeprint.Tree, dumpStats *images.DumpStatsEntry) {
 	statsTree := tree.AddBranch("CRIU dump statistics")
-	statsTree.AddBranch(fmt.Sprintf("Freezing Time: %d us", dumpStats.GetFreezingTime()))
-	statsTree.AddBranch(fmt.Sprintf("Frozen Time: %d us", dumpStats.GetFrozenTime()))
-	statsTree.AddBranch(fmt.Sprintf("Memdump Time: %d us", dumpStats.GetMemdumpTime()))
-	statsTree.AddBranch(fmt.Sprintf("Memwrite Time: %d us", dumpStats.GetMemwriteTime()))
-	statsTree.AddBranch(fmt.Sprintf("Pages Scanned: %d us", dumpStats.GetPagesScanned()))
-	statsTree.AddBranch(fmt.Sprintf("Pages Written: %d us", dumpStats.GetPagesWritten()))
+	statsTree.AddBranch(fmt.Sprintf("Freezing time: %d us", dumpStats.GetFreezingTime()))
+	statsTree.AddBranch(fmt.Sprintf("Frozen time: %d us", dumpStats.GetFrozenTime()))
+	statsTree.AddBranch(fmt.Sprintf("Memdump time: %d us", dumpStats.GetMemdumpTime()))
+	statsTree.AddBranch(fmt.Sprintf("Memwrite time: %d us", dumpStats.GetMemwriteTime()))
+	statsTree.AddBranch(fmt.Sprintf("Pages scanned: %d us", dumpStats.GetPagesScanned()))
+	statsTree.AddBranch(fmt.Sprintf("Pages written: %d us", dumpStats.GetPagesWritten()))
 }
 
 func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) {

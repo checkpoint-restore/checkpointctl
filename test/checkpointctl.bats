@@ -246,7 +246,7 @@ function teardown() {
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 0 ]
 	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[12]} == *"Memwrite Time"* ]]
+	[[ ${lines[12]} == *"Memwrite time"* ]]
 	[[ ${lines[13]} =~ [1-9]+" us" ]]
 }
 
@@ -257,7 +257,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --mounts
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Overview of Mounts"* ]]
+	[[ ${lines[8]} == *"Overview of mounts"* ]]
 	[[ ${lines[9]} == *"Destination"* ]]
 	[[ ${lines[10]} == *"proc"* ]]
 }
@@ -282,12 +282,12 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Overview of Mounts"* ]]
+	[[ ${lines[8]} == *"Overview of mounts"* ]]
 	[[ ${lines[9]} == *"Destination"* ]]
 	[[ ${lines[10]} == *"proc"* ]]
 	[[ ${lines[12]} == *"/etc/hostname"* ]]
 	[[ ${lines[15]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[19]} == *"Memwrite Time"* ]]
+	[[ ${lines[19]} == *"Memwrite time"* ]]
 	[[ ${lines[20]} =~ [1-9]+" us" ]]
 	[[ ${lines[22]} == *"Process tree"* ]]
 	[[ ${lines[23]} == *"piggie"* ]]
@@ -342,7 +342,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Root Fs Diff Size"* ]]
+	[[ ${lines[8]} == *"Root FS diff size"* ]]
 }
 
 @test "Run checkpointctl inspect with multiple tar files" {
