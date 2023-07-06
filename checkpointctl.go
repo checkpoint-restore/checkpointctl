@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -79,12 +78,6 @@ func setupInspect() *cobra.Command {
 
 	flags.BoolVar(
 		&stats,
-		"print-stats",
-		false,
-		"Display checkpoint statistics",
-	)
-	flags.BoolVar(
-		&stats,
 		"stats",
 		false,
 		"Display checkpoint statistics",
@@ -113,11 +106,6 @@ func setupInspect() *cobra.Command {
 		"tree",
 		"Specify the output format: tree or json",
 	)
-
-	err := flags.MarkHidden("print-stats")
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	return cmd
 }
