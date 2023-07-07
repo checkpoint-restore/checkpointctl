@@ -13,7 +13,9 @@ Details on how to create checkpoints with the help of [CRIU][criu] can be found 
 * [Forensic container checkpointing in Kubernetes][forensic]
 * [Podman checkpoint][podman]
 
-To display information about a checkpoint archive you can just use
+## Usage
+
+To display an overview of a checkpoint archive you can just use
 `checkpointctl show`:
 
 ```console
@@ -39,25 +41,28 @@ $ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-co
 +-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
 ```
 
-It is also possible to display additional checkpoint related information
-with the parameter `--stats`:
+To retrieve low-level information about a container checkpoint, use the `checkpointctl inspect` command:
 
 ```console
-$ checkpointctl show /tmp/dump.tar --stats
+$ checkpointctl inspect /tmp/ubuntu_looper.tar.gz --ps-tree
 
-+-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
-|    CONTAINER    |                  IMAGE                   |      ID      | RUNTIME |       CREATED        | ENGINE | CHKPT SIZE | ROOT FS DIFF SIZE |
-+-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
-| magical_murdock | quay.io/adrianreber/wildfly-hello:latest | f11d11844af0 | crun    | 2023-02-28T09:43:52Z | Podman | 338.2 MiB  | 177.0 KiB         |
-+-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
-
-CRIU dump statistics
-+---------------+-------------+--------------+---------------+---------------+---------------+
-| FREEZING TIME | FROZEN TIME | MEMDUMP TIME | MEMWRITE TIME | PAGES SCANNED | PAGES WRITTEN |
-+---------------+-------------+--------------+---------------+---------------+---------------+
-| 104450 us     | 442148 us   | 212281 us    | 148292 us     |        495649 |         86510 |
-+---------------+-------------+--------------+---------------+---------------+---------------+
+awesome_booth
+├── Image: docker.io/library/ubuntu:latest
+├── ID: 695b77deb38281244a114da111e2ee606ab9464ffa94a98be382d181c2121c9c
+├── Runtime: crun
+├── Created: 2023-03-08T08:45:33+03:00
+├── Engine: Podman
+├── Checkpoint size: 2.8 MiB
+├── Root FS diff size: 309.0 KiB
+└── Process tree
+    └── [1]  bash
+        └── [5]  su
+            └── [6]  bash
+                └── [47]  loop.sh
+                    └── [74]  sleep
 ```
+
+For a complete list of flags supported, use `checkpointctl inspect --help`.
 
 ## Installing from source code
 
