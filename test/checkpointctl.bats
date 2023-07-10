@@ -329,18 +329,19 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Overview of mounts"* ]]
-	[[ ${lines[9]} == *"Destination"* ]]
-	[[ ${lines[10]} == *"proc"* ]]
-	[[ ${lines[12]} == *"/etc/hostname"* ]]
-	[[ ${lines[15]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[19]} == *"Memwrite time"* ]]
-	[[ ${lines[20]} =~ [1-9]+" us" ]]
-	[[ ${lines[22]} == *"Process tree"* ]]
-	[[ ${lines[23]} == *"piggie"* ]]
-	[[ ${lines[24]} == *"[REG 0]"* ]]
-	[[ ${lines[25]} == *"[cwd]"* ]]
-	[[ ${lines[26]} == *"[root]"* ]]
+	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[12]} == *"Memwrite time"* ]]
+	[[ ${lines[13]} =~ [1-9]+" us" ]]
+	[[ ${lines[15]} == *"Process tree"* ]]
+	[[ ${lines[16]} == *"piggie"* ]]
+	[[ ${lines[17]} == *"[REG 0]"* ]]
+	[[ ${lines[18]} == *"[cwd]"* ]]
+	[[ ${lines[19]} == *"[root]"* ]]
+	[[ ${lines[20]} == *"Overview of mounts"* ]]
+	[[ ${lines[21]} == *"Destination"* ]]
+	[[ ${lines[22]} == *"proc"* ]]
+	[[ ${lines[24]} == *"/etc/hostname"* ]]
+
 }
 
 @test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump and no checkpoint directory" {
