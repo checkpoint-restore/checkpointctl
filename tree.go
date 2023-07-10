@@ -37,7 +37,9 @@ func renderTreeView(tasks []task) error {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 
-			addPsTreeToTree(tree, psTree)
+			if err = addPsTreeToTree(tree, psTree); err != nil {
+				return fmt.Errorf("failed to get process tree: %w", err)
+			}
 		}
 
 		if files {
@@ -110,7 +112,30 @@ func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry)
 	statsTree.AddBranch(fmt.Sprintf("Pages written: %d us", dumpStats.GetPagesWritten()))
 }
 
-func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) {
+func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) error {
+	psRoot := psTree
+	if pID != 0 {
+		// dfs performs a short-circuiting depth-first search.
+		var dfs func(*crit.PsTree) *crit.PsTree
+		dfs = func(root *crit.PsTree) *crit.PsTree {
+			if root.PID == pID {
+				return root
+			}
+			for _, child := range root.Children {
+				if ps := dfs(child); ps != nil {
+					return ps
+				}
+			}
+			return nil
+		}
+
+		ps := dfs(psTree)
+		if ps == nil {
+			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", pID)
+		}
+		psRoot = ps
+	}
+
 	// processNodes is a recursive function to create
 	// a new branch for each process and add its child
 	// processes as child nodes of the branch.
@@ -122,13 +147,21 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) {
 		}
 	}
 	psTreeNode := tree.AddBranch("Process tree")
-	processNodes(psTreeNode, psTree)
+	processNodes(psTreeNode, psRoot)
+
+	return nil
 }
 
 func addFdsToTree(tree treeprint.Tree, fds []*crit.Fd) {
 	var node treeprint.Tree
 	for _, fd := range fds {
 		node = tree.FindByMeta(fd.PId)
+		// If FindByMeta returns nil, then the node with
+		// the PID has been pruned while building the tree.
+		// Hence, skip all associated file descriptors.
+		if node == nil {
+			continue
+		}
 		for _, file := range fd.Files {
 			node.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
 		}
