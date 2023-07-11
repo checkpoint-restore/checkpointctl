@@ -6,7 +6,7 @@ require (
 	github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230705155226-f8745d1ee56a
 	github.com/containers/storage v1.46.1
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/opencontainers/runtime-spec v1.1.0-rc.2
+	github.com/opencontainers/runtime-spec v1.1.0-rc.3
 	github.com/spf13/cobra v1.7.0
 	github.com/xlab/treeprint v1.2.0
 )
