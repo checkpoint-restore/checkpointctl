@@ -234,7 +234,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 1 ]
-	[[ ${lines[0]} == *"Unknown magic"* ]]
+	[[ ${lines[0]} == *"unknown magic"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --stats and valid stats-dump" {
@@ -262,6 +262,19 @@ function teardown() {
 	[[ ${lines[10]} == *"proc"* ]]
 }
 
+@test "Run checkpointctl inspect with tar file and --ps-tree" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree
+	[ "$status" -eq 0 ]
+	[[ ${lines[8]} == *"Process tree"* ]]
+	[[ ${lines[9]} == *"piggie"* ]]
+}
+
 @test "Run checkpointctl inspect with tar file and --ps-tree and missing pstree.img" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
@@ -272,13 +285,47 @@ function teardown() {
 	[[ ${lines[0]} == *"failed to get process tree"* ]]
 }
 
+@test "Run checkpointctl inspect with tar file and --files" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/files.img \
+		test-imgs/fs-*.img \
+		test-imgs/ids-*.img \
+		test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --files
+	[ "$status" -eq 0 ]
+	[[ ${lines[10]} == *"[REG 0]"* ]]
+	[[ ${lines[11]} == *"[cwd]"* ]]
+	[[ ${lines[12]} == *"[root]"* ]]
+}
+
+@test "Run checkpointctl inspect with tar file and --files and missing files.img" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --files
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"failed to get file descriptors"* ]]
+}
+
 @test "Run checkpointctl inspect with tar file and --all and valid spec.dump and valid stats-dump" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
 	cp test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	cp test-imgs/pstree.img \
-		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+		test-imgs/core-*.img \
+		test-imgs/files.img \
+		test-imgs/fs-*.img \
+		test-imgs/ids-*.img \
+		test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
@@ -291,6 +338,9 @@ function teardown() {
 	[[ ${lines[20]} =~ [1-9]+" us" ]]
 	[[ ${lines[22]} == *"Process tree"* ]]
 	[[ ${lines[23]} == *"piggie"* ]]
+	[[ ${lines[24]} == *"[REG 0]"* ]]
+	[[ ${lines[25]} == *"[cwd]"* ]]
+	[[ ${lines[26]} == *"[root]"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump and no checkpoint directory" {
