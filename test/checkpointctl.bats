@@ -285,6 +285,36 @@ function teardown() {
 	[[ ${lines[0]} == *"failed to get process tree"* ]]
 }
 
+@test "Run checkpointctl inspect with tar file and --ps-tree-cmd" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
+	[ "$status" -eq 0 ]
+	[[ ${lines[8]} == *"Process tree"* ]]
+	[[ ${lines[9]} == *"piggie/piggie"* ]]
+}
+
+@test "Run checkpointctl inspect with tar file and --ps-tree-cmd and missing pages-*.img {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"failed to process command line arguments"* ]]
+}
+
 @test "Run checkpointctl inspect with tar file and --files" {
 	cp data/config.dump \
 		data/spec.dump "$TEST_TMP_DIR1"
