@@ -21,10 +21,6 @@ func renderTreeView(tasks []task) error {
 
 		tree := buildTree(info.containerInfo, info.configDump, info.archiveSizes)
 
-		if mounts {
-			addMountsToTree(tree, info.specDump)
-		}
-
 		if stats {
 			dumpStats, err := crit.GetDumpStats(task.outputDir)
 			if err != nil {
@@ -52,6 +48,10 @@ func renderTreeView(tasks []task) error {
 			}
 
 			addFdsToTree(tree, fds)
+		}
+
+		if mounts {
+			addMountsToTree(tree, info.specDump)
 		}
 
 		fmt.Printf("\nDisplaying container checkpoint tree view from %s\n\n", task.checkpointFilePath)
