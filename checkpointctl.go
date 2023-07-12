@@ -12,15 +12,16 @@ import (
 )
 
 var (
-	name    string
-	version string
-	format  string
-	stats   bool
-	mounts  bool
-	pID     uint32
-	psTree  bool
-	files   bool
-	showAll bool
+	name      string
+	version   string
+	format    string
+	stats     bool
+	mounts    bool
+	pID       uint32
+	psTree    bool
+	psTreeCmd bool
+	files     bool
+	showAll   bool
 )
 
 func main() {
@@ -104,6 +105,12 @@ func setupInspect() *cobra.Command {
 		"Display an overview of processes in the container checkpoint",
 	)
 	flags.BoolVar(
+		&psTreeCmd,
+		"ps-tree-cmd",
+		false,
+		"Display an overview of processes in the container checkpoint with full command line arguments",
+	)
+	flags.BoolVar(
 		&files,
 		"files",
 		false,
@@ -158,6 +165,18 @@ func inspect(cmd *cobra.Command, args []string) error {
 			filepath.Join(metadata.CheckpointDirectory, "ids-"),
 			// fdinfo-*.img
 			filepath.Join(metadata.CheckpointDirectory, "fdinfo-"),
+		)
+	}
+
+	if psTreeCmd {
+		// Enable displaying process tree when using --ps-tree-cmd.
+		psTree = true
+		requiredFiles = append(
+			requiredFiles,
+			// Unpack pagemap-*.img, pages-*.img, and mm-*.img
+			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+			filepath.Join(metadata.CheckpointDirectory, "pages-"),
+			filepath.Join(metadata.CheckpointDirectory, "mm-"),
 		)
 	}
 

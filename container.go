@@ -16,10 +16,13 @@ import (
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
+	"github.com/checkpoint-restore/go-criu/v6/crit"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 )
+
+var pageSize = os.Getpagesize()
 
 type containerMetadata struct {
 	Name    string `json:"name,omitempty"`
@@ -309,4 +312,19 @@ func iterateTarArchive(archiveInput string, callback func(r *tar.Reader, header 
 	}
 
 	return nil
+}
+
+func getCmdline(checkpointOutputDir string, pid uint32) (cmdline string, err error) {
+	mr, err := crit.NewMemoryReader(filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory), pid, pageSize)
+	if err != nil {
+		return
+	}
+
+	buffer, err := mr.GetPsArgs()
+	if err != nil {
+		return
+	}
+
+	cmdline = strings.Join(strings.Split(buffer.String(), "\x00"), " ")
+	return
 }
