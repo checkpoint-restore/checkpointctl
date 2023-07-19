@@ -328,3 +328,23 @@ func getCmdline(checkpointOutputDir string, pid uint32) (cmdline string, err err
 	cmdline = strings.Join(strings.Split(buffer.String(), "\x00"), " ")
 	return
 }
+
+func getPsEnvVars(checkpointOutputDir string, pid uint32) (envVars []string, err error) {
+	mr, err := crit.NewMemoryReader(filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory), pid, pageSize)
+	if err != nil {
+		return
+	}
+
+	buffer, err := mr.GetPsEnvVars()
+	if err != nil {
+		return
+	}
+
+	for _, envVar := range strings.Split(buffer.String(), "\x00") {
+		if envVar != "" {
+			envVars = append(envVars, envVar)
+		}
+	}
+
+	return
+}

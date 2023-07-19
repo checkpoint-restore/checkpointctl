@@ -20,6 +20,7 @@ var (
 	pID       uint32
 	psTree    bool
 	psTreeCmd bool
+	psTreeEnv bool
 	files     bool
 	showAll   bool
 )
@@ -111,6 +112,12 @@ func setupInspect() *cobra.Command {
 		"Display an overview of processes in the container checkpoint with full command line arguments",
 	)
 	flags.BoolVar(
+		&psTreeEnv,
+		"ps-tree-env",
+		false,
+		"Display an overview of processes in the container checkpoint with their environment variables",
+	)
+	flags.BoolVar(
 		&files,
 		"files",
 		false,
@@ -168,8 +175,8 @@ func inspect(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	if psTreeCmd {
-		// Enable displaying process tree when using --ps-tree-cmd.
+	if psTreeCmd || psTreeEnv {
+		// Enable displaying process tree when using --ps-tree-cmd or --ps-tree-env.
 		psTree = true
 		requiredFiles = append(
 			requiredFiles,

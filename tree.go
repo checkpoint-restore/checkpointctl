@@ -43,7 +43,7 @@ func renderTreeView(tasks []task) error {
 				}
 			}
 
-			if err = addPsTreeToTree(tree, psTree); err != nil {
+			if err = addPsTreeToTree(tree, psTree, task.outputDir); err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 		}
@@ -118,7 +118,7 @@ func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry)
 	statsTree.AddBranch(fmt.Sprintf("Pages written: %d", dumpStats.GetPagesWritten()))
 }
 
-func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) error {
+func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputDir string) error {
 	psRoot := psTree
 	if pID != 0 {
 		// dfs performs a short-circuiting depth-first search.
@@ -148,6 +148,14 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) error {
 	var processNodes func(treeprint.Tree, *crit.PsTree)
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
 		node := tree.AddMetaBranch(root.PID, root.Comm)
+		// attach environment variables to process
+		if psTreeEnv {
+			envVars, _ := getPsEnvVars(checkpointOutputDir, root.PID)
+
+			for _, env := range envVars {
+				node.AddBranch(env)
+			}
+		}
 		for _, child := range root.Children {
 			processNodes(node, child)
 		}
