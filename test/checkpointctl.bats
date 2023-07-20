@@ -247,7 +247,7 @@ function teardown() {
 	[ "$status" -eq 0 ]
 	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[12]} == *"Memwrite time"* ]]
-	[[ ${lines[13]} =~ [1-9]+" us" ]]
+	[[ ${lines[13]} =~ [1-9] ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --mounts and valid spec.dump" {
@@ -356,7 +356,7 @@ function teardown() {
 	[ "$status" -eq 0 ]
 	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[12]} == *"Memwrite time"* ]]
-	[[ ${lines[13]} =~ [1-9]+" us" ]]
+	[[ ${lines[13]} =~ [1-9] ]]
 	[[ ${lines[15]} == *"Process tree"* ]]
 	[[ ${lines[16]} == *"piggie"* ]]
 	[[ ${lines[17]} == *"[REG 0]"* ]]

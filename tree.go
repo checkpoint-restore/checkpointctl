@@ -108,8 +108,8 @@ func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry)
 	statsTree.AddBranch(fmt.Sprintf("Frozen time: %d us", dumpStats.GetFrozenTime()))
 	statsTree.AddBranch(fmt.Sprintf("Memdump time: %d us", dumpStats.GetMemdumpTime()))
 	statsTree.AddBranch(fmt.Sprintf("Memwrite time: %d us", dumpStats.GetMemwriteTime()))
-	statsTree.AddBranch(fmt.Sprintf("Pages scanned: %d us", dumpStats.GetPagesScanned()))
-	statsTree.AddBranch(fmt.Sprintf("Pages written: %d us", dumpStats.GetPagesWritten()))
+	statsTree.AddBranch(fmt.Sprintf("Pages scanned: %d", dumpStats.GetPagesScanned()))
+	statsTree.AddBranch(fmt.Sprintf("Pages written: %d", dumpStats.GetPagesWritten()))
 }
 
 func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree) error {
