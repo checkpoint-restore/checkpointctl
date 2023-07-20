@@ -17,6 +17,7 @@ var (
 	format  string
 	stats   bool
 	mounts  bool
+	pID     uint32
 	psTree  bool
 	files   bool
 	showAll bool
@@ -89,6 +90,13 @@ func setupInspect() *cobra.Command {
 		false,
 		"Display an overview of mounts used in the container checkpoint",
 	)
+	flags.Uint32VarP(
+		&pID,
+		"pid",
+		"p",
+		0,
+		"Display the process tree of a specific PID",
+	)
 	flags.BoolVar(
 		&psTree,
 		"ps-tree",
@@ -129,6 +137,11 @@ func inspect(cmd *cobra.Command, args []string) error {
 
 	if stats {
 		requiredFiles = append(requiredFiles, "stats-dump")
+	}
+
+	if pID != 0 {
+		// Enable displaying process tree if the PID filter is passed.
+		psTree = true
 	}
 
 	if files {

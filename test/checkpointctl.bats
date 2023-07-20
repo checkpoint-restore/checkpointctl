@@ -315,6 +315,31 @@ function teardown() {
 	[[ ${lines[0]} == *"failed to get file descriptors"* ]]
 }
 
+@test "Run checkpointctl inspect with tar file and --ps-tree and valid PID" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree --pid 1
+	[ "$status" -eq 0 ]
+	[[ ${lines[8]} == *"Process tree"* ]]
+	[[ ${lines[9]} == *"piggie"* ]]
+}
+
+@test "Run checkpointctl inspect with tar file and --ps-tree and invalid PID" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree --pid 99999
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"no process with PID 99999"* ]]
+}
+
 @test "Run checkpointctl inspect with tar file and --all and valid spec.dump and valid stats-dump" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
