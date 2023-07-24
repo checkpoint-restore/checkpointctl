@@ -37,6 +37,12 @@ func renderTreeView(tasks []task) error {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 
+			if psTreeCmd {
+				if err := updatePsTreeCommToCmdline(task.outputDir, psTree); err != nil {
+					return fmt.Errorf("failed to process command line arguments: %w", err)
+				}
+			}
+
 			if err = addPsTreeToTree(tree, psTree); err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
@@ -166,4 +172,22 @@ func addFdsToTree(tree treeprint.Tree, fds []*crit.Fd) {
 			node.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
 		}
 	}
+}
+
+// Recursively updates the Comm field of the psTree struct with the command line arguments
+// from process memory pages
+func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) error {
+	cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
+	if err != nil {
+		return err
+	}
+	if cmdline != "" {
+		psTree.Comm = cmdline
+	}
+	for _, child := range psTree.Children {
+		if err := updatePsTreeCommToCmdline(checkpointOutputDir, child); err != nil {
+			return err
+		}
+	}
+	return nil
 }
