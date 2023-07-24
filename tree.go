@@ -145,25 +145,30 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputD
 	// processNodes is a recursive function to create
 	// a new branch for each process and add its child
 	// processes as child nodes of the branch.
-	var processNodes func(treeprint.Tree, *crit.PsTree)
-	processNodes = func(tree treeprint.Tree, root *crit.PsTree) {
+	var processNodes func(treeprint.Tree, *crit.PsTree) error
+	processNodes = func(tree treeprint.Tree, root *crit.PsTree) error {
 		node := tree.AddMetaBranch(root.PID, root.Comm)
 		// attach environment variables to process
 		if psTreeEnv {
-			envVars, _ := getPsEnvVars(checkpointOutputDir, root.PID)
+			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
+			if err != nil {
+				return err
+			}
 
 			for _, env := range envVars {
 				node.AddBranch(env)
 			}
 		}
 		for _, child := range root.Children {
-			processNodes(node, child)
+			if err := processNodes(node, child); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
 	psTreeNode := tree.AddBranch("Process tree")
-	processNodes(psTreeNode, psRoot)
 
-	return nil
+	return processNodes(psTreeNode, psRoot)
 }
 
 func addFdsToTree(tree treeprint.Tree, fds []*crit.Fd) {
