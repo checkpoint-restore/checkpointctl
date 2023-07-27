@@ -40,6 +40,9 @@ func main() {
 	inspectCommand := setupInspect()
 	rootCommand.AddCommand(inspectCommand)
 
+	memparseCommand := setupMemParse()
+	rootCommand.AddCommand(memparseCommand)
+
 	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {
@@ -262,4 +265,34 @@ func cleanupTasks(tasks []task) {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}
+}
+
+func setupMemParse() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "memparse",
+		Short: "Analyze container checkpoint memory",
+		RunE:  memparse,
+		Args:  cobra.MinimumNArgs(1),
+	}
+
+	return cmd
+}
+
+func memparse(cmd *cobra.Command, args []string) error {
+	requiredFiles := []string{
+		metadata.SpecDumpFile, metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+		filepath.Join(metadata.CheckpointDirectory, "core-"),
+		filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+		filepath.Join(metadata.CheckpointDirectory, "pages-"),
+		filepath.Join(metadata.CheckpointDirectory, "mm-"),
+	}
+
+	tasks, err := createTasks(args, requiredFiles)
+	if err != nil {
+		return err
+	}
+	defer cleanupTasks(tasks)
+
+	return showProcessMemorySizeTables(tasks)
 }
