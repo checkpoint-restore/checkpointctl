@@ -376,6 +376,32 @@ function teardown() {
 	[[ ${lines[0]} == *"failed to get file descriptors"* ]]
 }
 
+@test "Run checkpointctl inspect with tar file and --sockets" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/files.img \
+		test-imgs/ids-*.img \
+		test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --sockets
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl inspect with tar file and --sockets and missing files.img" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --sockets
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"failed to get sockets"* ]]
+}
+
 @test "Run checkpointctl inspect with tar file and --ps-tree and valid PID" {
 	cp data/config.dump \
 		data/spec.dump "$TEST_TMP_DIR1"
