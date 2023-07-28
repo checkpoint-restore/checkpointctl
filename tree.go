@@ -121,21 +121,7 @@ func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry)
 func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputDir string) error {
 	psRoot := psTree
 	if pID != 0 {
-		// dfs performs a short-circuiting depth-first search.
-		var dfs func(*crit.PsTree) *crit.PsTree
-		dfs = func(root *crit.PsTree) *crit.PsTree {
-			if root.PID == pID {
-				return root
-			}
-			for _, child := range root.Children {
-				if ps := dfs(child); ps != nil {
-					return ps
-				}
-			}
-			return nil
-		}
-
-		ps := dfs(psTree)
+		ps := psTree.FindPs(pID)
 		if ps == nil {
 			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", pID)
 		}

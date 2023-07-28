@@ -12,17 +12,18 @@ import (
 )
 
 var (
-	name      string
-	version   string
-	format    string
-	stats     bool
-	mounts    bool
-	pID       uint32
-	psTree    bool
-	psTreeCmd bool
-	psTreeEnv bool
-	files     bool
-	showAll   bool
+	name           string
+	version        string
+	format         string
+	stats          bool
+	mounts         bool
+	outputFilePath string
+	pID            uint32
+	psTree         bool
+	psTreeCmd      bool
+	psTreeEnv      bool
+	files          bool
+	showAll        bool
 )
 
 func main() {
@@ -275,6 +276,23 @@ func setupMemParse() *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 	}
 
+	flags := cmd.Flags()
+
+	flags.Uint32VarP(
+		&pID,
+		"pid",
+		"p",
+		0,
+		"Specify the PID of a process to analyze",
+	)
+	flags.StringVarP(
+		&outputFilePath,
+		"output",
+		"o",
+		"",
+		"Specify the output file to be written to",
+	)
+
 	return cmd
 }
 
@@ -283,9 +301,19 @@ func memparse(cmd *cobra.Command, args []string) error {
 		metadata.SpecDumpFile, metadata.ConfigDumpFile,
 		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
 		filepath.Join(metadata.CheckpointDirectory, "core-"),
-		filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
-		filepath.Join(metadata.CheckpointDirectory, "pages-"),
-		filepath.Join(metadata.CheckpointDirectory, "mm-"),
+	}
+
+	if pID == 0 {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+		)
+	} else {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("pagemap-%d.img", pID)),
+			filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("mm-%d.img", pID)),
+		)
 	}
 
 	tasks, err := createTasks(args, requiredFiles)
@@ -293,6 +321,10 @@ func memparse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer cleanupTasks(tasks)
+
+	if pID != 0 {
+		return printProcessMemoryPages(tasks[0])
+	}
 
 	return showProcessMemorySizeTables(tasks)
 }
