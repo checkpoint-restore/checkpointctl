@@ -506,3 +506,60 @@ function teardown() {
 	[[ ${lines[6]} == *"Podman"* ]]
 	[[ ${lines[14]} == *"Podman"* ]]
 }
+
+@test "Run checkpointctl memparse with tar file" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[4]} == *"piggie"* ]]
+}
+
+@test "Run checkpointctl memparse with tar file and missing pstree.img" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"no such file or directory"* ]]
+}
+
+@test "Run checkpointctl memparse with tar file and valid PID" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	[[ ${lines[3]} == *"....H...H.../..H"* ]]
+}
+
+@test "Run checkpointctl memparse with tar file and invalid PID" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=9999 
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"no process with PID 9999"* ]]
+}
