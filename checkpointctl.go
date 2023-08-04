@@ -143,7 +143,8 @@ func inspect(cmd *cobra.Command, args []string) error {
 	if showAll {
 		stats = true
 		mounts = true
-		psTree = true
+		psTreeCmd = true
+		psTreeEnv = true
 		files = true
 	}
 

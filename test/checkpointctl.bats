@@ -411,23 +411,37 @@ function teardown() {
 		test-imgs/files.img \
 		test-imgs/fs-*.img \
 		test-imgs/ids-*.img \
-		test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+		test-imgs/fdinfo-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
+
+	run checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
+
 	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[12]} == *"Memwrite time"* ]]
 	[[ ${lines[13]} =~ [1-9] ]]
 	[[ ${lines[15]} == *"Process tree"* ]]
 	[[ ${lines[16]} == *"piggie"* ]]
-	[[ ${lines[17]} == *"[REG 0]"* ]]
-	[[ ${lines[18]} == *"[cwd]"* ]]
-	[[ ${lines[19]} == *"[root]"* ]]
-	[[ ${lines[20]} == *"Overview of mounts"* ]]
-	[[ ${lines[21]} == *"Destination"* ]]
-	[[ ${lines[22]} == *"proc"* ]]
-	[[ ${lines[24]} == *"/etc/hostname"* ]]
 
+	expected_messages=(
+		"[REG 0]"
+		"[cwd]"
+		"[root]"
+		"Overview of mounts"
+		"Destination"
+		"proc"
+		"/etc/hostname"
+	)
+
+	for message in "${expected_messages[@]}"; do
+		if ! grep -q "$message" <<< "$output"; then
+			echo "Error: Expected message '$message' not found"
+			false
+		fi
+	done
 }
 
 @test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump and no checkpoint directory" {
