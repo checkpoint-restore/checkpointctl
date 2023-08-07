@@ -70,6 +70,7 @@ shellcheck:
 lint: golang-lint shellcheck
 
 test: $(NAME)
+	$(GO) test -v ./...
 	make -C test
 
 test-junit: $(NAME)
