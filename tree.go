@@ -110,10 +110,10 @@ func addMountsToTree(tree treeprint.Tree, specDump *spec.Spec) {
 
 func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry) {
 	statsTree := tree.AddBranch("CRIU dump statistics")
-	statsTree.AddBranch(fmt.Sprintf("Freezing time: %d us", dumpStats.GetFreezingTime()))
-	statsTree.AddBranch(fmt.Sprintf("Frozen time: %d us", dumpStats.GetFrozenTime()))
-	statsTree.AddBranch(fmt.Sprintf("Memdump time: %d us", dumpStats.GetMemdumpTime()))
-	statsTree.AddBranch(fmt.Sprintf("Memwrite time: %d us", dumpStats.GetMemwriteTime()))
+	statsTree.AddBranch(fmt.Sprintf("Freezing time: %s", FormatTime(dumpStats.GetFreezingTime())))
+	statsTree.AddBranch(fmt.Sprintf("Frozen time: %s", FormatTime(dumpStats.GetFrozenTime())))
+	statsTree.AddBranch(fmt.Sprintf("Memdump time: %s", FormatTime(dumpStats.GetMemdumpTime())))
+	statsTree.AddBranch(fmt.Sprintf("Memwrite time: %s", FormatTime(dumpStats.GetMemwriteTime())))
 	statsTree.AddBranch(fmt.Sprintf("Pages scanned: %d", dumpStats.GetPagesScanned()))
 	statsTree.AddBranch(fmt.Sprintf("Pages written: %d", dumpStats.GetPagesWritten()))
 }
