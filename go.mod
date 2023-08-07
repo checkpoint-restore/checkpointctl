@@ -3,7 +3,7 @@ module github.com/checkpoint-restore/checkpointctl
 go 1.18
 
 require (
-	github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230705155226-f8745d1ee56a
+	github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230807192453-2210c022f3aa
 	github.com/containers/storage v1.48.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/runtime-spec v1.1.0
@@ -23,7 +23,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
-	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 )
