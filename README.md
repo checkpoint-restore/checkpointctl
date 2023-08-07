@@ -110,6 +110,31 @@ For a complete list of flags supported, use `checkpointctl inspect --help`.
     make DESTDIR=/some/new/place install
     ```
 
+## Enable autocompletion
+
+You now need to ensure that the autocompletion script gets sourced in all your shell sessions.
+There are two ways in which you can do this:
+
+### User
+
+```console
+echo 'source <(checkpointctl completion bash)' >>~/.bashrc
+```
+
+### System
+
+```console
+checkpointctl completion bash | sudo tee /etc/bash_completion.d/checkpointctl > /dev/null
+sudo chmod a+r /etc/bash_completion.d/checkpointctl
+```
+
+Both approaches are equivalent. After reloading your shell, autocompletion should be working.
+To enable bash autocompletion in current shell session, source the `~/.bashrc` file:
+
+```console
+source ~/.bashrc
+```
+
 ## Uninstalling
 
 The following command can be used to clean up a previously installed checkpointctl instance.
