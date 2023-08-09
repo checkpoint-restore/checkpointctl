@@ -77,7 +77,7 @@ $ checkpointctl memparse /tmp/jira.tar.gz  --pid=1 | less
 
 Displaying memory pages content for Process ID 1 from checkpoint: /tmp/jira.tar.gz
 
-Address           Hexadecimal                                       ASCII            
+Address           Hexadecimal                                       ASCII
 -------------------------------------------------------------------------------------
 00005633bb080000  f3 0f 1e fa 48 83 ec 08 48 8b 05 d1 4f 00 00 48  |....H...H...O..H|
 00005633bb080010  85 c0 74 02 ff d0 48 83 c4 08 c3 00 00 00 00 00  |..t...H.........|
@@ -104,7 +104,7 @@ $ sudo checkpointctl memparse --pid 1 /tmp/postgres.tar.gz | grep -B 1 -A 1 myse
 
 Here's another scenario, of memory analysis for a web application container. We start a vulnerable web application container, perform an arbitrary code execution attack, create a checkpoint for forensic analysis while leaving the container running, and finally analyze the checkpoint memory to identify the injected code.
 
-```console
+```bash
 # Start vulnerable web application
 $ sudo podman run --name dsvw -p 1234:8000 -d quay.io/rst0git/dsvw
 
@@ -116,7 +116,6 @@ Name:      www.google.com
 Address 1: 142.250.187.228 lhr25s34-in-f4.1e100.net
 Address 2: 2a00:1450:4009:820::2004 lhr25s34-in-x04.1e100.net
 secret
-(reverse-i-search)`': ^C
 
 # Create a checkpoint for forensic analysis and leave the container running
 $ sudo podman container checkpoint --leave-running -l -e /tmp/dsvw.tar
