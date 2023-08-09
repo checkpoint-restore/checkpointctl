@@ -12,17 +12,18 @@ import (
 )
 
 var (
-	name      string
-	version   string
-	format    string
-	stats     bool
-	mounts    bool
-	pID       uint32
-	psTree    bool
-	psTreeCmd bool
-	psTreeEnv bool
-	files     bool
-	showAll   bool
+	name           string
+	version        string
+	format         string
+	stats          bool
+	mounts         bool
+	outputFilePath string
+	pID            uint32
+	psTree         bool
+	psTreeCmd      bool
+	psTreeEnv      bool
+	files          bool
+	showAll        bool
 )
 
 func main() {
@@ -39,6 +40,9 @@ func main() {
 
 	inspectCommand := setupInspect()
 	rootCommand.AddCommand(inspectCommand)
+
+	memparseCommand := setupMemParse()
+	rootCommand.AddCommand(memparseCommand)
 
 	rootCommand.Version = version
 
@@ -262,4 +266,65 @@ func cleanupTasks(tasks []task) {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}
+}
+
+func setupMemParse() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "memparse",
+		Short: "Analyze container checkpoint memory",
+		RunE:  memparse,
+		Args:  cobra.MinimumNArgs(1),
+	}
+
+	flags := cmd.Flags()
+
+	flags.Uint32VarP(
+		&pID,
+		"pid",
+		"p",
+		0,
+		"Specify the PID of a process to analyze",
+	)
+	flags.StringVarP(
+		&outputFilePath,
+		"output",
+		"o",
+		"",
+		"Specify the output file to be written to",
+	)
+
+	return cmd
+}
+
+func memparse(cmd *cobra.Command, args []string) error {
+	requiredFiles := []string{
+		metadata.SpecDumpFile, metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+		filepath.Join(metadata.CheckpointDirectory, "core-"),
+	}
+
+	if pID == 0 {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+		)
+	} else {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("pagemap-%d.img", pID)),
+			filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("mm-%d.img", pID)),
+		)
+	}
+
+	tasks, err := createTasks(args, requiredFiles)
+	if err != nil {
+		return err
+	}
+	defer cleanupTasks(tasks)
+
+	if pID != 0 {
+		return printProcessMemoryPages(tasks[0])
+	}
+
+	return showProcessMemorySizeTables(tasks)
 }
