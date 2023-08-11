@@ -297,8 +297,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Process tree"* ]]
-	[[ ${lines[9]} == *"piggie/piggie"* ]]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie/piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-cmd and missing pages-*.img {
@@ -327,9 +327,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-env
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Process tree"* ]]
-	[[ ${lines[9]} == *"piggie"* ]]
-	[[ ${lines[10]} == *"="* ]]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
+	[[ ${lines[11]} == *"="* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-env and missing pages-*.img {
@@ -420,11 +420,11 @@ function teardown() {
 	run checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
 
-	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[12]} == *"Memwrite time"* ]]
-	[[ ${lines[13]} =~ [1-9] ]]
-	[[ ${lines[15]} == *"Process tree"* ]]
-	[[ ${lines[16]} == *"piggie"* ]]
+	[[ ${lines[9]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[13]} == *"Memwrite time"* ]]
+	[[ ${lines[14]} =~ [1-9] ]]
+	[[ ${lines[16]} == *"Process tree"* ]]
+	[[ ${lines[17]} == *"piggie"* ]]
 
 	expected_messages=(
 		"[REG 0]"
@@ -559,7 +559,7 @@ function teardown() {
 		test-imgs/pages-*.img \
 		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
-	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=9999 
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=9999
 	[ "$status" -eq 1 ]
 	[[ ${lines[0]} == *"no process with PID 9999"* ]]
 }
