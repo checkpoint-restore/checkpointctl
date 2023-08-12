@@ -201,6 +201,8 @@ func hasPrefix(path, prefix string) bool {
 type archiveSizes struct {
 	checkpointSize    int64
 	rootFsDiffTarSize int64
+	pagesSize         int64
+	amdgpuPagesSize   int64
 }
 
 // getArchiveSizes calculates the sizes of different components within a container checkpoint.
@@ -212,6 +214,11 @@ func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 			if hasPrefix(header.Name, metadata.CheckpointDirectory) {
 				// Add the file size to the total checkpoint size
 				result.checkpointSize += header.Size
+				if hasPrefix(header.Name, filepath.Join(metadata.CheckpointDirectory, metadata.PagesPrefix)) {
+					result.pagesSize += header.Size
+				} else if hasPrefix(header.Name, filepath.Join(metadata.CheckpointDirectory, metadata.AmdgpuPagesPrefix)) {
+					result.amdgpuPagesSize += header.Size
+				}
 			} else if hasPrefix(header.Name, metadata.RootFsDiffTar) {
 				// Read the size of rootfs diff
 				result.rootFsDiffTarSize = header.Size

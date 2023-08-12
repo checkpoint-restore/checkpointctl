@@ -88,7 +88,13 @@ func buildTree(ci *containerInfo, containerConfig *metadata.ContainerConfig, arc
 		tree.AddBranch(fmt.Sprintf("MAC: %s", ci.MAC))
 	}
 
-	tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(archiveSizes.checkpointSize)))
+	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(archiveSizes.checkpointSize)))
+	if archiveSizes.pagesSize != 0 {
+		checkpointSize.AddNode(fmt.Sprintf("Memory pages size: %s", metadata.ByteToString(archiveSizes.pagesSize)))
+	}
+	if archiveSizes.amdgpuPagesSize != 0 {
+		checkpointSize.AddNode(fmt.Sprintf("AMD GPU memory pages size: %s", metadata.ByteToString(archiveSizes.amdgpuPagesSize)))
+	}
 
 	if archiveSizes.rootFsDiffTarSize != 0 {
 		tree.AddBranch(fmt.Sprintf("Root FS diff size: %s", metadata.ByteToString(archiveSizes.rootFsDiffTarSize)))
