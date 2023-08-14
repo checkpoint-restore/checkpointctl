@@ -58,6 +58,16 @@ func renderTreeView(tasks []task) error {
 			addFdsToTree(tree, fds)
 		}
 
+		if sockets {
+			c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
+			fds, err := c.ExploreSk()
+			if err != nil {
+				return fmt.Errorf("failed to get sockets: %w", err)
+			}
+
+			addSkToTree(tree, fds)
+		}
+
 		if mounts {
 			addMountsToTree(tree, info.specDump)
 		}
@@ -177,6 +187,54 @@ func addFdsToTree(tree treeprint.Tree, fds []*crit.Fd) {
 		nodeSubtree := node.AddBranch("Open files")
 		for _, file := range fd.Files {
 			nodeSubtree.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
+		}
+	}
+}
+
+func addSkToTree(tree treeprint.Tree, sks []*crit.Sk) {
+	var node treeprint.Tree
+	for _, sk := range sks {
+		node = tree.FindByMeta(sk.PId)
+		// If FindByMeta returns nil, then the node with
+		// the PID has been pruned while building the tree.
+		// Hence, skip all associated sockets.
+		if node == nil {
+			continue
+		}
+
+		nodeSubtree := node.AddBranch("Open sockets")
+		var data string
+		var protocol string
+		for _, socket := range sk.Sockets {
+			protocol = socket.Protocol
+			switch socket.FdType {
+			case "UNIXSK":
+				// UNIX sockets do not have a protocol assigned.
+				// Hence, the meta value for the socket is just
+				// the socket type.
+				protocol = fmt.Sprintf("UNIX (%s)", socket.Type)
+				data = socket.SrcAddr
+				if len(data) == 0 {
+					// Use an abstract socket address
+					data = "@"
+				}
+			case "INETSK":
+				if protocol == "TCP" {
+					protocol = fmt.Sprintf("%s (%s)", socket.Protocol, socket.State)
+				}
+				data = fmt.Sprintf(
+					"%s:%d -> %s:%d (↑ %s ↓ %s)",
+					socket.SrcAddr, socket.SrcPort,
+					socket.DestAddr, socket.DestPort,
+					socket.SendBuf, socket.RecvBuf,
+				)
+			case "PACKETSK":
+				data = fmt.Sprintf("↑ %s ↓ %s", socket.SendBuf, socket.RecvBuf)
+			case "NETLINKSK":
+				data = fmt.Sprintf("↑ %s ↓ %s", socket.SendBuf, socket.RecvBuf)
+			}
+
+			nodeSubtree.AddMetaBranch(protocol, data)
 		}
 	}
 }
