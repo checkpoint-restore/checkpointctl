@@ -147,8 +147,9 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputD
 				return err
 			}
 
+			nodeSubtree := node.AddBranch("Environment variables")
 			for _, env := range envVars {
-				node.AddBranch(env)
+				nodeSubtree.AddBranch(env)
 			}
 		}
 		for _, child := range root.Children {
@@ -173,8 +174,9 @@ func addFdsToTree(tree treeprint.Tree, fds []*crit.Fd) {
 		if node == nil {
 			continue
 		}
+		nodeSubtree := node.AddBranch("Open files")
 		for _, file := range fd.Files {
-			node.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
+			nodeSubtree.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
 		}
 	}
 }
