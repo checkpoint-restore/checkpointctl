@@ -1,4 +1,4 @@
-# github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230807192453-2210c022f3aa
+# github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230822084504-f3c069bb94de
 ## explicit; go 1.18
 github.com/checkpoint-restore/go-criu/v6/crit
 github.com/checkpoint-restore/go-criu/v6/crit/images/bpfmap-data

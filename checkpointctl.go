@@ -327,6 +327,7 @@ func memparse(cmd *cobra.Command, args []string) error {
 		requiredFiles = append(
 			requiredFiles,
 			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+			filepath.Join(metadata.CheckpointDirectory, "mm-"),
 		)
 	} else {
 		requiredFiles = append(

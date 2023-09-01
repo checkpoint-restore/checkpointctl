@@ -28,6 +28,7 @@ func showProcessMemorySizeTables(tasks []task) error {
 		"PID",
 		"Process name",
 		"Memory size",
+		"Shared memory size",
 	}
 	table.SetHeader(header)
 	table.SetAutoMergeCells(false)
@@ -52,10 +53,16 @@ func showProcessMemorySizeTables(tasks []task) error {
 			memSize += int64(*entry.NrPages) * int64(pageSize)
 		}
 
+		shmemSize, err := memReader.GetShmemSize()
+		if err != nil {
+			return err
+		}
+
 		table.Append([]string{
 			fmt.Sprintf("%d", root.PID),
 			root.Comm,
 			metadata.ByteToString(memSize),
+			metadata.ByteToString(shmemSize),
 		})
 
 		for _, child := range root.Children {
