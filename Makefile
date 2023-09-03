@@ -8,11 +8,7 @@ GO_SRC = $(shell find . -name \*.go)
 GO_BUILD = $(GO) build
 NAME = checkpointctl
 
-VERSION_MAJOR := 0
-VERSION_MINOR := 1
-VERSION_SUBLEVEL := 0
-VERSION_EXTRA :=
-VERSION := $(VERSION_MAJOR)$(if $(VERSION_MINOR),.$(VERSION_MINOR))$(if $(VERSION_SUBLEVEL),.$(VERSION_SUBLEVEL))$(if $(VERSION_EXTRA),.$(VERSION_EXTRA))
+include Makefile.versions
 
 COVERAGE_PATH ?= $(shell pwd)/.coverage
 
@@ -52,14 +48,17 @@ install: $(NAME)
 	@echo "  INSTALL " $<
 	@mkdir -p $(DESTDIR)$(BINDIR)
 	@install -m0755 $< $(DESTDIR)$(BINDIR)
+	@make -C docs install
 
 uninstall:
+	@make -C docs uninstall
 	@echo " UNINSTALL" $(NAME)
 	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME))
 
 clean:
 	rm -f $(NAME) junit.xml $(NAME).coverage $(COVERAGE_PATH)/*
 	if [ -d $(COVERAGE_PATH) ]; then rmdir $(COVERAGE_PATH); fi
+	@make -C docs clean
 
 golang-lint:
 	golangci-lint run
@@ -93,9 +92,13 @@ vendor:
 	go mod vendor
 	go mod verify
 
+docs:
+	@make -C docs
+
 help:
 	@echo "Usage: make <target>"
 	@echo " * clean - remove artifacts"
+	@echo " * docs - build man pages"
 	@echo " * lint - verify the source code (shellcheck/golangci-lint)"
 	@echo " * golang-lint - run golangci-lint"
 	@echo " * shellcheck - run shellcheck"
@@ -109,4 +112,4 @@ help:
 	@echo " * release - build a static binary"
 	@echo " * help - show help"
 
-.PHONY: clean install uninstall release lint golang-lint shellcheck vendor test help check-go-version test-junit
+.PHONY: clean docs install uninstall release lint golang-lint shellcheck vendor test help check-go-version test-junit

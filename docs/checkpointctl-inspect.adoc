@@ -1,0 +1,49 @@
+= checkpointctl-inspect(1)
+include::footer.adoc[]
+
+== Name
+
+*checkpointctl-inspect* - display low-level information about a container checkpoint
+
+== Synopsis
+
+*checkpointctl inspect* [_OPTION_]...  _FILE_
+
+== Options
+
+*-h*, *--help*::
+  Show help for checkpointctl memparse
+
+*--all*::
+  Show all information about container checkpoints
+
+*--files*::
+  Display the open file descriptors for processes in the container checkpoint
+
+*--format*=_FORMAT_::
+  Specify the output format: tree or json (default "tree")
+
+*--mounts*::
+  Display an overview of mounts used in the container checkpoint
+
+*-p, --pid*=_PID_::
+  Display the process tree of a specific PID
+
+*--ps-tree*::
+  Display an overview of processes in the container checkpoint
+
+*--ps-tree-cmd*::
+  Display an overview of processes in the container checkpoint with full command line arguments
+
+*--ps-tree-env*::
+  Display an overview of processes in the container checkpoint with their environment variables
+
+*--sockets*::
+  Display the open sockets for processes in the container checkpoint
+
+*--stats*::
+  Display checkpoint statistics
+
+== See also
+
+checkpointctl(1)
