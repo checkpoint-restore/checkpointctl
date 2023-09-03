@@ -6,12 +6,16 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
-          only-new-issues: true
+    - uses: actions/checkout@v3
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        only-new-issues: true
+    - name: codespell
+      uses: codespell-project/actions-codespell@v2
+      with:
+        skip: vendor
 
   gomod:
     runs-on: ubuntu-latest
