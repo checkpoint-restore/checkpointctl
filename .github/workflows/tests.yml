@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install tools
-        run: sudo dnf -y install ShellCheck bats golang criu
+        run: sudo dnf -y install ShellCheck bats golang criu asciidoctor
       - name: Run make shellcheck
         run: make shellcheck
       - name: Run make all

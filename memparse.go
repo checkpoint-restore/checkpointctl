@@ -131,7 +131,7 @@ func printProcessMemoryPages(task task) error {
 	var compact bool
 
 	if outputFilePath != "" {
-		// Write to ouput to file if --output is specified
+		// Write output to file if --output is specified
 		f, err := os.Create(outputFilePath)
 		if err != nil {
 			return err
