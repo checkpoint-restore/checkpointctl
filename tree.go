@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v6/crit"
-	stats_pb "github.com/checkpoint-restore/go-criu/v6/crit/images/stats"
+	"github.com/checkpoint-restore/go-criu/v7/crit"
+	stats_pb "github.com/checkpoint-restore/go-criu/v7/crit/images/stats"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/xlab/treeprint"
 )

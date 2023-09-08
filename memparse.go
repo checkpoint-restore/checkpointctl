@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v6/crit"
+	"github.com/checkpoint-restore/go-criu/v7/crit"
 	"github.com/olekukonko/tablewriter"
 )
 
