@@ -1,5 +1,5 @@
-github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230822084504-f3c069bb94de h1:EWaQXnhXTEaaZeJObDoHPAxvhp9zvD55V8qldfxvEiw=
-github.com/checkpoint-restore/go-criu/v6 v6.3.1-0.20230822084504-f3c069bb94de/go.mod h1:2tn0Jd4/R94ab1JR/OYdh0QXnM1RNN+OCkDYGQKCbFg=
+github.com/checkpoint-restore/go-criu/v7 v7.0.0 h1:R4UF/njKOuq8ooG7naFGsCeKsjv5j+rIhgFgSSeC2KY=
+github.com/checkpoint-restore/go-criu/v7 v7.0.0/go.mod h1:xD1v3cPww1QYpJR3+XTTdC8hYubPnptIPsT1daXhbr4=
 github.com/containers/storage v1.49.0 h1:7Vqj8OKlwlcWZ4U61+eS2bNwyIG/qXQo/UZVW5kXn74=
 github.com/containers/storage v1.49.0/go.mod h1:fCvGMWQ0BOvlReQf9DqRAcl73ofTfRXE8l6ifnI4a3g=
 github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
