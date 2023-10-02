@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/checkpoint-restore/go-criu/v7 v7.0.0
-	github.com/containers/storage v1.49.0
+	github.com/containers/storage v1.50.2
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/runtime-spec v1.1.0
 	github.com/spf13/cobra v1.7.0
@@ -23,6 +23,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
