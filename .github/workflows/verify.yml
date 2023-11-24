@@ -15,7 +15,7 @@ jobs:
     - name: codespell
       uses: codespell-project/actions-codespell@v2
       with:
-        skip: vendor
+        skip: vendor,*.svg
 
   gomod:
     runs-on: ubuntu-latest
