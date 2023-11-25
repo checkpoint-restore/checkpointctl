@@ -1,5 +1,9 @@
+<!-- markdownlint-disable MD033 -->
+<!-- markdownlint-disable MD041 -->
+<p1 align="center"><img src="docs/checkpointctl.svg" height="250"></p>
+
 <!-- markdownlint-disable MD013 -->
-# checkpointctl -- Show information about checkpoint archives
+# checkpointctl - a tool for in-depth analysis of container checkpoints
 
 [![Run Tests](https://github.com/checkpoint-restore/checkpointctl/actions/workflows/tests.yml/badge.svg)](https://github.com/checkpoint-restore/checkpointctl/actions/workflows/tests.yml)
 
