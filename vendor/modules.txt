@@ -54,7 +54,7 @@ github.com/checkpoint-restore/go-criu/v7/crit/images/tty
 github.com/checkpoint-restore/go-criu/v7/crit/images/tun
 github.com/checkpoint-restore/go-criu/v7/crit/images/vma
 github.com/checkpoint-restore/go-criu/v7/magic
-# github.com/containers/storage v1.50.2
+# github.com/containers/storage v1.51.0
 ## explicit; go 1.19
 github.com/containers/storage/pkg/archive
 github.com/containers/storage/pkg/fileutils
@@ -74,7 +74,7 @@ github.com/docker/go-units
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/klauspost/compress v1.16.7
+# github.com/klauspost/compress v1.17.2
 ## explicit; go 1.18
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
@@ -90,13 +90,13 @@ github.com/klauspost/pgzip
 # github.com/mattn/go-runewidth v0.0.9
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
-# github.com/moby/sys/mountinfo v0.6.2
+# github.com/moby/sys/mountinfo v0.7.1
 ## explicit; go 1.16
 github.com/moby/sys/mountinfo
 # github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
-# github.com/opencontainers/runc v1.1.9
+# github.com/opencontainers/runc v1.1.10
 ## explicit; go 1.17
 github.com/opencontainers/runc/libcontainer/user
 # github.com/opencontainers/runtime-spec v1.1.0
@@ -123,9 +123,8 @@ github.com/ulikunitz/xz/lzma
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# golang.org/x/sys v0.12.0
-## explicit; go 1.17
-golang.org/x/sys/internal/unsafeheader
+# golang.org/x/sys v0.14.0
+## explicit; go 1.18
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # google.golang.org/protobuf v1.31.0
