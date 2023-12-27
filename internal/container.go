@@ -2,7 +2,7 @@
 
 // This file is used to handle container checkpoint archives
 
-package main
+package internal
 
 import (
 	"archive/tar"
@@ -74,25 +74,25 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 	}, nil
 }
 
-func getCheckpointInfo(task task) (*checkpointInfo, error) {
+func getCheckpointInfo(task Task) (*checkpointInfo, error) {
 	info := &checkpointInfo{}
 	var err error
 
-	info.configDump, _, err = metadata.ReadContainerCheckpointConfigDump(task.outputDir)
+	info.configDump, _, err = metadata.ReadContainerCheckpointConfigDump(task.OutputDir)
 	if err != nil {
 		return nil, err
 	}
-	info.specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.outputDir)
-	if err != nil {
-		return nil, err
-	}
-
-	info.containerInfo, err = getContainerInfo(task.outputDir, info.specDump, info.configDump)
+	info.specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.OutputDir)
 	if err != nil {
 		return nil, err
 	}
 
-	info.archiveSizes, err = getArchiveSizes(task.checkpointFilePath)
+	info.containerInfo, err = getContainerInfo(task.OutputDir, info.specDump, info.configDump)
+	if err != nil {
+		return nil, err
+	}
+
+	info.archiveSizes, err = getArchiveSizes(task.CheckpointFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func getCheckpointInfo(task task) (*checkpointInfo, error) {
 	return info, nil
 }
 
-func showContainerCheckpoints(tasks []task) error {
+func ShowContainerCheckpoints(tasks []Task) error {
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
 		"Container",
@@ -135,7 +135,7 @@ func showContainerCheckpoints(tasks []task) error {
 		row = append(row, info.containerInfo.Engine)
 
 		if len(tasks) == 1 {
-			fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", task.checkpointFilePath)
+			fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", task.CheckpointFilePath)
 
 			if info.containerInfo.IP != "" {
 				header = append(header, "IP")
@@ -229,8 +229,8 @@ func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 	return result, err
 }
 
-// untarFiles unpack only specified files from an archive to the destination directory.
-func untarFiles(src, dest string, files []string) error {
+// UntarFiles unpack only specified files from an archive to the destination directory.
+func UntarFiles(src, dest string, files []string) error {
 	archiveFile, err := os.Open(src)
 	if err != nil {
 		return err

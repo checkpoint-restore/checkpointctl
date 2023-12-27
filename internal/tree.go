@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"github.com/xlab/treeprint"
 )
 
-func renderTreeView(tasks []task) error {
+func RenderTreeView(tasks []Task) error {
 	for _, task := range tasks {
 		info, err := getCheckpointInfo(task)
 		if err != nil {
@@ -21,8 +21,8 @@ func renderTreeView(tasks []task) error {
 
 		tree := buildTree(info.containerInfo, info.configDump, info.archiveSizes)
 
-		if stats {
-			dumpStats, err := crit.GetDumpStats(task.outputDir)
+		if Stats {
+			dumpStats, err := crit.GetDumpStats(task.OutputDir)
 			if err != nil {
 				return fmt.Errorf("failed to get dump statistics: %w", err)
 			}
@@ -30,26 +30,26 @@ func renderTreeView(tasks []task) error {
 			addDumpStatsToTree(tree, dumpStats)
 		}
 
-		if psTree {
-			c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
+		if PsTree {
+			c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
 			psTree, err := c.ExplorePs()
 			if err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 
-			if psTreeCmd {
-				if err := updatePsTreeCommToCmdline(task.outputDir, psTree); err != nil {
+			if PsTreeCmd {
+				if err := updatePsTreeCommToCmdline(task.OutputDir, psTree); err != nil {
 					return fmt.Errorf("failed to process command line arguments: %w", err)
 				}
 			}
 
-			if err = addPsTreeToTree(tree, psTree, task.outputDir); err != nil {
+			if err = addPsTreeToTree(tree, psTree, task.OutputDir); err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 		}
 
-		if files {
-			c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
+		if Files {
+			c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
 			fds, err := c.ExploreFds()
 			if err != nil {
 				return fmt.Errorf("failed to get file descriptors: %w", err)
@@ -58,8 +58,8 @@ func renderTreeView(tasks []task) error {
 			addFdsToTree(tree, fds)
 		}
 
-		if sockets {
-			c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
+		if Sockets {
+			c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
 			fds, err := c.ExploreSk()
 			if err != nil {
 				return fmt.Errorf("failed to get sockets: %w", err)
@@ -68,11 +68,11 @@ func renderTreeView(tasks []task) error {
 			addSkToTree(tree, fds)
 		}
 
-		if mounts {
+		if Mounts {
 			addMountsToTree(tree, info.specDump)
 		}
 
-		fmt.Printf("\nDisplaying container checkpoint tree view from %s\n\n", task.checkpointFilePath)
+		fmt.Printf("\nDisplaying container checkpoint tree view from %s\n\n", task.CheckpointFilePath)
 		fmt.Println(tree.String())
 	}
 
@@ -136,10 +136,10 @@ func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry)
 
 func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputDir string) error {
 	psRoot := psTree
-	if pID != 0 {
-		ps := psTree.FindPs(pID)
+	if PID != 0 {
+		ps := psTree.FindPs(PID)
 		if ps == nil {
-			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", pID)
+			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", PID)
 		}
 		psRoot = ps
 	}
@@ -151,7 +151,7 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputD
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) error {
 		node := tree.AddMetaBranch(root.PID, root.Comm)
 		// attach environment variables to process
-		if psTreeEnv {
+		if PsTreeEnv {
 			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
 			if err != nil {
 				return err

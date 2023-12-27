@@ -2,7 +2,7 @@
 
 // This file is used to handle memory pages analysis of container checkpoints
 
-package main
+package cmd
 
 import (
 	"bytes"
@@ -11,17 +11,83 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/checkpoint-restore/checkpointctl/internal"
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v7/crit"
 	"github.com/olekukonko/tablewriter"
+	"github.com/spf13/cobra"
 )
 
 // chunkSize represents the default size of memory chunk (in bytes)
 // to read for each output line when printing memory pages content in hexdump-like format.
 const chunkSize = 16
 
+var pageSize = os.Getpagesize()
+
+func MemParse() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "memparse",
+		Short: "Analyze container checkpoint memory",
+		RunE:  memparse,
+		Args:  cobra.MinimumNArgs(1),
+	}
+
+	flags := cmd.Flags()
+
+	flags.Uint32VarP(
+		pID,
+		"pid",
+		"p",
+		0,
+		"Specify the PID of a process to analyze",
+	)
+	flags.StringVarP(
+		outputFilePath,
+		"output",
+		"o",
+		"",
+		"Specify the output file to be written to",
+	)
+
+	return cmd
+}
+
+func memparse(cmd *cobra.Command, args []string) error {
+	requiredFiles := []string{
+		metadata.SpecDumpFile, metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
+		filepath.Join(metadata.CheckpointDirectory, "core-"),
+	}
+
+	if *pID == 0 {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
+			filepath.Join(metadata.CheckpointDirectory, "mm-"),
+		)
+	} else {
+		requiredFiles = append(
+			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("pagemap-%d.img", *pID)),
+			filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("mm-%d.img", *pID)),
+		)
+	}
+
+	tasks, err := internal.CreateTasks(args, requiredFiles)
+	if err != nil {
+		return err
+	}
+	defer internal.CleanupTasks(tasks)
+
+	if *pID != 0 {
+		return printProcessMemoryPages(tasks[0])
+	}
+
+	return showProcessMemorySizeTables(tasks)
+}
+
 // Display processes memory sizes within the given container checkpoints.
-func showProcessMemorySizeTables(tasks []task) error {
+func showProcessMemorySizeTables(tasks []internal.Task) error {
 	// Initialize the table
 	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
@@ -77,50 +143,50 @@ func showProcessMemorySizeTables(tasks []task) error {
 		// Clear the table before processing each checkpoint task
 		table.ClearRows()
 
-		c := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false)
+		c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
 		psTree, err := c.ExplorePs()
 		if err != nil {
 			return fmt.Errorf("failed to get process tree: %w", err)
 		}
 
 		// Populate the table rows
-		if err := traverseTree(psTree, task.outputDir); err != nil {
+		if err := traverseTree(psTree, task.OutputDir); err != nil {
 			return err
 		}
 
-		fmt.Printf("\nDisplaying processes memory sizes from %s\n\n", task.checkpointFilePath)
+		fmt.Printf("\nDisplaying processes memory sizes from %s\n\n", task.CheckpointFilePath)
 		table.Render()
 	}
 
 	return nil
 }
 
-func printProcessMemoryPages(task task) error {
-	c := crit.New(nil, nil, filepath.Join(task.outputDir, metadata.CheckpointDirectory), false, false)
+func printProcessMemoryPages(task internal.Task) error {
+	c := crit.New(nil, nil, filepath.Join(task.OutputDir, metadata.CheckpointDirectory), false, false)
 	psTree, err := c.ExplorePs()
 	if err != nil {
 		return fmt.Errorf("failed to get process tree: %w", err)
 	}
 
 	// Check if PID exist within the checkpoint
-	if pID != 0 {
-		ps := psTree.FindPs(pID)
+	if *pID != 0 {
+		ps := psTree.FindPs(*pID)
 		if ps == nil {
-			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", pID)
+			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", *pID)
 		}
 	}
 
 	memReader, err := crit.NewMemoryReader(
-		filepath.Join(task.outputDir, metadata.CheckpointDirectory),
-		pID, pageSize,
+		filepath.Join(task.OutputDir, metadata.CheckpointDirectory),
+		*pID, pageSize,
 	)
 	if err != nil {
 		return err
 	}
 
 	// Unpack pages-[pagesID].img file for the given PID
-	if err := untarFiles(
-		task.checkpointFilePath, task.outputDir,
+	if err := internal.UntarFiles(
+		task.CheckpointFilePath, task.OutputDir,
 		[]string{filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("pages-%d.img", memReader.GetPagesID()))},
 	); err != nil {
 		return err
@@ -130,20 +196,20 @@ func printProcessMemoryPages(task task) error {
 	var output io.Writer = os.Stdout
 	var compact bool
 
-	if outputFilePath != "" {
+	if *outputFilePath != "" {
 		// Write output to file if --output is specified
-		f, err := os.Create(outputFilePath)
+		f, err := os.Create(*outputFilePath)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
 		output = f
 		fmt.Printf("\nWriting memory pages content for process ID %d from checkpoint: %s to file: %s...\n",
-			pID, task.checkpointFilePath, outputFilePath,
+			*pID, task.CheckpointFilePath, *outputFilePath,
 		)
 	} else {
 		compact = true // Use a compact format when writing the output to stdout
-		fmt.Printf("\nDisplaying memory pages content for process ID %d from checkpoint: %s\n\n", pID, task.checkpointFilePath)
+		fmt.Printf("\nDisplaying memory pages content for process ID %d from checkpoint: %s\n\n", *pID, task.CheckpointFilePath)
 	}
 
 	fmt.Fprintln(output, "Address           Hexadecimal                                       ASCII            ")
