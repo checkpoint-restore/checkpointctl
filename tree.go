@@ -157,9 +157,11 @@ func addPsTreeToTree(tree treeprint.Tree, psTree *crit.PsTree, checkpointOutputD
 				return err
 			}
 
-			nodeSubtree := node.AddBranch("Environment variables")
-			for _, env := range envVars {
-				nodeSubtree.AddBranch(env)
+			if len(envVars) > 0 {
+				nodeSubtree := node.AddBranch("Environment variables")
+				for _, env := range envVars {
+					nodeSubtree.AddBranch(env)
+				}
 			}
 		}
 		for _, child := range root.Children {
