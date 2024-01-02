@@ -50,9 +50,28 @@ type SkNode struct {
 	OpenSockets []SocketNode `json:"open_sockets,omitempty"`
 }
 
+type SkData struct {
+	Type       string `json:"type,omitempty"`
+	Address    string `json:"address,omitempty"`
+	State      string `json:"state,omitempty"`
+	Source     string `json:"src,omitempty"`
+	SourcePort uint32 `json:"src_port,omitempty"`
+	Dest       string `json:"dst,omitempty"`
+	DestPort   uint32 `json:"dst_port,omitempty"`
+	SendBuf    string `json:"send_buf,omitempty"`
+	RecvBuf    string `json:"recv_buf,omitempty"`
+}
+
 type SocketNode struct {
-	Protocol string `json:"protocol"`
-	Data     string `json:"data"`
+	Protocol string `json:"protocol,omitempty"`
+	Data     SkData `json:"data,omitempty"`
+}
+
+var socketDataFuncs = map[string]func(*crit.Socket) SkData{
+	"UNIXSK":    getUnixSkData,
+	"INETSK":    getInetSkData,
+	"PACKETSK":  getPacketSkData,
+	"NETLINKSK": getNetlinkSkData,
 }
 
 type DisplayNode struct {
@@ -168,7 +187,10 @@ func renderJSONView(tasks []task) error {
 				return fmt.Errorf("failed to get sockets: %w", err)
 			}
 
-			node.Sockets = buildJSONSks(fds)
+			node.Sockets, err = buildJSONSks(fds)
+			if err != nil {
+				return fmt.Errorf("failed to build sockets: %w", err)
+			}
 		}
 
 		if mounts {
@@ -302,7 +324,7 @@ func buildJSONFds(fds []*crit.Fd) []FdNode {
 	return result
 }
 
-func buildJSONSks(sks []*crit.Sk) []SkNode {
+func buildJSONSks(sks []*crit.Sk) ([]SkNode, error) {
 	var result []SkNode
 
 	for _, sk := range sks {
@@ -312,11 +334,14 @@ func buildJSONSks(sks []*crit.Sk) []SkNode {
 
 		var sockets []SocketNode
 		for _, socket := range sk.Sockets {
-			socketNode := SocketNode{
-				Protocol: socket.Protocol,
-				Data:     getDataForSocket(socket),
+			socketData, err := getDataForSocket(socket)
+			if err != nil {
+				return nil, fmt.Errorf("error getting data for socket: %w", err)
 			}
-			sockets = append(sockets, socketNode)
+			sockets = append(sockets, SocketNode{
+				Protocol: socket.Protocol,
+				Data:     socketData,
+			})
 		}
 
 		if len(sockets) > 0 {
@@ -326,42 +351,47 @@ func buildJSONSks(sks []*crit.Sk) []SkNode {
 		result = append(result, skNode)
 	}
 
-	return result
+	return result, nil
 }
 
-func getDataForSocket(socket *crit.Socket) string {
-	switch socket.FdType {
-	case "UNIXSK":
-		return getUnixSkData(socket)
-	case "INETSK":
-		return getInetSkData(socket)
-	case "PACKETSK":
-		return getPacketSkData(socket)
-	case "NETLINKSK":
-		return getNetlinkSkData(socket)
-	default:
-		return ""
+func getDataForSocket(socket *crit.Socket) (SkData, error) {
+	dataFunc, found := socketDataFuncs[socket.FdType]
+	if !found {
+		return SkData{}, fmt.Errorf("unsupported socket type: %s", socket.FdType)
+	}
+	return dataFunc(socket), nil
+}
+
+func getUnixSkData(socket *crit.Socket) SkData {
+	return SkData{
+		Type:    "UNIX",
+		Address: socket.SrcAddr,
 	}
 }
 
-func getUnixSkData(socket *crit.Socket) string {
-	return fmt.Sprintf("Type: UNIX (%s), Address: %s", socket.Type, socket.SrcAddr)
+func getInetSkData(socket *crit.Socket) SkData {
+	return SkData{
+		Type:       socket.Protocol,
+		State:      socket.State,
+		Source:     socket.SrcAddr,
+		SourcePort: socket.SrcPort,
+		Dest:       socket.DestAddr,
+		DestPort:   socket.DestPort,
+		SendBuf:    socket.SendBuf,
+		RecvBuf:    socket.RecvBuf,
+	}
 }
 
-func getInetSkData(socket *crit.Socket) string {
-	return fmt.Sprintf(
-		"Type: %s, State: %s, Source: %s:%d, Destination: %s:%d, SendBuf: %s, RecvBuf: %s",
-		socket.Protocol, socket.State,
-		socket.SrcAddr, socket.SrcPort,
-		socket.DestAddr, socket.DestPort,
-		socket.SendBuf, socket.RecvBuf,
-	)
+func getPacketSkData(socket *crit.Socket) SkData {
+	return SkData{
+		SendBuf: socket.SendBuf,
+		RecvBuf: socket.RecvBuf,
+	}
 }
 
-func getPacketSkData(socket *crit.Socket) string {
-	return fmt.Sprintf("Type: PACKET, SendBuf: %s, RecvBuf: %s", socket.SendBuf, socket.RecvBuf)
-}
-
-func getNetlinkSkData(socket *crit.Socket) string {
-	return fmt.Sprintf("Type: NETLINK, SendBuf: %s, RecvBuf: %s", socket.SendBuf, socket.RecvBuf)
+func getNetlinkSkData(socket *crit.Socket) SkData {
+	return SkData{
+		SendBuf: socket.SendBuf,
+		RecvBuf: socket.RecvBuf,
+	}
 }
