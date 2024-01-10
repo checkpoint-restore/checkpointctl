@@ -231,7 +231,7 @@ func inspect(cmd *cobra.Command, args []string) error {
 	case "tree":
 		return renderTreeView(tasks)
 	case "json":
-		return fmt.Errorf("json format is not supported yet")
+		return renderJSONView(tasks)
 	default:
 		return fmt.Errorf("invalid output format: %s", format)
 	}
