@@ -589,3 +589,54 @@ function teardown() {
 	[ "$status" -eq 1 ]
 	[[ ${lines[0]} == *"no process with PID 9999"* ]]
 }
+
+@test "Run checkpointctl inspect with json format" {
+	cp data/config.dump data/spec.dump test-imgs/stats-dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	# test function definitions for JSON output using jq
+	test_engine() { jq -e '.[0].engine == "Podman"'; }
+	export -f test_engine
+
+	test_pstree_cmd() { jq -e '.[0].process_tree.command == "piggie"'; }
+	export -f test_pstree_cmd
+
+	test_pstree_child1() { jq -e '.[0].process_tree.children[0].command == "tcp-server"'; }
+	export -f test_pstree_child1
+
+	test_pstree_child2() { jq -e '.[0].process_tree.children[1].command == "tcp-client"'; }
+	export -f test_pstree_child2
+
+	test_pstree_env() { jq -e '.[0].process_tree.environment_variables.TEST_ENV == "BAR"'; }
+	export -f test_pstree_env
+
+	test_pstree_env_empty() { jq -e '.[0].process_tree.environment_variables.TEST_ENV_EMPTY == ""'; }
+	export -f test_pstree_env_empty
+
+	test_socket_protocol() { jq -e '.[0].sockets[0].open_sockets[0].protocol == "TCP"'; }
+	export -f test_socket_protocol
+
+	test_socket_src_port() { jq -e '.[0].sockets[0].open_sockets[0].data.src_port == 5000'; }
+	export -f test_socket_src_port
+
+	# Run tests
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_engine"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json --ps-tree | test_pstree_cmd"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json --all | test_pstree_env"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json --all | test_pstree_env_empty"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json --sockets | test_socket_protocol"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json --sockets | test_socket_src_port"
+	[ "$status" -eq 0 ]
+}
