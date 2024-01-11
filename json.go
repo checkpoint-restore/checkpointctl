@@ -269,7 +269,7 @@ func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 		envVarMap := make(map[string]string)
 		for _, envVar := range envVars {
 			i := strings.IndexByte(envVar, '=')
-			if i == -1 || i == 0 || i == len(envVar)-1 {
+			if i == -1 || i == 0 {
 				return PsNode{}, fmt.Errorf("invalid environment variable %s", envVar)
 			}
 			key := envVar[:i]
