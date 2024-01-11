@@ -14,7 +14,7 @@ test-junit: test-imgs
 test-imgs: piggie/piggie
 	$(eval PID := $(shell export TEST_ENV=BAR TEST_ENV_EMPTY=; piggie/piggie --tcp-socket))
 	mkdir -p $@
-	$(CRIU) dump --tcp-established -v4 -o dump.log -D $@ -t $(PID)
+	$(CRIU) dump --tcp-established -v4 -o dump.log -D $@ -t $(PID) || cat $@/dump.log
 
 piggie/piggie: piggie/piggie.c
 	$(CC) $^ -o $@
