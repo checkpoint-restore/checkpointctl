@@ -301,7 +301,7 @@ function teardown() {
 	[[ ${lines[10]} == *"piggie/piggie"* ]]
 }
 
-@test "Run checkpointctl inspect with tar file and --ps-tree-cmd and missing pages-*.img {
+@test "Run checkpointctl inspect with tar file and --ps-tree-cmd and missing pages-*.img" {
 	cp data/config.dump \
 		data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
@@ -332,7 +332,7 @@ function teardown() {
 	[[ ${lines[12]} == *"="* ]]
 }
 
-@test "Run checkpointctl inspect with tar file and --ps-tree-env and missing pages-*.img {
+@test "Run checkpointctl inspect with tar file and --ps-tree-env and missing pages-*.img" {
 	cp data/config.dump \
 		data/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
