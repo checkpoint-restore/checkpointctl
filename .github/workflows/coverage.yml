@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 0
       - name: Install tools
         run: |
-          sudo apt-get install -qqy bats
+          sudo apt-get install -qqy bats iptables iproute2
           # Add PPA for CRIU
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update

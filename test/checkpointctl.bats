@@ -359,9 +359,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --files
 	[ "$status" -eq 0 ]
-	[[ ${lines[11]} == *"[REG 0]"* ]]
-	[[ ${lines[12]} == *"[cwd]"* ]]
-	[[ ${lines[13]} == *"[root]"* ]]
+	[[ ${lines[24]} == *"[REG 0]"* ]]
+	[[ ${lines[25]} == *"[cwd]"* ]]
+	[[ ${lines[26]} == *"[root]"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --files and missing files.img" {

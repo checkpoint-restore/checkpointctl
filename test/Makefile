@@ -12,9 +12,9 @@ test-junit: test-imgs
 	bats -F junit checkpointctl.bats > junit.xml
 
 test-imgs: piggie/piggie
-	$(eval PID := $(shell piggie/piggie))
+	$(eval PID := $(shell piggie/piggie --tcp-socket))
 	mkdir -p $@
-	$(CRIU) dump -v4 -o dump.log -D $@ -t $(PID)
+	$(CRIU) dump --tcp-established -v4 -o dump.log -D $@ -t $(PID)
 
 piggie/piggie: piggie/piggie.c
 	$(CC) $^ -o $@
