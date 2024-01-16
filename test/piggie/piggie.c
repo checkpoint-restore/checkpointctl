@@ -1,10 +1,12 @@
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <signal.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <fcntl.h>
+#include <signal.h>
 #include <sched.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <string.h>
 
 #define STKS	(4*4096)
 
@@ -12,9 +14,14 @@
 #define CLONE_NEWPID    0x20000000
 #endif
 
-static int do_test(void *logf)
+typedef struct {
+	char *log_file;
+} opts_t;
+
+static int do_test(void *opts_ptr)
 {
-	int fd, i = 0;
+	opts_t *opts = opts_ptr;
+	int fd, ret, i = 0;
 
 	setsid();
 
@@ -28,11 +35,13 @@ static int do_test(void *logf)
 		close(fd);
 	}
 
-	fd = open(logf, O_WRONLY | O_TRUNC | O_CREAT, 0600);
-	dup2(fd, 1);
-	dup2(fd, 2);
-	if (fd != 1 && fd != 2)
-		close(fd);
+	if (opts->log_file) {
+		fd = open(opts->log_file, O_WRONLY | O_TRUNC | O_CREAT, 0600);
+		dup2(fd, 1);
+		dup2(fd, 2);
+		if (fd != 1 && fd != 2)
+			close(fd);
+	}
 
 	while (1) {
 		sleep(1);
@@ -43,19 +52,66 @@ static int do_test(void *logf)
 	return 0;
 }
 
-int main(int argc, char **argv)
+static int parse_options(int argc, char **argv, bool *usage_error, opts_t *opts)
 {
-	int pid;
-	void *stk;
+	int i = 1, exit_code = -1;
 
-	stk = mmap(NULL, STKS, PROT_READ | PROT_WRITE,
-			MAP_PRIVATE | MAP_ANON | MAP_GROWSDOWN, 0, 0);
-	pid = clone(do_test, stk + STKS, SIGCHLD | CLONE_NEWPID, argv[1]);
+	while (i < argc) {
+		if ((!strcmp(argv[i], "--help")) || (!strcmp(argv[i], "-h"))) {
+			*usage_error = false;
+			return 1;
+		}
+
+		if ((!strcmp(argv[i], "--log-file")) || (!strcmp(argv[i], "-o"))) {
+			opts->log_file = argv[i + 1];
+			i += 2;
+			continue;
+		}
+
+		printf("Unknown option: %s\n", argv[i]);
+		*usage_error = true;
+		goto out;
+	}
+
+	exit_code = 0;
+out:
+	return exit_code;
+}
+
+int main(int argc, char **argv) {
+	void *stk;
+	int i, pid, log_fd, option;
+	bool usage_error = false;
+	opts_t opts = {NULL};
+	int ret;
+
+	ret = parse_options(argc, argv, &usage_error, &opts);
+	if (ret) {
+		fprintf(stderr, "Usage: %s -o/--log-file <log_file>\n", argv[0]);
+		return (usage_error != false);
+	}
+
+	stk = mmap(NULL, STKS, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_GROWSDOWN, 0, 0);
+	pid = clone(do_test, stk + STKS, SIGCHLD | CLONE_NEWPID, (void*)&opts);
 	if (pid < 0) {
 		fprintf(stderr, "clone() failed: %m\n");
 		return 1;
 	}
+
 	printf("%d\n", pid);
+
+	if (opts.log_file) {
+		log_fd = open(opts.log_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+		if (log_fd == -1) {
+			perror("Error opening log file");
+			return 1;
+		}
+
+		dup2(log_fd, STDOUT_FILENO);
+		dup2(log_fd, STDERR_FILENO);
+
+		close(log_fd);
+	}
 
 	return 0;
 }
