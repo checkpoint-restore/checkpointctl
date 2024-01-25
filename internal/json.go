@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"encoding/json"
@@ -97,7 +97,7 @@ type MountNode struct {
 	Source      string `json:"source"`
 }
 
-func renderJSONView(tasks []task) error {
+func RenderJSONView(tasks []Task) error {
 	var result []DisplayNode
 
 	for _, task := range tasks {
@@ -140,8 +140,8 @@ func renderJSONView(tasks []task) error {
 
 		node.CheckpointSize = checkpointSizeNode
 
-		if stats {
-			dumpStats, err := crit.GetDumpStats(task.outputDir)
+		if Stats {
+			dumpStats, err := crit.GetDumpStats(task.OutputDir)
 			if err != nil {
 				return fmt.Errorf("failed to get dump statistics: %w", err)
 			}
@@ -158,13 +158,13 @@ func renderJSONView(tasks []task) error {
 			node.CriuDumpStatistics = &statsNode
 		}
 
-		if psTree {
-			psTree, err := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false).ExplorePs()
+		if PsTree {
+			psTree, err := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false).ExplorePs()
 			if err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
 
-			psTreeNode, err := buildJSONPsTree(psTree, task.outputDir)
+			psTreeNode, err := buildJSONPsTree(psTree, task.OutputDir)
 			if err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
 			}
@@ -172,8 +172,8 @@ func renderJSONView(tasks []task) error {
 			node.ProcessTree = &psTreeNode
 		}
 
-		if files {
-			fds, err := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false).ExploreFds()
+		if Files {
+			fds, err := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false).ExploreFds()
 			if err != nil {
 				return fmt.Errorf("failed to get file descriptors: %w", err)
 			}
@@ -181,8 +181,8 @@ func renderJSONView(tasks []task) error {
 			node.FileDescriptors = buildJSONFds(fds)
 		}
 
-		if sockets {
-			fds, err := crit.New(nil, nil, filepath.Join(task.outputDir, "checkpoint"), false, false).ExploreSk()
+		if Sockets {
+			fds, err := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false).ExploreSk()
 			if err != nil {
 				return fmt.Errorf("failed to get sockets: %w", err)
 			}
@@ -193,7 +193,7 @@ func renderJSONView(tasks []task) error {
 			}
 		}
 
-		if mounts {
+		if Mounts {
 			specDump := info.specDump
 			node.Mounts = buildJSONMounts(specDump)
 		}
@@ -230,10 +230,10 @@ func buildJSONPsTree(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 	var rootNode PsNode
 	var err error
 
-	if pID != 0 {
-		ps := psTree.FindPs(pID)
+	if PID != 0 {
+		ps := psTree.FindPs(PID)
 		if ps == nil {
-			return PsNode{}, fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", pID)
+			return PsNode{}, fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", PID)
 		}
 		rootNode, err = buildJSONPsNode(ps, checkpointOutputDir)
 	} else {
@@ -253,7 +253,7 @@ func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 		Comm: psTree.Comm,
 	}
 
-	if psTreeCmd {
+	if PsTreeCmd {
 		cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
 		if err != nil {
 			return PsNode{}, err
@@ -261,7 +261,7 @@ func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 		node.Cmdline = cmdline
 	}
 
-	if psTreeEnv {
+	if PsTreeEnv {
 		envVars, err := getPsEnvVars(checkpointOutputDir, psTree.PID)
 		if err != nil {
 			return PsNode{}, err
