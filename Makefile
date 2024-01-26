@@ -8,6 +8,10 @@ GO_SRC = $(shell find . -name \*.go)
 GO_BUILD = $(GO) build
 NAME = checkpointctl
 
+BASHINSTALLDIR=${PREFIX}/share/bash-completion/completions
+ZSHINSTALLDIR=${PREFIX}/share/zsh/site-functions
+FISHINSTALLDIR=${PREFIX}/share/fish/vendor_completions.d
+
 include Makefile.versions
 
 COVERAGE_PATH ?= $(shell pwd)/.coverage
@@ -48,14 +52,14 @@ release:
 	CGO_ENABLED=0 $(GO_BUILD) -o $(NAME) -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 .PHONY: install
-install: $(NAME)
+install: $(NAME) install.completions
 	@echo "  INSTALL " $<
 	@mkdir -p $(DESTDIR)$(BINDIR)
 	@install -m0755 $< $(DESTDIR)$(BINDIR)
 	@make -C docs install
 
 .PHONY: uninstall
-uninstall:
+uninstall: uninstall.completions
 	@make -C docs uninstall
 	@echo " UNINSTALL" $(NAME)
 	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME))
@@ -110,9 +114,41 @@ vendor:
 docs:
 	@make -C docs
 
+.PHONY: completions
+completions: $(NAME)
+	declare -A outfiles=([bash]=%s [zsh]=_%s [fish]=%s.fish);\
+	for shell in $${!outfiles[*]}; do \
+		outfile=$$(printf "completions/$$shell/$${outfiles[$$shell]}" $(NAME)); \
+		./$(NAME) completion $$shell >| $$outfile; \
+	done
+
+.PHONY: validate.completions
+validate.completions: SHELL:=/usr/bin/env bash # Set shell to bash for this target
+validate.completions:
+	# Check if the files can be loaded by the shell
+	. completions/bash/$(NAME)
+	if [ -x /bin/zsh ]; then /bin/zsh completions/zsh/_$(NAME); fi
+	if [ -x /bin/fish ]; then /bin/fish completions/fish/$(NAME).fish; fi
+
+.PHONY: install.completions
+install.completions:
+	@install -d -m 755 ${DESTDIR}${BASHINSTALLDIR}
+	@install -m 644 completions/bash/$(NAME) ${DESTDIR}${BASHINSTALLDIR}
+	@install -d -m 755 ${DESTDIR}${ZSHINSTALLDIR}
+	@install -m 644 completions/zsh/_$(NAME) ${DESTDIR}${ZSHINSTALLDIR}
+	@install -d -m 755 ${DESTDIR}${FISHINSTALLDIR}
+	@install -m 644 completions/fish/$(NAME).fish ${DESTDIR}${FISHINSTALLDIR}
+
+.PHONY: uninstall.completions
+uninstall.completions:
+	@$(RM) $(addprefix ${DESTDIR}${BASHINSTALLDIR}/,$(NAME))
+	@$(RM) $(addprefix ${DESTDIR}${ZSHINSTALLDIR}/,_$(NAME))
+	@$(RM) $(addprefix ${DESTDIR}${FISHINSTALLDIR}/,$(NAME).fish)
+
 .PHONY: help
 help:
 	@echo "Usage: make <target>"
+	@echo " * completions - generate auto-completion files"
 	@echo " * clean - remove artifacts"
 	@echo " * docs - build man pages"
 	@echo " * lint - verify the source code (shellcheck/golangci-lint)"
