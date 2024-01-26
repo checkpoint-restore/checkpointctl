@@ -18,8 +18,10 @@ MIN_GO_MAJOR_VER = 1
 MIN_GO_MINOR_VER = 20
 GO_VALIDATION_ERR = Go version is not supported. Please update to at least $(MIN_GO_MAJOR_VER).$(MIN_GO_MINOR_VER)
 
+.PHONY: all
 all: $(NAME)
 
+.PHONY: check-go-version
 check-go-version:
 	@if [ $(GO_MAJOR_VER) -gt $(MIN_GO_MAJOR_VER) ]; then \
 		exit 0 ;\
@@ -41,40 +43,50 @@ $(NAME).coverage: check-go-version $(GO_SRC)
 		-o $@ \
 		-ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
+.PHONY: release
 release:
 	CGO_ENABLED=0 $(GO_BUILD) -o $(NAME) -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
+.PHONY: install
 install: $(NAME)
 	@echo "  INSTALL " $<
 	@mkdir -p $(DESTDIR)$(BINDIR)
 	@install -m0755 $< $(DESTDIR)$(BINDIR)
 	@make -C docs install
 
+.PHONY: uninstall
 uninstall:
 	@make -C docs uninstall
 	@echo " UNINSTALL" $(NAME)
 	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME))
 
+.PHONY: clean
 clean:
 	rm -f $(NAME) junit.xml $(NAME).coverage $(COVERAGE_PATH)/*
 	if [ -d $(COVERAGE_PATH) ]; then rmdir $(COVERAGE_PATH); fi
 	@make -C docs clean
 
+.PHONY: golang-lint
 golang-lint:
 	golangci-lint run
 
+.PHONY: shellcheck
 shellcheck:
 	shellcheck test/*bats
 
+.PHONY: lint
 lint: golang-lint shellcheck
 
+.PHONY: test
 test: $(NAME)
 	$(GO) test -v ./...
 	make -C test
 
+.PHONY: test-junit
 test-junit: $(NAME)
 	make -C test test-junit clean
 
+.PHONY: coverage
 coverage: check-go-version $(NAME).coverage
 	mkdir -p $(COVERAGE_PATH)
 	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 make -C test
@@ -82,19 +94,23 @@ coverage: check-go-version $(NAME).coverage
 	$(GO) tool covdata percent -i=${COVERAGE_PATH}
 	$(GO) tool covdata textfmt -i=${COVERAGE_PATH} -o ${COVERAGE_PATH}/coverage.out
 
+.PHONY: codecov
 codecov:
 	curl -Os https://uploader.codecov.io/latest/linux/codecov
 	chmod +x codecov
 	./codecov -f "$(COVERAGE_PATH)"/coverage.out
 
+.PHONY: vendor
 vendor:
 	go mod tidy
 	go mod vendor
 	go mod verify
 
+.PHONY: docs
 docs:
 	@make -C docs
 
+.PHONY: help
 help:
 	@echo "Usage: make <target>"
 	@echo " * clean - remove artifacts"
@@ -111,5 +127,3 @@ help:
 	@echo " * uninstall - remove the installed binary from $(BINDIR)"
 	@echo " * release - build a static binary"
 	@echo " * help - show help"
-
-.PHONY: clean docs install uninstall release lint golang-lint shellcheck vendor test help check-go-version test-junit
