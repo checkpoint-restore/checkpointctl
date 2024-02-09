@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v7/crit"
@@ -89,6 +90,9 @@ func buildTree(ci *containerInfo, containerConfig *metadata.ContainerConfig, arc
 	tree.AddBranch(fmt.Sprintf("ID: %s", containerConfig.ID))
 	tree.AddBranch(fmt.Sprintf("Runtime: %s", containerConfig.OCIRuntime))
 	tree.AddBranch(fmt.Sprintf("Created: %s", ci.Created))
+	if !containerConfig.CheckpointedAt.IsZero() {
+		tree.AddBranch(fmt.Sprintf("Checkpointed: %s", containerConfig.CheckpointedAt.Format(time.RFC3339)))
+	}
 	tree.AddBranch(fmt.Sprintf("Engine: %s", ci.Engine))
 
 	if ci.IP != "" {
