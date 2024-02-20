@@ -501,13 +501,14 @@ function teardown() {
 }
 
 @test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump (CRI-O) and checkpoint directory" {
-	cp data/config.dump "$TEST_TMP_DIR1"
+	echo '{"checkpointedTime": "2024-02-09T11:01:26.186815191Z"}' > "$TEST_TMP_DIR1"/config.dump
 	cp data/spec.dump.cri-o "$TEST_TMP_DIR1"/spec.dump
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[6]} == *"CRI-O"* ]]
+	[[ ${lines[6]} == *"Checkpointed: 2024-02-09"* ]]
+	[[ ${lines[7]} == *"CRI-O"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and rootfs-diff tar file" {

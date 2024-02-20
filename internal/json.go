@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/checkpoint-restore/go-criu/v7/crit"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
@@ -80,6 +81,7 @@ type DisplayNode struct {
 	ID                 string         `json:"id"`
 	Runtime            string         `json:"runtime"`
 	Created            string         `json:"created"`
+	Checkpointed       string         `json:"checkpointed,omitempty"`
 	Engine             string         `json:"engine"`
 	IP                 string         `json:"ip,omitempty"`
 	MAC                string         `json:"mac,omitempty"`
@@ -113,6 +115,10 @@ func RenderJSONView(tasks []Task) error {
 			Runtime:       info.configDump.OCIRuntime,
 			Created:       info.containerInfo.Created,
 			Engine:        info.containerInfo.Engine,
+		}
+
+		if !info.configDump.CheckpointedAt.IsZero() {
+			node.Checkpointed = info.configDump.CheckpointedAt.Format(time.RFC3339)
 		}
 
 		if info.containerInfo.IP != "" {

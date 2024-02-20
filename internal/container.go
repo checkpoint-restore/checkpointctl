@@ -52,10 +52,10 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *con
 	}
 }
 
-func getContainerdInfo(containerdStatus *metadata.ContainerdStatus, specDump *spec.Spec) *containerInfo {
+func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) *containerInfo {
 	return &containerInfo{
 		Name:    specDump.Annotations["io.kubernetes.cri.container-name"],
-		Created: time.Unix(0, containerdStatus.CreatedAt).Format(time.RFC3339),
+		Created: containerConfig.CreatedTime.Format(time.RFC3339),
 		Engine:  "containerd",
 	}
 }
@@ -87,7 +87,7 @@ func getCheckpointInfo(task Task) (*checkpointInfo, error) {
 		return nil, err
 	}
 
-	info.containerInfo, err = getContainerInfo(task.OutputDir, info.specDump, info.configDump)
+	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func ShowContainerCheckpoints(tasks []Task) error {
 	return nil
 }
 
-func getContainerInfo(checkpointDir string, specDump *spec.Spec, containerConfig *metadata.ContainerConfig) (*containerInfo, error) {
+func getContainerInfo(specDump *spec.Spec, containerConfig *metadata.ContainerConfig) (*containerInfo, error) {
 	var ci *containerInfo
 	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
@@ -184,11 +184,7 @@ func getContainerInfo(checkpointDir string, specDump *spec.Spec, containerConfig
 			return nil, fmt.Errorf("getting container checkpoint information failed: %w", err)
 		}
 	default:
-		containerdStatus, _, _ := metadata.ReadContainerCheckpointStatusFile(checkpointDir)
-		if containerdStatus == nil {
-			return nil, fmt.Errorf("unknown container manager found: %s", m)
-		}
-		ci = getContainerdInfo(containerdStatus, specDump)
+		ci = getContainerdInfo(containerConfig, specDump)
 	}
 
 	return ci, nil
