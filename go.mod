@@ -6,7 +6,7 @@ require (
 	github.com/checkpoint-restore/go-criu/v7 v7.0.0
 	github.com/containers/storage v1.52.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/opencontainers/runtime-spec v1.1.0
+	github.com/opencontainers/runtime-spec v1.2.0
 	github.com/spf13/cobra v1.8.0
 	github.com/xlab/treeprint v1.2.0
 )
