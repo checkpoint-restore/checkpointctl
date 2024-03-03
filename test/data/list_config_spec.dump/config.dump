@@ -1,0 +1,12 @@
+{
+  "id": "6924be1bd90c23f10e2667102b0ee0f74f09bba78b6661871e733cb3b1737821",
+  "name": "k8s_container-name_deployment-name_default_6975ee47-6765-45dc-9a2b-1e38d51031f7_0",
+  "rootfsImage": "docker.io/library/nginx@sha256:161ef4b1bf7effb350a2a9625cb2b59f69d54ec6059a8a155a1438d0439c593c",
+  "rootfsImageRef": "a8758716bb6aa4d90071160d27028fe4eaee7ce8166221a97d30440c8eac2be6",
+  "rootfsImageName": "docker.io/library/nginx:latest",
+  "runtime": "runc",
+  "createdTime": "2024-01-27T14:45:26.083444055Z",
+  "checkpointedTime": "2024-01-28T00:10:45.673538606+05:30",
+  "restoredTime": "0001-01-01T00:00:00Z",
+  "restored": false
+}
