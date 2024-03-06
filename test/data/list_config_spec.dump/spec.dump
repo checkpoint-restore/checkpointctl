@@ -1,9 +1,10 @@
 {
 	"annotations": {
-	    "io.container.manager": "cri-o",
+		"io.container.manager": "cri-o",
 		"io.kubernetes.container.hash": "1511917a",
 		"io.kubernetes.container.name": "container-name",
 		"io.kubernetes.pod.name": "pod-name",
-		"io.kubernetes.pod.namespace": "default"
+		"io.kubernetes.pod.namespace": "default",
+		"io.kubernetes.cri-o.Metadata": "{\"name\":\"container-name\"}"
 	}
 }

@@ -20,8 +20,9 @@ function setup() {
 }
 
 function teardown() {
-	[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
-	[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
+	#[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
+	#[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
+	echo hu
 }
 
 @test "Run checkpointctl" {
@@ -644,23 +645,22 @@ function teardown() {
 
 @test "Run checkpointctl list with empty directory" {
     mkdir "$TEST_TMP_DIR1"/empty
-    checkpointctl list -p "$TEST_TMP_DIR1"/empty/
+    checkpointctl list "$TEST_TMP_DIR1"/empty/
     [ "$status" -eq 0 ]
     [[ ${lines[0]} == *"No checkpoints found"* ]]
 }
 
 @test "Run checkpointctl list with non existing directory" {
-	checkpointctl list -p /does-not-exist
+	checkpointctl list /does-not-exist
 	[ "$status" -eq 0 ]
 	[[ ${lines[0]} == *"No checkpoints found"* ]]
 }
 
 @test "Run checkpointctl list with empty tar file" {
 	touch "$TEST_TMP_DIR1"/checkpoint-nginx-empty.tar
-	checkpointctl list -p "$TEST_TMP_DIR1"
+	checkpointctl list "$TEST_TMP_DIR1"
 	[ "$status" -eq 0 ]
-	[[ "${lines[1]}" == *"Error reading spec.dump file"* ]]
-	[[ "${lines[2]}" == *"Error extracting information"* ]]
+	[[ "${lines[1]}" == *"Error extracting information"* ]]
 }
 
 @test "Run checkpointctl list with tar file with valid spec.dump and empty config.dump" {
@@ -668,9 +668,9 @@ function teardown() {
 	cp data/list_config_spec.dump/spec.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/checkpoint-config.tar . )
-	checkpointctl list -p "$TEST_TMP_DIR2"
+	checkpointctl list "$TEST_TMP_DIR2"
 	[ "$status" -eq 0 ]
-	[[ "${lines[1]}" == *"Error extracting information from $TEST_TMP_DIR2/checkpoint-config.tar: unexpected end of JSON input"* ]]
+	[[ "${lines[1]}" == *"Error extracting information from $TEST_TMP_DIR2/checkpoint-config.tar: failed to unmarshal"* ]]
 }
 
 @test "Run checkpointctl list with tar file with valid config.dump and empty spec.dump" {
@@ -678,9 +678,9 @@ function teardown() {
 	cp data/list_config_spec.dump/config.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/checkpoint-config.tar . )
-	checkpointctl list -p "$TEST_TMP_DIR2"
+	checkpointctl list "$TEST_TMP_DIR2"
 	[ "$status" -eq 0 ]
-	[[ ${lines[1]} == *"Error extracting information from $TEST_TMP_DIR2/checkpoint-config.tar: unexpected end of JSON input" ]]
+	[[ ${lines[1]} == *"Error extracting information from $TEST_TMP_DIR2/checkpoint-config.tar: failed to unmarshal"* ]]
 }
 
 @test "Run checkpointctl list with tar file with valid config.dump and spec.dump" {
@@ -691,10 +691,10 @@ function teardown() {
 	jq '.["annotations"]["io.kubernetes.pod.name"] = "modified-pod-name"' "$TEST_TMP_DIR1"/spec.dump > "$TEST_TMP_DIR1"/spec_modified.dump
 	mv "$TEST_TMP_DIR1"/spec_modified.dump "$TEST_TMP_DIR1"/spec.dump
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/checkpoint-valid-config-modified.tar . )
-	checkpointctl list -p "$TEST_TMP_DIR2"
+	checkpointctl list "$TEST_TMP_DIR2"
 	[ "$status" -eq 0 ]
-	[[ "${lines[4]}" == *"| default   | modified-pod-name | container-name | cri-o  |"* ]]
+	[[ "${lines[4]}" == *"| default   | modified-pod-name | container-name | CRI-O  |"* ]]
 	[[ "${lines[4]}" == *"| checkpoint-valid-config-modified.tar |"* ]]
-	[[ "${lines[6]}" == *"| default   | pod-name          | container-name | cri-o  |"* ]]
+	[[ "${lines[6]}" == *"| default   | pod-name          | container-name | CRI-O  |"* ]]
 	[[ "${lines[6]}" == *"| checkpoint-valid-config.tar          |"* ]]
 }

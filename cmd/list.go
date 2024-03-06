@@ -16,32 +16,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	defaultCheckpointPath     = "/var/lib/kubelet/checkpoints/"
-	additionalCheckpointPaths []string
-)
+var defaultCheckpointPath = "/var/lib/kubelet/checkpoints/"
 
 func List() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List checkpoints stored in the default and additional paths",
-		RunE:  list,
+		Use:                   "list [directories]",
+		Short:                 "List checkpoints stored in the default and additional directories",
+		RunE:                  list,
+		DisableFlagsInUseLine: true,
 	}
-
-	flags := cmd.Flags()
-	flags.StringSliceVarP(
-		&additionalCheckpointPaths,
-		"paths",
-		"p",
-		[]string{},
-		"Specify additional paths to include in checkpoint listing",
-	)
 
 	return cmd
 }
 
 func list(cmd *cobra.Command, args []string) error {
-	allPaths := append([]string{defaultCheckpointPath}, additionalCheckpointPaths...)
+	allPaths := func() []string {
+		if len(args) == 0 {
+			return []string{defaultCheckpointPath}
+		}
+		return args
+	}()
 	showTable := false
 
 	table := tablewriter.NewWriter(os.Stdout)
@@ -92,7 +86,7 @@ func list(cmd *cobra.Command, args []string) error {
 	}
 
 	if !showTable {
-		fmt.Println("No checkpoints found")
+		fmt.Printf("No checkpoints found in %v\n", allPaths)
 		return nil
 	}
 
