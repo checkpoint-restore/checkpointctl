@@ -1,10 +1,8 @@
 package internal
 
 import (
-	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -31,46 +29,25 @@ func ExtractConfigDump(checkpointPath string) (*ChkptConfig, error) {
 		return nil, err
 	}
 
-	specDumpPath := filepath.Join(tempDir, "spec.dump")
-	specContent, err := os.ReadFile(specDumpPath)
+	info := &checkpointInfo{}
+	info.configDump, _, err = metadata.ReadContainerCheckpointConfigDump(tempDir)
 	if err != nil {
-		log.Printf("Error reading spec.dump file: %v\n", err)
 		return nil, err
 	}
-
-	configDumpPath := filepath.Join(tempDir, "config.dump")
-	configContent, err := os.ReadFile(configDumpPath)
+	info.specDump, _, err = metadata.ReadContainerCheckpointSpecDump(tempDir)
 	if err != nil {
-		log.Printf("Error reading config.dump file: %v\n", err)
 		return nil, err
 	}
 
-	return extractConfigDumpContent(configContent, specContent)
-}
-
-func extractConfigDumpContent(configContent []byte, specContent []byte) (*ChkptConfig, error) {
-	var spec metadata.Spec
-	var config metadata.ContainerConfig
-
-	if err := json.Unmarshal(configContent, &config); err != nil {
+	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump)
+	if err != nil {
 		return nil, err
 	}
-
-	if err := json.Unmarshal(specContent, &spec); err != nil {
-		return nil, err
-	}
-
-	namespace := spec.Annotations["io.kubernetes.pod.namespace"]
-	timestamp := config.CheckpointedAt
-	pod := spec.Annotations["io.kubernetes.pod.name"]
-	container := spec.Annotations["io.kubernetes.container.name"]
-	containerManager := spec.Annotations["io.container.manager"]
-
 	return &ChkptConfig{
-		Namespace:        namespace,
-		Pod:              pod,
-		Container:        container,
-		ContainerManager: containerManager,
-		Timestamp:        timestamp,
+		Namespace:        info.containerInfo.Namespace,
+		Pod:              info.containerInfo.Pod,
+		Container:        info.containerInfo.Name,
+		ContainerManager: info.containerInfo.Engine,
+		Timestamp:        info.configDump.CheckpointedAt,
 	}, nil
 }

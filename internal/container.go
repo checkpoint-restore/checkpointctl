@@ -30,11 +30,13 @@ type containerMetadata struct {
 }
 
 type containerInfo struct {
-	Name    string
-	IP      string
-	MAC     string
-	Created string
-	Engine  string
+	Name      string
+	IP        string
+	MAC       string
+	Created   string
+	Engine    string
+	Namespace string
+	Pod       string
 }
 
 type checkpointInfo struct {
@@ -54,9 +56,11 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *con
 
 func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) *containerInfo {
 	return &containerInfo{
-		Name:    specDump.Annotations["io.kubernetes.cri.container-name"],
-		Created: containerConfig.CreatedTime.Format(time.RFC3339),
-		Engine:  "containerd",
+		Name:      specDump.Annotations["io.kubernetes.cri.container-name"],
+		Created:   containerConfig.CreatedTime.Format(time.RFC3339),
+		Engine:    "containerd",
+		Namespace: specDump.Annotations["io.kubernetes.cri.sandbox-namespace"],
+		Pod:       specDump.Annotations["io.kubernetes.cri.sandbox-name"],
 	}
 }
 
@@ -67,10 +71,12 @@ func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerIn
 	}
 
 	return &containerInfo{
-		IP:      specDump.Annotations["io.kubernetes.cri-o.IP.0"],
-		Name:    cm.Name,
-		Created: specDump.Annotations["io.kubernetes.cri-o.Created"],
-		Engine:  "CRI-O",
+		IP:        specDump.Annotations["io.kubernetes.cri-o.IP.0"],
+		Name:      cm.Name,
+		Created:   specDump.Annotations["io.kubernetes.cri-o.Created"],
+		Engine:    "CRI-O",
+		Namespace: specDump.Annotations["io.kubernetes.pod.namespace"],
+		Pod:       specDump.Annotations["io.kubernetes.pod.name"],
 	}, nil
 }
 

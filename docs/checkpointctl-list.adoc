@@ -3,21 +3,18 @@ include::footer.adoc[]
 
 == Name
 
-*checkpointctl-list* - List checkpoints stored in the default and additional paths
+*checkpointctl-list* - List checkpoints stored in the default and additional directories
 
 == Synopsis
 
-*checkpointctl list* [_OPTION_]... _FOLDER_...
+*checkpointctl list* [_directories_]
 
 == Options
 
 *-h*, *--help*::
   Show help for checkpointctl list
 
-*-p*, *--path*::
-  Specify additional paths to include in checkpoint listing
-
-== Default Path
+== Default Directory
 
 The default path for checking checkpoints is `/var/lib/kubelet/checkpoints/`.
 
