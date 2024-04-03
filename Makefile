@@ -1,12 +1,14 @@
 SHELL = /bin/bash
 PREFIX ?= $(DESTDIR)/usr/local
 BINDIR ?= $(PREFIX)/bin
+SCRIPTDIR ?= $(DESTDIR)/usr/libexec
 GO ?= go
 GOPATH := $(shell $(GO) env GOPATH)
 GOBIN := $(shell $(GO) env GOBIN)
 GO_SRC = $(shell find . -name \*.go)
 GO_BUILD = $(GO) build
 NAME = checkpointctl
+SCRIPTNAME = build_image.sh
 
 BASHINSTALLDIR=${PREFIX}/share/bash-completion/completions
 ZSHINSTALLDIR=${PREFIX}/share/zsh/site-functions
@@ -33,17 +35,22 @@ release:
 	CGO_ENABLED=0 $(GO_BUILD) -o $(NAME) -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
 .PHONY: install
-install: $(NAME) install.completions
+install: $(NAME) install.completions install-scripts
 	@echo "  INSTALL " $<
 	@mkdir -p $(DESTDIR)$(BINDIR)
 	@install -m0755 $< $(DESTDIR)$(BINDIR)
 	@make -C docs install
 
+.PHONY: install-scripts
+install-scripts:
+	@echo "  INSTALL SCRIPTS"
+	@install -m0755 internal/scripts/build_image.sh $(DESTDIR)$(SCRIPTDIR)
+
 .PHONY: uninstall
 uninstall: uninstall.completions
 	@make -C docs uninstall
 	@echo " UNINSTALL" $(NAME)
-	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME))
+	@$(RM) $(addprefix $(DESTDIR)$(BINDIR)/,$(NAME)) $(addprefix $(DESTDIR)$(SCRIPTDIR)/,$(SCRIPTNAME))
 
 .PHONY: clean
 clean:
@@ -58,9 +65,14 @@ golang-lint:
 .PHONY: shellcheck
 shellcheck:
 	shellcheck test/*bats
+	shellcheck internal/scripts/build_image.sh
+
+.PHONY: shfmt-lint
+shfmt-lint:
+	shfmt -w -d internal/scripts/build_image.sh
 
 .PHONY: lint
-lint: golang-lint shellcheck
+lint: golang-lint shellcheck shfmt-lint
 
 .PHONY: test
 test: $(NAME)
@@ -126,9 +138,10 @@ help:
 	@echo " * completions - generate auto-completion files"
 	@echo " * clean - remove artifacts"
 	@echo " * docs - build man pages"
-	@echo " * lint - verify the source code (shellcheck/golangci-lint)"
+	@echo " * lint - verify the source code (shellcheck/golangci-lint/shfmt-lint)"
 	@echo " * golang-lint - run golangci-lint"
 	@echo " * shellcheck - run shellcheck"
+	@echo " * shfmt-lint - run shfmt on selected shell scripts"
 	@echo " * vendor - update go.mod, go.sum, and vendor directory"
 	@echo " * test - run tests"
 	@echo " * test-junit - run tests and create junit output"

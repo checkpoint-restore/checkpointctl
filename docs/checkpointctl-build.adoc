@@ -1,0 +1,25 @@
+= checkpointctl-build(1)
+include::footer.adoc[]
+
+== Name
+
+*checkpointctl-build* - Create OCI image from a checkpoint tar file.
+
+== Synopsis
+
+*checkpointctl build* CHECKPOINT_PATH IMAGE_NAME 
+
+== Options
+
+*-h*, *--help*::
+  Show help for checkpointctl build
+
+== Description
+
+Creates an OCI image from a checkpoint tar file. This command requires `buildah` to be installed on the system.
+
+Please ensure that `buildah` is installed before running this command.
+
+== See also
+
+checkpointctl(1)
