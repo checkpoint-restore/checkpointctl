@@ -281,5 +281,5 @@ The author of a change remains the copyright holder of their code
 retrieved from the git commit history and in some cases, the file headers.
 
 [forensic]: https://kubernetes.io/blog/2022/12/05/forensic-container-checkpointing-alpha/
-[podman]: https://podman.io/getting-started/checkpoint
+[podman]: https://podman.io/docs/checkpoint
 [criu]: https://criu.org/
