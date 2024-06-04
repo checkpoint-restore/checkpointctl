@@ -1,6 +1,8 @@
 module github.com/checkpoint-restore/checkpointctl
 
-go 1.18
+go 1.21
+
+toolchain go1.21.1
 
 require (
 	github.com/checkpoint-restore/go-criu/v7 v7.1.0
