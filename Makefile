@@ -79,12 +79,6 @@ coverage: $(NAME).coverage
 	$(GO) tool covdata percent -i=${COVERAGE_PATH}
 	$(GO) tool covdata textfmt -i=${COVERAGE_PATH} -o ${COVERAGE_PATH}/coverage.out
 
-.PHONY: codecov
-codecov:
-	curl -Os https://uploader.codecov.io/latest/linux/codecov
-	chmod +x codecov
-	./codecov -f "$(COVERAGE_PATH)"/coverage.out
-
 .PHONY: vendor
 vendor:
 	go mod tidy
@@ -139,7 +133,6 @@ help:
 	@echo " * test - run tests"
 	@echo " * test-junit - run tests and create junit output"
 	@echo " * coverage - generate test coverage report"
-	@echo " * codecov - upload coverage report to codecov.io"
 	@echo " * install - install the binary to $(BINDIR)"
 	@echo " * uninstall - remove the installed binary from $(BINDIR)"
 	@echo " * release - build a static binary"
