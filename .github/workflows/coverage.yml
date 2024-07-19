@@ -4,10 +4,11 @@ on: [push, pull_request]
 
 jobs:
   coverage:
+    if: ${{ github.repository == 'checkpoint-restore/checkpointctl' }}
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           # needed for codecov
           fetch-depth: 0
@@ -20,5 +21,11 @@ jobs:
           sudo apt-get install -qqy criu
       - name: Run make coverage
         run: sudo -E make coverage
-      - name: Run make codecov
-        run: make codecov
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          file: .coverage/coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
