@@ -16,32 +16,13 @@ include Makefile.versions
 
 COVERAGE_PATH ?= $(shell pwd)/.coverage
 
-GO_MAJOR_VER = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f1)
-GO_MINOR_VER = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f2)
-MIN_GO_MAJOR_VER = 1
-MIN_GO_MINOR_VER = 20
-GO_VALIDATION_ERR = Go version is not supported. Please update to at least $(MIN_GO_MAJOR_VER).$(MIN_GO_MINOR_VER)
-
 .PHONY: all
 all: $(NAME)
-
-.PHONY: check-go-version
-check-go-version:
-	@if [ $(GO_MAJOR_VER) -gt $(MIN_GO_MAJOR_VER) ]; then \
-		exit 0 ;\
-	elif [ $(GO_MAJOR_VER) -lt $(MIN_GO_MAJOR_VER) ]; then \
-		echo '$(GO_VALIDATION_ERR)';\
-		exit 1; \
-	elif [ $(GO_MINOR_VER) -lt $(MIN_GO_MINOR_VER) ] ; then \
-		echo '$(GO_VALIDATION_ERR)';\
-		exit 1; \
-	fi
-
 
 $(NAME): $(GO_SRC)
 	$(GO_BUILD) -o $@ -ldflags "-X main.name=$(NAME) -X main.version=${VERSION}"
 
-$(NAME).coverage: check-go-version $(GO_SRC)
+$(NAME).coverage: $(GO_SRC)
 	$(GO) build \
 		-cover \
 		-o $@ \
@@ -91,7 +72,7 @@ test-junit: $(NAME)
 	make -C test test-junit clean
 
 .PHONY: coverage
-coverage: check-go-version $(NAME).coverage
+coverage: $(NAME).coverage
 	mkdir -p $(COVERAGE_PATH)
 	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 make -C test
 	# Print coverage from this run
