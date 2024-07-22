@@ -577,6 +577,76 @@ function teardown() {
 	[[ ${lines[3]} == *"....H...H.../..H"* ]]
 }
 
+@test "Run checkpointctl memparse --search=PATH with invalid PID" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search=PATH "$TEST_TMP_DIR2"/test.tar --pid=999
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"no process with PID 999"* ]]
+}
+
+@test "Run checkpointctl memparse with --search=PATH and --context=-1" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search=PATH --context=-1 "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"context size cannot be negative"* ]]
+}
+
+@test "Run checkpointctl memparse with --search=NON_EXISTING_PATTERN" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search=NON_EXISTING_PATTERN "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	[[ ${lines[0]} == *"No matches"* ]]
+}
+
+@test "Run checkpointctl memparse with --search=PATH and --context=10 flags" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search=PATH --context=10 "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	[[ ${lines[3]} == *"PATH"* ]]
+}
+
+@test "Run checkpointctl memparse with --search-regex='HOME=([^?]+)' " {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search-regex='HOME=([^?]+)' "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	[[ ${lines[3]} == *"HOME"* ]]
+}
+
 @test "Run checkpointctl memparse with tar file and invalid PID" {
 	cp data/config.dump \
 		data/spec.dump "$TEST_TMP_DIR1"
