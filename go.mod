@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.1
 
 require (
-	github.com/checkpoint-restore/go-criu/v7 v7.1.0
+	github.com/checkpoint-restore/go-criu/v7 v7.2.0
 	github.com/containers/storage v1.54.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/runtime-spec v1.2.0
@@ -25,6 +25,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 )
