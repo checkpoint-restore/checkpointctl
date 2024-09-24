@@ -20,6 +20,15 @@ include::footer.adoc[]
 *-p, --pid*=_PID_::
   Specify the PID of a process to analyze
 
+*-s, --search*=_STRING_::
+  Search for a string pattern in memory pages
+
+*-r, --search-regex*=_REGEX_::
+  Search for a regex pattern in memory pages
+
+*-c, --context*=_CONTEXT_::
+  Print the specified number of bytes surrounding each match
+
 == See also
 
 checkpointctl(1)
