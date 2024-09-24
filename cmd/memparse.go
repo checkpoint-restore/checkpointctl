@@ -49,6 +49,30 @@ func MemParse() *cobra.Command {
 		"Specify the output file to be written to",
 	)
 
+	flags.StringVarP(
+		searchPattern,
+		"search",
+		"s",
+		"",
+		"Search for a string pattern in memory pages",
+	)
+
+	flags.StringVarP(
+		searchRegexPattern,
+		"search-regex",
+		"r",
+		"",
+		"Search for a regex pattern in memory pages",
+	)
+
+	flags.IntVarP(
+		searchContext,
+		"context",
+		"c",
+		0,
+		"Print the specified number of bytes surrounding each match",
+	)
+
 	return cmd
 }
 
@@ -78,6 +102,10 @@ func memparse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer internal.CleanupTasks(tasks)
+
+	if *searchPattern != "" || *searchRegexPattern != "" {
+		return printMemorySearchResultForPID(tasks[0])
+	}
 
 	if *pID != 0 {
 		return printProcessMemoryPages(tasks[0])
@@ -272,4 +300,69 @@ func generateHexAndAscii(data []byte) (string, string) {
 	}
 
 	return hex, ascii
+}
+
+// Searches for a pattern in the memory of a given PID and prints the results.
+func printMemorySearchResultForPID(task internal.Task) error {
+	c := crit.New(nil, nil, filepath.Join(task.OutputDir, metadata.CheckpointDirectory), false, false)
+	psTree, err := c.ExplorePs()
+	if err != nil {
+		return fmt.Errorf("failed to get process tree: %w", err)
+	}
+
+	// Check if PID exist within the checkpoint
+	ps := psTree.FindPs(*pID)
+	if ps == nil {
+		return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", *pID)
+	}
+
+	memReader, err := crit.NewMemoryReader(
+		filepath.Join(task.OutputDir, metadata.CheckpointDirectory),
+		*pID, pageSize,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create memory reader: %w", err)
+	}
+
+	if err := internal.UntarFiles(
+		task.CheckpointFilePath, task.OutputDir,
+		[]string{filepath.Join(metadata.CheckpointDirectory, fmt.Sprintf("pages-%d.img", memReader.GetPagesID()))},
+	); err != nil {
+		return fmt.Errorf("failed to extract pages file: %w", err)
+	}
+
+	pattern := *searchPattern
+	escapeRegExpCharacters := true
+	if pattern == "" {
+		pattern = *searchRegexPattern
+		escapeRegExpCharacters = false
+	}
+
+	results, err := memReader.SearchPattern(pattern, escapeRegExpCharacters, *searchContext, 0)
+	if err != nil {
+		return fmt.Errorf("failed to search pattern in memory: %w", err)
+	}
+
+	if len(results) == 0 {
+		fmt.Printf("No matches for pattern \"%s\" in the memory of PID %d\n", pattern, *pID)
+		return nil
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Address", "Match", "Instance"})
+	table.SetAutoMergeCells(false)
+	table.SetRowLine(true)
+
+	for i, result := range results {
+		table.Append([]string{
+			fmt.Sprintf(
+				"%016x", result.Vaddr),
+			result.Match,
+			fmt.Sprintf("%d", i+1),
+		})
+	}
+
+	table.Render()
+
+	return nil
 }
