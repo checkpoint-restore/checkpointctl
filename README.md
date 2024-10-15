@@ -6,6 +6,7 @@
 # checkpointctl - a tool for in-depth analysis of container checkpoints
 
 [![Run Tests](https://github.com/checkpoint-restore/checkpointctl/actions/workflows/tests.yml/badge.svg)](https://github.com/checkpoint-restore/checkpointctl/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/checkpoint-restore/checkpointctl/graph/badge.svg?token=P1SXZ8HZ32)](https://codecov.io/gh/checkpoint-restore/checkpointctl)
 
 Container engines like *Podman* and *CRI-O* have the ability to checkpoint a
 container.  All data related to a checkpoint is collected in a checkpoint
