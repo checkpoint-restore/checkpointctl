@@ -20,9 +20,8 @@ function setup() {
 }
 
 function teardown() {
-	#[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
-	#[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
-	echo hu
+	[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
+	[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
 }
 
 @test "Run checkpointctl" {
@@ -360,7 +359,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --files
 	[ "$status" -eq 0 ]
-	[[ ${lines[24]} == *"[REG 0]"* ]]
+	[[ ${lines[11]} == *"[REG 0]"* ]]
 	[[ ${lines[25]} == *"[cwd]"* ]]
 	[[ ${lines[26]} == *"[root]"* ]]
 }
