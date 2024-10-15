@@ -20,9 +20,8 @@ function setup() {
 }
 
 function teardown() {
-	#[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
-	#[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
-	echo hu
+	[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
+	[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
 }
 
 @test "Run checkpointctl" {
