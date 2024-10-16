@@ -1,6 +1,8 @@
 <!-- markdownlint-disable MD033 -->
 <!-- markdownlint-disable MD041 -->
-<p1 align="center"><img src="docs/checkpointctl.svg" height="250"></p>
+<p1 align="center">
+    <img src="docs/checkpointctl.svg" height="250" alt="checkpointctl logo">
+</p>
 
 <!-- markdownlint-disable MD013 -->
 # checkpointctl - a tool for in-depth analysis of container checkpoints
