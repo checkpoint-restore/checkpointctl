@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v6
       with:
         version: latest
         only-new-issues: true
@@ -32,7 +32,7 @@ jobs:
       pull-requests: read
     steps:
     - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v2
+    - uses: dorny/paths-filter@v3
       id: changes
       with:
         filters: |
@@ -41,7 +41,7 @@ jobs:
             - '.github/workflows/verify.yml'
     - name: Lint markdown
       if: steps.changes.outputs.md == 'true'
-      uses: DavidAnson/markdownlint-cli2-action@v10
+      uses: DavidAnson/markdownlint-cli2-action@v17
       with:
         globs: |
           README.md
