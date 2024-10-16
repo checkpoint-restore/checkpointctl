@@ -6,7 +6,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3
       with:
@@ -20,7 +20,7 @@ jobs:
   gomod:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: verify go.mod/go.sum
       run: |
         make vendor
@@ -31,7 +31,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dorny/paths-filter@v2
       id: changes
       with:
