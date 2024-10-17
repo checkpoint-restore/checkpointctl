@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ func RenderTreeView(tasks []Task) error {
 
 		tree := buildTree(info.containerInfo, info.configDump, info.archiveSizes)
 
+		checkpointDirectory := filepath.Join(task.OutputDir, metadata.CheckpointDirectory)
 		if Stats {
 			dumpStats, err := crit.GetDumpStats(task.OutputDir)
 			if err != nil {
@@ -31,8 +33,12 @@ func RenderTreeView(tasks []Task) error {
 			addDumpStatsToTree(tree, dumpStats)
 		}
 
+		if Metadata {
+			addPodInfoToTree(tree, info)
+		}
+
 		if PsTree {
-			c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
+			c := crit.New(nil, nil, checkpointDirectory, false, false)
 			psTree, err := c.ExplorePs()
 			if err != nil {
 				return fmt.Errorf("failed to get process tree: %w", err)
@@ -48,7 +54,7 @@ func RenderTreeView(tasks []Task) error {
 				if !Files {
 					return nil, nil
 				}
-				c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
+				c := crit.New(nil, nil, checkpointDirectory, false, false)
 				fds, err := c.ExploreFds()
 				if err != nil {
 					return nil, fmt.Errorf("failed to get file descriptors: %w", err)
@@ -63,7 +69,7 @@ func RenderTreeView(tasks []Task) error {
 				if !Sockets {
 					return nil, nil
 				}
-				c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
+				c := crit.New(nil, nil, checkpointDirectory, false, false)
 				sks, err := c.ExploreSk()
 				if err != nil {
 					return nil, fmt.Errorf("failed to get sockets: %w", err)
@@ -293,4 +299,63 @@ func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) 
 		}
 	}
 	return nil
+}
+
+// Taken from the CRI API
+type mountAnnotations struct {
+	ContainerPath     string `json:"container_path,omitempty"`
+	HostPath          string `json:"host_path,omitempty"`
+	Readonly          bool   `json:"readonly,omitempty"`
+	SelinuxRelabel    bool   `json:"selinux_relabel,omitempty"`
+	Propagation       int    `json:"propagation,omitempty"`
+	UidMappings       []*int `json:"uidMappings,omitempty"`
+	GidMappings       []*int `json:"gidMappings,omitempty"`
+	RecursiveReadOnly bool   `json:"recursive_read_only,omitempty"`
+}
+
+func addPodInfoToTree(tree treeprint.Tree, info *checkpointInfo) {
+	podTree := tree.AddBranch("Metadata")
+	if len(info.containerInfo.Pod) > 0 {
+		podTree.AddBranch(fmt.Sprintf("Pod name: %s", info.containerInfo.Pod))
+	}
+	if len(info.containerInfo.Namespace) > 0 {
+		podTree.AddBranch(fmt.Sprintf("Kubernetes namespace: %s", info.containerInfo.Namespace))
+	}
+	if len(info.specDump.Annotations) > 0 {
+		annotationTree := podTree.AddBranch("Annotations")
+		for key := range info.specDump.Annotations {
+			switch key {
+			case "io.kubernetes.cri-o.Labels",
+				"io.kubernetes.cri-o.Annotations",
+				"io.kubernetes.cri-o.Metadata",
+				"kubectl.kubernetes.io/last-applied-configuration":
+				// We know that some annotations contain a JSON string we can pretty print
+				local := make(map[string]interface{})
+				if err := json.Unmarshal([]byte(info.specDump.Annotations[key]), &local); err != nil {
+					continue
+				}
+				localTree := annotationTree.AddBranch(key)
+				for labelKey := range local {
+					localTree.AddBranch(fmt.Sprintf("%s: %s", labelKey, local[labelKey]))
+				}
+			case "io.kubernetes.cri-o.Volumes":
+				// We know that some annotations contain a JSON string we can pretty print
+				var local []mountAnnotations
+				if err := json.Unmarshal([]byte(info.specDump.Annotations[key]), &local); err != nil {
+					fmt.Printf("error: %s", err)
+				}
+				localTree := annotationTree.AddBranch(key)
+				for _, mount := range local {
+					containerPath := localTree.AddBranch(mount.ContainerPath)
+					containerPath.AddBranch(fmt.Sprintf("host path: %s", mount.HostPath))
+					containerPath.AddBranch(fmt.Sprintf("read-only: %t", mount.Readonly))
+					containerPath.AddBranch(fmt.Sprintf("selinux relabel: %t", mount.SelinuxRelabel))
+					containerPath.AddBranch(fmt.Sprintf("recursive read-only: %t", mount.RecursiveReadOnly))
+					containerPath.AddBranch(fmt.Sprintf("propagation: %d", mount.Propagation))
+				}
+			default:
+				annotationTree.AddBranch(fmt.Sprintf("%s: %s", key, info.specDump.Annotations[key]))
+			}
+		}
+	}
 }

@@ -17,4 +17,5 @@ var (
 	searchPattern      *string = &internal.SearchPattern
 	searchRegexPattern *string = &internal.SearchRegexPattern
 	searchContext      *int    = &internal.SearchContext
+	showMetdata        *bool   = &internal.Metadata
 )
