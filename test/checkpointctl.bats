@@ -449,13 +449,14 @@ function teardown() {
 	[[ ${lines[9]} == *"CRIU dump statistics"* ]]
 	[[ ${lines[13]} == *"Memwrite time"* ]]
 	[[ ${lines[14]} =~ [1-9] ]]
-	[[ ${lines[16]} == *"Process tree"* ]]
-	[[ ${lines[17]} == *"piggie"* ]]
 
 	expected_messages=(
 		"[REG 0]"
 		"[cwd]"
 		"[root]"
+		"Metadata"
+		"Process tree"
+		"piggie"
 		"Overview of mounts"
 		"Destination"
 		"proc"
