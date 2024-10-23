@@ -79,6 +79,12 @@ func Inspect() *cobra.Command {
 		"tree",
 		"Specify the output format: tree or json",
 	)
+	flags.BoolVar(
+		showMetdata,
+		"metadata",
+		false,
+		"Show metadata about the container",
+	)
 
 	return cmd
 }
@@ -91,6 +97,7 @@ func inspect(cmd *cobra.Command, args []string) error {
 		*psTreeEnv = true
 		*files = true
 		*sockets = true
+		*showMetdata = true
 	}
 
 	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
