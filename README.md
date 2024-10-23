@@ -55,7 +55,7 @@ $ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-co
 To retrieve low-level information about a container checkpoint, use the `checkpointctl inspect` command:
 
 ```console
-$ checkpointctl inspect /tmp/ubuntu_looper.tar.gz --ps-tree
+$ checkpointctl inspect /tmp/ubuntu_looper.tar.gz --ps-tree --metadata
 
 awesome_booth
 ├── Image: docker.io/library/ubuntu:latest
@@ -65,6 +65,10 @@ awesome_booth
 ├── Engine: Podman
 ├── Checkpoint size: 2.8 MiB
 ├── Root FS diff size: 309.0 KiB
+├── Metadata
+│   └── Annotations
+│       ├── io.container.manager: libpod
+│       └── org.opencontainers.image.stopSignal: 15
 └── Process tree
     └── [1]  bash
         └── [5]  su
