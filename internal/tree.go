@@ -335,9 +335,8 @@ func addPodInfoToTree(tree treeprint.Tree, info *checkpointInfo) {
 					continue
 				}
 				localTree := annotationTree.AddBranch(key)
-				for labelKey := range local {
-					localTree.AddBranch(fmt.Sprintf("%s: %s", labelKey, local[labelKey]))
-				}
+				// Recursively add array/map JSON fields to the tree
+				addMapToTree(localTree, local)
 			case "io.kubernetes.cri-o.Volumes":
 				// We know that some annotations contain a JSON string we can pretty print
 				var local []mountAnnotations
@@ -356,6 +355,40 @@ func addPodInfoToTree(tree treeprint.Tree, info *checkpointInfo) {
 			default:
 				annotationTree.AddBranch(fmt.Sprintf("%s: %s", key, info.specDump.Annotations[key]))
 			}
+		}
+	}
+}
+
+func addMapToTree(tree treeprint.Tree, data map[string]interface{}) {
+	for key, value := range data {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			// Recursively add nested maps
+			subTree := tree.AddBranch(fmt.Sprintf("%s:", key))
+			addMapToTree(subTree, v)
+		case []interface{}:
+			// Handle arrays recursively
+			arrayTree := tree.AddBranch(fmt.Sprintf("%s: ", key))
+			addArrayToTree(arrayTree, v)
+		default:
+			tree.AddBranch(fmt.Sprintf("%s: %v", key, v))
+		}
+	}
+}
+
+func addArrayToTree(tree treeprint.Tree, data []interface{}) {
+	for i, value := range data {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			// Recursively add maps inside arrays
+			subTree := tree.AddBranch(fmt.Sprintf("[%d]:", i))
+			addMapToTree(subTree, v)
+		case []interface{}:
+			// Recursively add arrays inside arrays
+			subArrayTree := tree.AddBranch(fmt.Sprintf("[%d]: ", i))
+			addArrayToTree(subArrayTree, v)
+		default:
+			tree.AddBranch(fmt.Sprintf("[%d]: %v", i, v))
 		}
 	}
 }
