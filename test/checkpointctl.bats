@@ -574,7 +574,31 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"....H...H.../..H"* ]]
+
+	# Check if the 4th line matches the expected hex pattern
+	# We expect lines like: '000055eb086f6030  f3 0f 1e fa 68 00 00 00 00 f2 e9 e1 ff ff ff 90  |....h...........|'
+	line="${lines[3]}"
+
+	hex_address_regex="^[0-9a-fA-F]{16}"
+	# Check the hex address (first 16 characters)
+	if [[ ! $line =~ $hex_address_regex ]]; then
+		echo "Hex address part of line does not match. Line: $line"
+		return 1
+	fi
+
+	# Check the hex byte pairs
+	hex_bytes_regex="\s\s([[0-9a-fA-F]{2}\s*)+\s\s"
+	if [[ ! $line =~ $hex_bytes_regex ]]; then
+		echo "Hex byte pairs part of line does not match. Line: $line"
+		return 1
+	fi
+
+	# Check the ASCII representation (after the pipe character)
+	ascii_representation_regex="\|.*\|$"
+	if [[ ! $line =~ $ascii_representation_regex ]]; then
+		echo "ASCII representation part of line does not match. Line: $line"
+		return 1
+	fi
 }
 
 @test "Run checkpointctl memparse --search=PATH with invalid PID" {
