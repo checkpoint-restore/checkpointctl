@@ -17,11 +17,13 @@ function checkpointctl() {
 function setup() {
 	TEST_TMP_DIR1=$(mktemp -d)
 	TEST_TMP_DIR2=$(mktemp -d)
+	NON_ROOT_TMP1=$(sudo -u 'nobody' mktemp -d)
 }
 
 function teardown() {
 	[ "$TEST_TMP_DIR1" != "" ] && rm -rf "$TEST_TMP_DIR1"
 	[ "$TEST_TMP_DIR2" != "" ] && rm -rf "$TEST_TMP_DIR2"
+	[ "$NON_ROOT_TMP1" != "" ] && rm -rf "$NON_ROOT_TMP1"
 }
 
 @test "Run checkpointctl" {
@@ -296,6 +298,31 @@ function teardown() {
 		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
+	[ "$status" -eq 0 ]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie/piggie"* ]]
+}
+
+@test "Run checkpointctl inspect with tar file and --ps-tree-cmd as non-root" {
+	if [ "$CHECKPOINTCTL"  == "../checkpointctl.coverage" ]; then
+		skip "non-root test cannot access the coverage directory"
+	fi
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$NON_ROOT_TMP1"/test.tar . )
+	chmod 644 "$NON_ROOT_TMP1"/test.tar
+	NON_ROOT_BIN=$(mktemp)
+	cp "$CHECKPOINTCTL" "$NON_ROOT_BIN"
+	chmod 755 "$NON_ROOT_BIN"
+	run sudo -u 'nobody' "$NON_ROOT_BIN" inspect "$NON_ROOT_TMP1"/test.tar --ps-tree-cmd
+	echo "$output"
+	rm -f "$NON_ROOT_BIN"
 	[ "$status" -eq 0 ]
 	[[ ${lines[9]} == *"Process tree"* ]]
 	[[ ${lines[10]} == *"piggie/piggie"* ]]

@@ -244,7 +244,7 @@ func UntarFiles(src, dest string, files []string) error {
 		for _, file := range files {
 			if strings.Contains(header.Name, file) {
 				// Create the destination folder
-				if err := os.MkdirAll(filepath.Join(dest, filepath.Dir(header.Name)), 0o644); err != nil {
+				if err := os.MkdirAll(filepath.Join(dest, filepath.Dir(header.Name)), 0o700); err != nil {
 					return err
 				}
 				// Create the destination file
