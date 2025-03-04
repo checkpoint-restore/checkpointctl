@@ -163,6 +163,23 @@ Writing memory pages content for process ID 2 from checkpoint: /tmp/jira.tar.gz 
 
 Please note that writing large memory pages to a file can take several minutes.
 
+### `build` sub-command
+
+Restoring a container from a checkpoint in Kubernetes requires converting the checkpoint archive into an OCI image.
+The `build` command simplifies this process by extracting the necessary metadata from the checkpoint and creating an
+OCI-compatible image with appropriate annotations.
+
+Example:
+
+```console
+checkpointctl build ./checkpoint.tar quay.io/foo/bar:latest
+buildah push quay.io/foo/bar:latest
+```
+
+In this example, the `checkpointctl build` command converts the `checkpoint.tar` archive into an
+OCI-compatible image and tags it as `quay.io/foo/bar:latest`. The following `buildah push` command
+then uploads the newly created OCI image to the container registry, making it available for deployment.
+
 ## Installing from source code
 
 1. Clone the repository.
