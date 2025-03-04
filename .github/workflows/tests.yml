@@ -7,21 +7,21 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: registry.fedoraproject.org/fedora:latest
-      options: --privileged --cap-add=NET_ADMIN --cap-add=NET_RAW -v /lib/modules:/lib/modules
+      options: --user root --privileged --cap-add=NET_ADMIN --cap-add=NET_RAW -v /lib/modules:/lib/modules
     steps:
       - uses: actions/checkout@v4
       - name: Install tools
         run: |
-          sudo dnf -y install ShellCheck bats golang criu asciidoctor iptables iproute kmod jq bash bash-completion zsh fish
-          sudo modprobe -va ip_tables ip6table_filter nf_conntrack nf_conntrack_netlink
+          dnf -y install ShellCheck bats golang criu asciidoctor iptables iproute kmod jq bash bash-completion zsh fish
+          modprobe -va ip_tables ip6table_filter nf_conntrack nf_conntrack_netlink
       - name: Run make shellcheck
         run: make shellcheck
       - name: Run make all
         run: make all
       - name: Run make test
-        run: sudo -E make test
+        run: make test
       - name: Run make test-junit
-        run: sudo -E make test-junit
+        run: make test-junit
       - name: Upload Test Results
         # To display test results from forked repositories they need to
         # be uploaded and then analyzed.
