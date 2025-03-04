@@ -1,0 +1,29 @@
+= checkpointctl-build(1)
+include::footer.adoc[]
+
+== Name
+
+*checkpointctl-build* - Create OCI image from a checkpoint tar file.
+
+== Synopsis
+
+*checkpointctl build* CHECKPOINT_PATH IMAGE_NAME
+
+== Options
+
+*-h*, *--help*::
+  Show help for checkpointctl build
+
+== Description
+
+Create an OCI image from a container checkpoint archive (tar file) using `buildah`.
+The checkpoint metadata is extracted from the archive and applied as OCI image annotations,
+allowing the container runtime (Podman, CRI-O, containerd) to identify the image as a checkpoint.
+
+Usage Example:
+  `checkpointctl build checkpoint.tar quay.io/foo/bar:latest`
+  `buildah push quay.io/foo/bar:latest`
+
+== See also
+
+checkpointctl(1)
