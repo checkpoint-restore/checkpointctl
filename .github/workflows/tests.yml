@@ -5,14 +5,18 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    container:
-      image: registry.fedoraproject.org/fedora:latest
-      options: --privileged --cap-add=NET_ADMIN --cap-add=NET_RAW -v /lib/modules:/lib/modules
     steps:
       - uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          check-latest: true
       - name: Install tools
         run: |
-          sudo dnf -y install ShellCheck bats golang criu asciidoctor iptables iproute kmod jq bash bash-completion zsh fish
+          # Add PPA for CRIU
+          sudo add-apt-repository ppa:criu/ppa
+          sudo apt-get update
+          sudo apt-get install -qqy shellcheck bats criu asciidoctor iptables iproute2 kmod jq bash bash-completion zsh fish
           sudo modprobe -va ip_tables ip6table_filter nf_conntrack nf_conntrack_netlink
       - name: Run make shellcheck
         run: make shellcheck
