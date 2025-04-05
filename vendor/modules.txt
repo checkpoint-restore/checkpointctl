@@ -74,13 +74,14 @@ github.com/docker/go-units
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/klauspost/compress v1.17.11
-## explicit; go 1.21
+# github.com/klauspost/compress v1.18.0
+## explicit; go 1.22
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/internal/cpuinfo
+github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
@@ -96,7 +97,7 @@ github.com/moby/sys/capability
 # github.com/moby/sys/mountinfo v0.7.2
 ## explicit; go 1.17
 github.com/moby/sys/mountinfo
-# github.com/moby/sys/user v0.3.0
+# github.com/moby/sys/user v0.4.0
 ## explicit; go 1.17
 github.com/moby/sys/user
 # github.com/olekukonko/tablewriter v0.0.5
@@ -126,12 +127,12 @@ github.com/ulikunitz/xz/lzma
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# golang.org/x/sys v0.29.0
-## explicit; go 1.18
+# golang.org/x/sys v0.32.0
+## explicit; go 1.23.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# google.golang.org/protobuf v1.35.2
-## explicit; go 1.21
+# google.golang.org/protobuf v1.36.6
+## explicit; go 1.22
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -152,6 +153,7 @@ google.golang.org/protobuf/internal/genid
 google.golang.org/protobuf/internal/impl
 google.golang.org/protobuf/internal/order
 google.golang.org/protobuf/internal/pragma
+google.golang.org/protobuf/internal/protolazy
 google.golang.org/protobuf/internal/set
 google.golang.org/protobuf/internal/strs
 google.golang.org/protobuf/internal/version
