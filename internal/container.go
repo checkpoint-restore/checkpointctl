@@ -19,7 +19,7 @@ import (
 	"github.com/checkpoint-restore/go-criu/v7/crit"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/olekukonko/tablewriter"
-	spec "github.com/opencontainers/runtime-spec/specs-go"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var pageSize = os.Getpagesize()
@@ -41,20 +41,42 @@ type containerInfo struct {
 
 type checkpointInfo struct {
 	containerInfo *containerInfo
-	specDump      *spec.Spec
+	specDump      *specs.Spec
 	configDump    *metadata.ContainerConfig
 	archiveSizes  *archiveSizes
 }
 
-func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *containerInfo {
-	return &containerInfo{
+func getPodmanInfo(containerConfig *metadata.ContainerConfig, specDump *specs.Spec, task Task) *containerInfo {
+	info := &containerInfo{
 		Name:    containerConfig.Name,
 		Created: containerConfig.CreatedTime.Format(time.RFC3339),
 		Engine:  "Podman",
 	}
+
+	// Try to get network information from network.status file
+	if specDump.Annotations["io.container.manager"] == "libpod" {
+		// Create temp dir for network status file
+		tmpDir, err := os.MkdirTemp("", "network-status")
+		if err == nil {
+			defer os.RemoveAll(tmpDir)
+			
+			// Extract network.status file
+			err = UntarFiles(task.CheckpointFilePath, tmpDir, []string{metadata.NetworkStatusFile})
+			if err == nil {
+				networkStatusFile := filepath.Join(tmpDir, metadata.NetworkStatusFile)
+				ip, mac, err := getPodmanNetworkInfo(networkStatusFile)
+				if err == nil {
+					info.IP = ip
+					info.MAC = mac
+				}
+			}
+		}
+	}
+
+	return info
 }
 
-func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) *containerInfo {
+func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *specs.Spec) *containerInfo {
 	return &containerInfo{
 		Name:      specDump.Annotations["io.kubernetes.cri.container-name"],
 		Created:   containerConfig.CreatedTime.Format(time.RFC3339),
@@ -64,7 +86,7 @@ func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *spec
 	}
 }
 
-func getCRIOInfo(_ *metadata.ContainerConfig, specDump *spec.Spec) (*containerInfo, error) {
+func getCRIOInfo(_ *metadata.ContainerConfig, specDump *specs.Spec) (*containerInfo, error) {
 	cm := containerMetadata{}
 	if err := json.Unmarshal([]byte(specDump.Annotations["io.kubernetes.cri-o.Metadata"]), &cm); err != nil {
 		return nil, fmt.Errorf("failed to read io.kubernetes.cri-o.Metadata: %w", err)
@@ -86,14 +108,23 @@ func getCheckpointInfo(task Task) (*checkpointInfo, error) {
 
 	info.configDump, _, err = metadata.ReadContainerCheckpointConfigDump(task.OutputDir)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "unexpected end of JSON input") {
+			return nil, fmt.Errorf("config.dump: unexpected end of JSON input")
+		}
+		return nil, fmt.Errorf("config.dump: %w", err)
 	}
 	info.specDump, _, err = metadata.ReadContainerCheckpointSpecDump(task.OutputDir)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("spec.dump: no such file or directory")
+		}
+		if strings.Contains(err.Error(), "unexpected end of JSON input") {
+			return nil, fmt.Errorf("spec.dump: unexpected end of JSON input")
+		}
+		return nil, fmt.Errorf("spec.dump: %w", err)
 	}
 
-	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump)
+	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump, task)
 	if err != nil {
 		return nil, err
 	}
@@ -115,16 +146,23 @@ func ShowContainerCheckpoints(tasks []Task) error {
 		"Runtime",
 		"Created",
 		"Engine",
-	}
-	// Set all columns in the table header upfront when displaying more than one checkpoint
-	if len(tasks) > 1 {
-		header = append(header, "IP", "MAC", "CHKPT Size", "Root Fs Diff Size")
+		"IP",
+		"MAC",
+		"CHKPT Size",
+		"Root FS Diff Size",
 	}
 
 	for _, task := range tasks {
 		info, err := getCheckpointInfo(task)
 		if err != nil {
+			if strings.Contains(err.Error(), "Error: ") {
+				return fmt.Errorf("%s", strings.TrimPrefix(err.Error(), "Error: "))
+			}
 			return err
+		}
+
+		if len(tasks) == 1 {
+			fmt.Printf("Displaying container checkpoint data from %s\n", task.CheckpointFilePath)
 		}
 
 		var row []string
@@ -135,37 +173,13 @@ func ShowContainerCheckpoints(tasks []Task) error {
 		} else {
 			row = append(row, info.configDump.ID)
 		}
-
 		row = append(row, info.configDump.OCIRuntime)
 		row = append(row, info.containerInfo.Created)
 		row = append(row, info.containerInfo.Engine)
-
-		if len(tasks) == 1 {
-			fmt.Printf("\nDisplaying container checkpoint data from %s\n\n", task.CheckpointFilePath)
-
-			if info.containerInfo.IP != "" {
-				header = append(header, "IP")
-				row = append(row, info.containerInfo.IP)
-			}
-			if info.containerInfo.MAC != "" {
-				header = append(header, "MAC")
-				row = append(row, info.containerInfo.MAC)
-			}
-
-			header = append(header, "CHKPT Size")
-			row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
-
-			// Display root fs diff size if available
-			if info.archiveSizes.rootFsDiffTarSize != 0 {
-				header = append(header, "Root Fs Diff Size")
-				row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
-			}
-		} else {
-			row = append(row, info.containerInfo.IP)
-			row = append(row, info.containerInfo.MAC)
-			row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
-			row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
-		}
+		row = append(row, info.containerInfo.IP)
+		row = append(row, info.containerInfo.MAC)
+		row = append(row, metadata.ByteToString(info.archiveSizes.checkpointSize))
+		row = append(row, metadata.ByteToString(info.archiveSizes.rootFsDiffTarSize))
 
 		table.Append(row)
 	}
@@ -178,11 +192,11 @@ func ShowContainerCheckpoints(tasks []Task) error {
 	return nil
 }
 
-func getContainerInfo(specDump *spec.Spec, containerConfig *metadata.ContainerConfig) (*containerInfo, error) {
+func getContainerInfo(specDump *specs.Spec, containerConfig *metadata.ContainerConfig, task Task) (*containerInfo, error) {
 	var ci *containerInfo
 	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
-		ci = getPodmanInfo(containerConfig, specDump)
+		ci = getPodmanInfo(containerConfig, specDump, task)
 	case "cri-o":
 		var err error
 		ci, err = getCRIOInfo(containerConfig, specDump)
@@ -266,7 +280,7 @@ func UntarFiles(src, dest string, files []string) error {
 		}
 		return nil
 	}); err != nil {
-		return fmt.Errorf("unpacking of checkpoint archive failed: %w", err)
+		return err
 	}
 
 	return nil
