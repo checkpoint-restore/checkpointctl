@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0
-	github.com/containers/storage v1.57.2
+	github.com/containers/storage v1.58.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/spf13/cobra v1.9.1
