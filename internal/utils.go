@@ -2,8 +2,10 @@ package internal
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -80,5 +82,54 @@ func CleanupTasks(tasks []Task) {
 		if err := os.RemoveAll(task.OutputDir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
+	}
+}
+
+// Constant values are based on kubectl's tabwriter settings:
+// https://github.com/kubernetes/cli-runtime/blob/master/pkg/printers/tabwriter.go
+const (
+	tabwriterMinWidth = 6
+	tabwriterWidth    = 4
+	tabwriterPadding  = 3
+	tabwriterPadChar  = ' '
+	tabwriterFlags    = 0
+)
+
+// GetNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.
+func GetNewTabWriter(output io.Writer) *tabwriter.Writer {
+	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
+}
+
+// WriteTableHeader writes the header row and separator line for a table
+func WriteTableHeader(w *tabwriter.Writer, header []string) {
+	// Print header
+	for i, h := range header {
+		if i > 0 {
+			fmt.Fprint(w, "\t")
+		}
+		fmt.Fprint(w, strings.ToUpper(h))
+	}
+	fmt.Fprintln(w)
+
+	// Print separator line
+	for i := range header {
+		if i > 0 {
+			fmt.Fprint(w, "\t")
+		}
+		fmt.Fprint(w, strings.Repeat("-", len(header[i])))
+	}
+	fmt.Fprintln(w)
+}
+
+// WriteTableRows writes the data rows for a table
+func WriteTableRows(w *tabwriter.Writer, rows [][]string) {
+	for _, row := range rows {
+		for i, cell := range row {
+			if i > 0 {
+				fmt.Fprint(w, "\t")
+			}
+			fmt.Fprint(w, cell)
+		}
+		fmt.Fprintln(w)
 	}
 }
