@@ -30,24 +30,25 @@ To display an overview of a checkpoint archive you can just use
 ```console
 $ checkpointctl show /tmp/dump.tar
 
-+-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
-|    CONTAINER    |                  IMAGE                   |      ID      | RUNTIME |       CREATED        | ENGINE | CHKPT SIZE | ROOT FS DIFF SIZE |
-+-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
-| magical_murdock | quay.io/adrianreber/wildfly-hello:latest | f11d11844af0 | crun    | 2023-02-28T09:43:52Z | Podman | 338.2 MiB  | 177.0 KiB         |
-+-----------------+------------------------------------------+--------------+---------+----------------------+--------+------------+-------------------+
+Displaying container checkpoint data from /root/dump.tar
+
+CONTAINER  IMAGE                             ID            RUNTIME  CREATED               ENGINE  CHKPT SIZE ROOT FS DIFF SIZE
+---------  -----                             --            -------  -------               ------  ---------- -----------------
+looper     docker.io/library/busybox:latest  8b5c2ca15082  crun     2021-09-28T10:03:56Z  Podman  130.8 KiB  204 B
 ```
 
 For a checkpoint archive created by Kubernetes with *CRI-O* the output would
 look like this:
 
 ```console
-$ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-counter-2023-02-13T16\:20\:09Z.tar
+$ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-counter-2025-05-22T14\:31\:35Z.tar
 
-+-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
-| CONTAINER |               IMAGE                |      ID      | RUNTIME |            CREATED             | ENGINE |     IP     | CHKPT SIZE |
-+-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
-| counter   | quay.io/adrianreber/counter:latest | 7eb9680287f1 | runc    | 2023-02-13T16:12:25.843774934Z | CRI-O  | 10.88.0.24 | 8.5 MiB    |
-+-----------+------------------------------------+--------------+---------+--------------------------------+--------+------------+------------+
+Displaying container checkpoint data from /var/lib/kubelet/checkpoints/checkpoint-counters_default-counter-2025-05-22T14:31:35Z.tar
+
+CONTAINER  IMAGE                               ID            RUNTIME  CREATED                         ENGINE  IP         CHKPT SIZE  ROOT FS DIFF SIZE
+---------  -----                               --            -------  -------                         ------  --         ----------  -----------------
+counter    quay.io/adrianreber/counter:latest  29ed106ef467  runc     2025-05-22T14:31:24.818422898Z  CRI-O   10.0.0.70  9.2 MiB     2.0 KiB
+
 ```
 
 ### `inspect` sub-command
@@ -88,7 +89,7 @@ $ checkpointctl memparse /tmp/jira.tar.gz  --pid=1 | less
 
 Displaying memory pages content for Process ID 1 from checkpoint: /tmp/jira.tar.gz
 
-Address           Hexadecimal                                       ASCII
+ADDRESS           HEXADECIMAL                                       ASCII
 -------------------------------------------------------------------------------------
 00005633bb080000  f3 0f 1e fa 48 83 ec 08 48 8b 05 d1 4f 00 00 48  |....H...H...O..H|
 00005633bb080010  85 c0 74 02 ff d0 48 83 c4 08 c3 00 00 00 00 00  |..t...H.........|
@@ -145,13 +146,10 @@ $ sudo checkpointctl memparse /tmp/jira.tar.gz
 
 Displaying processes memory sizes from /tmp/jira.tar.gz
 
-+-----+--------------+-------------+
-| PID | PROCESS NAME | MEMORY SIZE |
-+-----+--------------+-------------+
-|   1 | tini         | 100.0 KiB   |
-+-----+--------------+-------------+
-|   2 | java         | 553.5 MiB   |
-+-----+--------------+-------------+
+PID  PROCESS NAME  MEMORY SIZE  SHARED MEMORY SIZE
+---  ------------  -----------  ------------------
+1    tini          100.0 KiB    0 B
+2    java          553.5 MiB    0 B
 ```
 
 In this example, given the large size of the java process, it is better to write its output to a file.

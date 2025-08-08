@@ -14,7 +14,6 @@ import (
 	"github.com/checkpoint-restore/checkpointctl/internal"
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v7/crit"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -116,21 +115,16 @@ func memparse(cmd *cobra.Command, args []string) error {
 
 // Display processes memory sizes within the given container checkpoints.
 func showProcessMemorySizeTables(tasks []internal.Task) error {
-	// Initialize the table
-	table := tablewriter.NewWriter(os.Stdout)
 	header := []string{
 		"PID",
 		"Process name",
 		"Memory size",
 		"Shared memory size",
 	}
-	table.SetHeader(header)
-	table.SetAutoMergeCells(false)
-	table.SetRowLine(true)
 
 	// Function to recursively traverse the process tree and populate the table rows
-	var traverseTree func(*crit.PsTree, string) error
-	traverseTree = func(root *crit.PsTree, checkpointOutputDir string) error {
+	var traverseTree func(*crit.PsTree, string, *[][]string) error
+	traverseTree = func(root *crit.PsTree, checkpointOutputDir string, rows *[][]string) error {
 		memReader, err := crit.NewMemoryReader(
 			filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory),
 			root.PID, pageSize,
@@ -152,15 +146,16 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 			return err
 		}
 
-		table.Append([]string{
+		row := []string{
 			fmt.Sprintf("%d", root.PID),
 			root.Comm,
 			metadata.ByteToString(memSize),
 			metadata.ByteToString(shmemSize),
-		})
+		}
+		*rows = append(*rows, row)
 
 		for _, child := range root.Children {
-			if err := traverseTree(child, checkpointOutputDir); err != nil {
+			if err := traverseTree(child, checkpointOutputDir, rows); err != nil {
 				return err
 			}
 		}
@@ -168,8 +163,8 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 	}
 
 	for _, task := range tasks {
-		// Clear the table before processing each checkpoint task
-		table.ClearRows()
+		w := internal.GetNewTabWriter(os.Stdout)
+		var rows [][]string
 
 		c := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false)
 		psTree, err := c.ExplorePs()
@@ -178,12 +173,16 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 		}
 
 		// Populate the table rows
-		if err := traverseTree(psTree, task.OutputDir); err != nil {
+		if err := traverseTree(psTree, task.OutputDir, &rows); err != nil {
 			return err
 		}
 
 		fmt.Printf("\nDisplaying processes memory sizes from %s\n\n", task.CheckpointFilePath)
-		table.Render()
+
+		internal.WriteTableHeader(w, header)
+		internal.WriteTableRows(w, rows)
+
+		w.Flush()
 	}
 
 	return nil
@@ -348,21 +347,24 @@ func printMemorySearchResultForPID(task internal.Task) error {
 		return nil
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Address", "Match", "Instance"})
-	table.SetAutoMergeCells(false)
-	table.SetRowLine(true)
+	w := internal.GetNewTabWriter(os.Stdout)
+	header := []string{"Address", "Match", "Instance"}
 
+	internal.WriteTableHeader(w, header)
+
+	// Build rows
+	var rows [][]string
 	for i, result := range results {
-		table.Append([]string{
-			fmt.Sprintf(
-				"%016x", result.Vaddr),
+		row := []string{
+			fmt.Sprintf("%016x", result.Vaddr),
 			result.Match,
 			fmt.Sprintf("%d", i+1),
-		})
+		}
+		rows = append(rows, row)
 	}
 
-	table.Render()
+	internal.WriteTableRows(w, rows)
 
+	w.Flush()
 	return nil
 }

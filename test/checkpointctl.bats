@@ -94,7 +94,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[4]} == *"Podman"* ]]
+	[[ ${lines[3]} == *"Podman"* ]]
 }
 
 @test "Run checkpointctl show with tar file from containerd with valid config.dump and valid spec.dump and checkpoint directory" {
@@ -104,7 +104,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[4]} == *"containerd"* ]]
+	[[ ${lines[3]} == *"containerd"* ]]
 }
 
 @test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump (CRI-O) and no checkpoint directory" {
@@ -123,7 +123,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[4]} == *"CRI-O"* ]]
+	[[ ${lines[3]} == *"CRI-O"* ]]
 }
 
 @test "Run checkpointctl show with tar file compressed" {
@@ -133,7 +133,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test.tar.gz . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar.gz
 	[ "$status" -eq 0 ]
-	[[ ${lines[4]} == *"Podman"* ]]
+	[[ ${lines[3]} == *"Podman"* ]]
 }
 
 @test "Run checkpointctl show with tar file corrupted" {
@@ -167,7 +167,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[2]} == *"ROOT FS DIFF SIZE"* ]]
+	[[ ${lines[1]} == *"ROOT FS DIFF SIZE"* ]]
 }
 
 @test "Run checkpointctl show with multiple tar files" {
@@ -177,8 +177,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar .  && tar cf "$TEST_TMP_DIR2"/test2.tar . )
 	checkpointctl show "$TEST_TMP_DIR2"/*.tar
 	[ "$status" -eq 0 ]
+	[[ ${lines[2]} == *"Podman"* ]]
 	[[ ${lines[3]} == *"Podman"* ]]
-	[[ ${lines[5]} == *"Podman"* ]]
 }
 
 @test "Run checkpointctl inspect with invalid format" {
@@ -573,7 +573,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[4]} == *"piggie"* ]]
+	[[ ${lines[3]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file and missing pstree.img" {
@@ -695,7 +695,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search-regex='HOME=([^?]+)' "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"HOME"* ]]
+	[[ ${lines[2]} == *"HOME"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file and invalid PID" {
@@ -814,8 +814,14 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/checkpoint-valid-config-modified.tar . )
 	checkpointctl list "$TEST_TMP_DIR2"
 	[ "$status" -eq 0 ]
-	[[ "${lines[4]}" == *"| default   | modified-pod-name | container-name | CRI-O  |"* ]]
-	[[ "${lines[4]}" == *"| checkpoint-valid-config-modified.tar |"* ]]
-	[[ "${lines[6]}" == *"| default   | pod-name          | container-name | CRI-O  |"* ]]
-	[[ "${lines[6]}" == *"| checkpoint-valid-config.tar          |"* ]]
+	[[ "${lines[3]}" == *"default"* ]]
+	[[ "${lines[3]}" == *"modified-pod-name"* ]]
+	[[ "${lines[3]}" == *"container-name"* ]]
+	[[ "${lines[3]}" == *"CRI-O"* ]]
+	[[ "${lines[3]}" == *"checkpoint-valid-config-modified.tar"* ]]
+	[[ "${lines[4]}" == *"default"* ]]
+	[[ "${lines[4]}" == *"pod-name"* ]]
+	[[ "${lines[4]}" == *"container-name"* ]]
+	[[ "${lines[4]}" == *"CRI-O"* ]]
+	[[ "${lines[4]}" == *"checkpoint-valid-config.tar"* ]]
 }
