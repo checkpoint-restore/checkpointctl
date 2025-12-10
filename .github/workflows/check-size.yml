@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
 
+permissions:
+  contents: read
+
 jobs:
   check_size:
     runs-on: ubuntu-latest
