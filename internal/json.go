@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/checkpoint-restore/go-criu/v7/crit"
+	"github.com/checkpoint-restore/go-criu/v8/crit"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
