@@ -1,59 +1,62 @@
-# github.com/checkpoint-restore/go-criu/v7 v7.2.0
-## explicit; go 1.20
-github.com/checkpoint-restore/go-criu/v7/crit
-github.com/checkpoint-restore/go-criu/v7/crit/images/bpfmap-data
-github.com/checkpoint-restore/go-criu/v7/crit/images/bpfmap-file
-github.com/checkpoint-restore/go-criu/v7/crit/images/core-aarch64
-github.com/checkpoint-restore/go-criu/v7/crit/images/core-arm
-github.com/checkpoint-restore/go-criu/v7/crit/images/core-mips
-github.com/checkpoint-restore/go-criu/v7/crit/images/core-ppc64
-github.com/checkpoint-restore/go-criu/v7/crit/images/core-s390
-github.com/checkpoint-restore/go-criu/v7/crit/images/core-x86
-github.com/checkpoint-restore/go-criu/v7/crit/images/creds
-github.com/checkpoint-restore/go-criu/v7/crit/images/criu-core
-github.com/checkpoint-restore/go-criu/v7/crit/images/criu-sa
-github.com/checkpoint-restore/go-criu/v7/crit/images/eventfd
-github.com/checkpoint-restore/go-criu/v7/crit/images/eventpoll
-github.com/checkpoint-restore/go-criu/v7/crit/images/ext-file
-github.com/checkpoint-restore/go-criu/v7/crit/images/fdinfo
-github.com/checkpoint-restore/go-criu/v7/crit/images/fh
-github.com/checkpoint-restore/go-criu/v7/crit/images/fifo
-github.com/checkpoint-restore/go-criu/v7/crit/images/fown
-github.com/checkpoint-restore/go-criu/v7/crit/images/fs
-github.com/checkpoint-restore/go-criu/v7/crit/images/fsnotify
-github.com/checkpoint-restore/go-criu/v7/crit/images/ghost-file
-github.com/checkpoint-restore/go-criu/v7/crit/images/ipc-desc
-github.com/checkpoint-restore/go-criu/v7/crit/images/ipc-msg
-github.com/checkpoint-restore/go-criu/v7/crit/images/ipc-sem
-github.com/checkpoint-restore/go-criu/v7/crit/images/ipc-shm
-github.com/checkpoint-restore/go-criu/v7/crit/images/memfd
-github.com/checkpoint-restore/go-criu/v7/crit/images/mm
-github.com/checkpoint-restore/go-criu/v7/crit/images/ns
-github.com/checkpoint-restore/go-criu/v7/crit/images/opts
-github.com/checkpoint-restore/go-criu/v7/crit/images/packet-sock
-github.com/checkpoint-restore/go-criu/v7/crit/images/pagemap
-github.com/checkpoint-restore/go-criu/v7/crit/images/pipe
-github.com/checkpoint-restore/go-criu/v7/crit/images/pipe-data
-github.com/checkpoint-restore/go-criu/v7/crit/images/pstree
-github.com/checkpoint-restore/go-criu/v7/crit/images/regfile
-github.com/checkpoint-restore/go-criu/v7/crit/images/rlimit
-github.com/checkpoint-restore/go-criu/v7/crit/images/rseq
-github.com/checkpoint-restore/go-criu/v7/crit/images/siginfo
-github.com/checkpoint-restore/go-criu/v7/crit/images/signalfd
-github.com/checkpoint-restore/go-criu/v7/crit/images/sk-inet
-github.com/checkpoint-restore/go-criu/v7/crit/images/sk-netlink
-github.com/checkpoint-restore/go-criu/v7/crit/images/sk-opts
-github.com/checkpoint-restore/go-criu/v7/crit/images/sk-packet
-github.com/checkpoint-restore/go-criu/v7/crit/images/sk-unix
-github.com/checkpoint-restore/go-criu/v7/crit/images/stats
-github.com/checkpoint-restore/go-criu/v7/crit/images/tcp-stream
-github.com/checkpoint-restore/go-criu/v7/crit/images/time
-github.com/checkpoint-restore/go-criu/v7/crit/images/timer
-github.com/checkpoint-restore/go-criu/v7/crit/images/timerfd
-github.com/checkpoint-restore/go-criu/v7/crit/images/tty
-github.com/checkpoint-restore/go-criu/v7/crit/images/tun
-github.com/checkpoint-restore/go-criu/v7/crit/images/vma
-github.com/checkpoint-restore/go-criu/v7/magic
+# github.com/checkpoint-restore/go-criu/v8 v8.0.0
+## explicit; go 1.24.0
+github.com/checkpoint-restore/go-criu/v8/crit
+github.com/checkpoint-restore/go-criu/v8/crit/images/bpfmap-data
+github.com/checkpoint-restore/go-criu/v8/crit/images/bpfmap-file
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-aarch64
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-arm
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-loongarch64
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-mips
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-ppc64
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-riscv64
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-s390
+github.com/checkpoint-restore/go-criu/v8/crit/images/core-x86
+github.com/checkpoint-restore/go-criu/v8/crit/images/creds
+github.com/checkpoint-restore/go-criu/v8/crit/images/criu-core
+github.com/checkpoint-restore/go-criu/v8/crit/images/criu-sa
+github.com/checkpoint-restore/go-criu/v8/crit/images/eventfd
+github.com/checkpoint-restore/go-criu/v8/crit/images/eventpoll
+github.com/checkpoint-restore/go-criu/v8/crit/images/ext-file
+github.com/checkpoint-restore/go-criu/v8/crit/images/fdinfo
+github.com/checkpoint-restore/go-criu/v8/crit/images/fh
+github.com/checkpoint-restore/go-criu/v8/crit/images/fifo
+github.com/checkpoint-restore/go-criu/v8/crit/images/fown
+github.com/checkpoint-restore/go-criu/v8/crit/images/fs
+github.com/checkpoint-restore/go-criu/v8/crit/images/fsnotify
+github.com/checkpoint-restore/go-criu/v8/crit/images/ghost-file
+github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-desc
+github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-msg
+github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-sem
+github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-shm
+github.com/checkpoint-restore/go-criu/v8/crit/images/memfd
+github.com/checkpoint-restore/go-criu/v8/crit/images/mm
+github.com/checkpoint-restore/go-criu/v8/crit/images/ns
+github.com/checkpoint-restore/go-criu/v8/crit/images/opts
+github.com/checkpoint-restore/go-criu/v8/crit/images/packet-sock
+github.com/checkpoint-restore/go-criu/v8/crit/images/pagemap
+github.com/checkpoint-restore/go-criu/v8/crit/images/pidfd
+github.com/checkpoint-restore/go-criu/v8/crit/images/pipe
+github.com/checkpoint-restore/go-criu/v8/crit/images/pipe-data
+github.com/checkpoint-restore/go-criu/v8/crit/images/pstree
+github.com/checkpoint-restore/go-criu/v8/crit/images/regfile
+github.com/checkpoint-restore/go-criu/v8/crit/images/rlimit
+github.com/checkpoint-restore/go-criu/v8/crit/images/rseq
+github.com/checkpoint-restore/go-criu/v8/crit/images/siginfo
+github.com/checkpoint-restore/go-criu/v8/crit/images/signalfd
+github.com/checkpoint-restore/go-criu/v8/crit/images/sk-inet
+github.com/checkpoint-restore/go-criu/v8/crit/images/sk-netlink
+github.com/checkpoint-restore/go-criu/v8/crit/images/sk-opts
+github.com/checkpoint-restore/go-criu/v8/crit/images/sk-packet
+github.com/checkpoint-restore/go-criu/v8/crit/images/sk-unix
+github.com/checkpoint-restore/go-criu/v8/crit/images/stats
+github.com/checkpoint-restore/go-criu/v8/crit/images/tcp-stream
+github.com/checkpoint-restore/go-criu/v8/crit/images/time
+github.com/checkpoint-restore/go-criu/v8/crit/images/timer
+github.com/checkpoint-restore/go-criu/v8/crit/images/timerfd
+github.com/checkpoint-restore/go-criu/v8/crit/images/tty
+github.com/checkpoint-restore/go-criu/v8/crit/images/tun
+github.com/checkpoint-restore/go-criu/v8/crit/images/vma
+github.com/checkpoint-restore/go-criu/v8/magic
 # github.com/containers/storage v1.59.1
 ## explicit; go 1.23.0
 github.com/containers/storage/pkg/archive
@@ -118,11 +121,11 @@ github.com/ulikunitz/xz/lzma
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# golang.org/x/sys v0.35.0
-## explicit; go 1.23.0
+# golang.org/x/sys v0.39.0
+## explicit; go 1.24.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# google.golang.org/protobuf v1.36.8
+# google.golang.org/protobuf v1.36.10
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
