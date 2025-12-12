@@ -287,6 +287,10 @@ PRs that fix issues should include a reference like `Closes #XXXX` in the
 commit message so that github will automatically close the referenced issue
 when the PR is merged.
 
+PRs are checked for binary size increases. If a PR legitimately increases
+the binary size beyond the default threshold, you can override the limit by
+adding `[MAX_BINARY_SIZE_INCREASE=<bytes>]` to the PR description.
+
 Contributors must assert that they are in compliance with the [Developer
 Certificate of Origin 1.1](http://developercertificate.org/). This is achieved
 by adding a "Signed-off-by" line containing the contributor's name and e-mail
