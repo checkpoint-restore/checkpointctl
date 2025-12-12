@@ -8,27 +8,23 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+      options: --privileged -v /lib/modules:/lib/modules
     steps:
       - uses: actions/checkout@v4
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          check-latest: true
       - name: Install tools
         run: |
-          # Add PPA for CRIU
-          sudo add-apt-repository ppa:criu/ppa
-          sudo apt-get update
-          sudo apt-get install -qqy shellcheck bats criu asciidoctor iptables iproute2 kmod jq bash bash-completion zsh fish
-          sudo modprobe -va ip_tables ip6table_filter nf_conntrack nf_conntrack_netlink
+          dnf install -y golang make ShellCheck bats criu rubygem-asciidoctor iptables iproute kmod jq bash bash-completion zsh fish
+          modprobe -va ip_tables ip6table_filter nf_conntrack nf_conntrack_netlink
       - name: Run make shellcheck
         run: make shellcheck
       - name: Run make all
         run: make all
       - name: Run make test
-        run: sudo -E make test
+        run: make test
       - name: Run make test-junit
-        run: sudo -E make test-junit
+        run: make test-junit
       - name: Upload Test Results
         # To display test results from forked repositories they need to
         # be uploaded and then analyzed.
