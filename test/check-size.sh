@@ -8,7 +8,7 @@
 BIN_NAME=checkpointctl
 PREV_SIZE_FILE=prev_size
 # Maximum allowable size difference, in bytes
-MAX_DIFF=51200
+MAX_DIFF=${1:-51200}
 
 # Build the checkpointctl binary. If the commit is not self-contained,
 # the build will fail, in which case there is no point checking for a
