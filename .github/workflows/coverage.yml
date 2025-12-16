@@ -8,6 +8,9 @@ permissions:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+      options: --privileged
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -16,13 +19,9 @@ jobs:
           fetch-depth: 0
       - name: Install tools
         run: |
-          sudo apt-get install -qqy bats iptables iproute2 jq
-          # Add PPA for CRIU
-          sudo add-apt-repository ppa:criu/ppa
-          sudo apt-get update
-          sudo apt-get install -qqy criu
+          dnf install -y bats iptables iproute jq criu golang make
       - name: Run make coverage
-        run: sudo -E make coverage
+        run: make coverage
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4

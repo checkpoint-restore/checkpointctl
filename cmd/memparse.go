@@ -13,7 +13,7 @@ import (
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v7/crit"
+	"github.com/checkpoint-restore/go-criu/v8/crit"
 	"github.com/spf13/cobra"
 )
 
@@ -245,7 +245,7 @@ func printProcessMemoryPages(task internal.Task) error {
 	pagemapEntries := memReader.GetPagemapEntries()
 	for _, entry := range pagemapEntries {
 		start := entry.GetVaddr()
-		end := start + (uint64(pageSize) * uint64(entry.GetNrPages()))
+		end := start + (uint64(pageSize) * entry.GetNrPages())
 		buf, err := memReader.GetMemPages(start, end)
 		if err != nil {
 			return err
