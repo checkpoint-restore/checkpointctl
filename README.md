@@ -191,13 +191,13 @@ then uploads the newly created OCI image to the container registry, making it av
     On Fedora, CentOS and related distributions:
 
     ```console
-    sudo yum install -y go make
+    sudo yum install -y go make asciidoctor
     ```
 
     On Debian, Ubuntu, and related distributions:
 
     ```console
-    sudo apt-get install -y golang make
+    sudo apt-get install -y golang make asciidoctor
     ```
 
 3. Build.
