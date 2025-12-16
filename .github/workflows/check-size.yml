@@ -25,6 +25,50 @@ jobs:
         git config --global user.name "checkpoint-restore"
     - name: Configure base branch without switching current branch
       run: git fetch origin ${GITHUB_BASE_REF}:${GITHUB_BASE_REF}
+    - name: Save PR context
+      env:
+        EVENT_JSON: ${{ toJSON(github.event) }}
+      run: |
+        mkdir -p artifacts
+        printenv EVENT_JSON > artifacts/event.json
     - name: Compare binary size change across each commit
+      id: size-check
       # Use the last non-merge commit from the base branch as the baseline
-      run: git rebase -v $(git rev-list --no-merges -n 1 ${GITHUB_BASE_REF})^ -x test/check-size.sh
+      run: |
+        set +e
+        OUTPUT=$(git rebase -v $(git rev-list --no-merges -n 1 ${GITHUB_BASE_REF})^ -x test/check-size.sh 2>&1)
+        EXIT_CODE=$?
+        echo "$OUTPUT"
+        echo "$OUTPUT" > artifacts/output.txt
+        echo "exit_code=${EXIT_CODE}" >> $GITHUB_OUTPUT
+        exit $EXIT_CODE
+    - name: Generate size check comment
+      if: failure()
+      run: |
+        cat > artifacts/comment.md << 'EOF'
+        ## Binary Size Check Failed
+
+        The binary size increase exceeds the allowed threshold.
+
+        ### Size Check Output
+        ```
+        EOF
+        cat artifacts/output.txt >> artifacts/comment.md
+        cat >> artifacts/comment.md << 'EOF'
+        ```
+
+        ### How to resolve
+
+        If this size increase is expected and acceptable, a maintainer can add
+        the `bloat-ok` label to this PR to bypass the size check.
+
+        ---
+        *Binary size check performed by CI*
+        EOF
+    - name: Upload size check results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: size-check-results
+        retention-days: 5
+        path: artifacts/
