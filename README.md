@@ -205,6 +205,10 @@ then uploads the newly created OCI image to the container registry, making it av
     ```console
     make
     ```
+    
+    On Debian-based systems, the Go version provided by the distribution may be older than the version required by this project, as Debian packages prioritize long-term stability over the latest language releases.  
+    As a result, running `make` may fail with an error like `invalid go version '1.24.6'`, because older Go releases do not recognize newer `go.mod` version formats. Installing a newer Go version from the official Go website resolves the issue.
+
 
 4. Once checkpointctl has been compiled, it can be installed on a system by simply typing
 
