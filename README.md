@@ -191,14 +191,16 @@ then uploads the newly created OCI image to the container registry, making it av
     On Fedora, CentOS and related distributions:
 
     ```console
-    sudo yum install -y go make
+    sudo yum install -y make asciidoctor
     ```
 
     On Debian, Ubuntu, and related distributions:
 
     ```console
-    sudo apt-get install -y golang make
+    sudo apt-get install -y make asciidoctor
     ```
+
+    Linux distributions often provide an old version of the golang compiler. We recommend to install Go from the [official tarballs](https://go.dev/doc/install).
 
 3. Build.
 
