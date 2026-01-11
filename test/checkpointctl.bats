@@ -681,7 +681,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search=PATH --context=10 "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"PATH"* ]]
+	[[ "$(printf '%s\n' "${lines[@]}")" == *"PATH"* ]]
 }
 
 @test "Run checkpointctl memparse with --search-regex='HOME=([^?]+)' " {

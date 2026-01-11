@@ -28,11 +28,12 @@ type StatsNode struct {
 }
 
 type PsNode struct {
-	PID      uint32            `json:"pid"`
-	Comm     string            `json:"command"`
-	Cmdline  string            `json:"cmdline,omitempty"`
-	EnvVars  map[string]string `json:"environment_variables,omitempty"`
-	Children []PsNode          `json:"children,omitempty"`
+	PID       uint32            `json:"pid"`
+	Comm      string            `json:"command"`
+	Cmdline   string            `json:"cmdline,omitempty"`
+	TaskState string            `json:"task_state,omitempty"`
+	EnvVars   map[string]string `json:"environment_variables,omitempty"`
+	Children  []PsNode          `json:"children,omitempty"`
 }
 
 type FdNode struct {
@@ -254,9 +255,15 @@ func buildJSONPsTree(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 }
 
 func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, error) {
+	taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
 	node := PsNode{
-		PID:  psTree.PID,
-		Comm: psTree.Comm,
+		PID:       psTree.PID,
+		Comm:      psTree.Comm,
+		TaskState: taskState.String(),
+	}
+
+	if !taskState.IsAliveOrStopped() {
+		return node, nil
 	}
 
 	if PsTreeCmd {
