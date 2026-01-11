@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/checkpoint-restore/go-criu/v8/crit"
+	criu_core "github.com/checkpoint-restore/go-criu/v8/crit/images/criu-core"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -112,21 +113,25 @@ func TestBuildJSONMounts(t *testing.T) {
 }
 
 func TestBuildJSONPsTree(t *testing.T) {
+	aliveState := uint32(1) // COMPEL_TASK_ALIVE
+	coreEntry := &criu_core.CoreEntry{Tc: &criu_core.TaskCoreEntry{TaskState: &aliveState}}
 	psTree := &crit.PsTree{
 		PID:  1,
 		Comm: "root",
+		Core: coreEntry,
 		Children: []*crit.PsTree{
-			{PID: 2, Comm: "child1"},
-			{PID: 3, Comm: "child2"},
+			{PID: 2, Comm: "child1", Core: coreEntry},
+			{PID: 3, Comm: "child2", Core: coreEntry},
 		},
 	}
 
 	expectedPsTree := PsNode{
-		PID:  1,
-		Comm: "root",
+		PID:       1,
+		Comm:      "root",
+		TaskState: "Alive",
 		Children: []PsNode{
-			{PID: 2, Comm: "child1"},
-			{PID: 3, Comm: "child2"},
+			{PID: 2, Comm: "child1", TaskState: "Alive"},
+			{PID: 3, Comm: "child2", TaskState: "Alive"},
 		},
 	}
 
@@ -141,21 +146,25 @@ func TestBuildJSONPsTree(t *testing.T) {
 }
 
 func TestBuildJSONPsNode(t *testing.T) {
+	aliveState := uint32(1) // COMPEL_TASK_ALIVE
+	coreEntry := &criu_core.CoreEntry{Tc: &criu_core.TaskCoreEntry{TaskState: &aliveState}}
 	psTree := &crit.PsTree{
 		PID:  1,
 		Comm: "root",
+		Core: coreEntry,
 		Children: []*crit.PsTree{
-			{PID: 2, Comm: "child1"},
-			{PID: 3, Comm: "child2"},
+			{PID: 2, Comm: "child1", Core: coreEntry},
+			{PID: 3, Comm: "child2", Core: coreEntry},
 		},
 	}
 
 	expectedPsNode := PsNode{
-		PID:  1,
-		Comm: "root",
+		PID:       1,
+		Comm:      "root",
+		TaskState: "Alive",
 		Children: []PsNode{
-			{PID: 2, Comm: "child1"},
-			{PID: 3, Comm: "child2"},
+			{PID: 2, Comm: "child1", TaskState: "Alive"},
+			{PID: 3, Comm: "child2", TaskState: "Alive"},
 		},
 	}
 

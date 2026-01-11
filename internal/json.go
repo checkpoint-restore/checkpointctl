@@ -28,11 +28,12 @@ type StatsNode struct {
 }
 
 type PsNode struct {
-	PID      uint32            `json:"pid"`
-	Comm     string            `json:"command"`
-	Cmdline  string            `json:"cmdline,omitempty"`
-	EnvVars  map[string]string `json:"environment_variables,omitempty"`
-	Children []PsNode          `json:"children,omitempty"`
+	PID       uint32            `json:"pid"`
+	Comm      string            `json:"command"`
+	Cmdline   string            `json:"cmdline,omitempty"`
+	TaskState string            `json:"task_state,omitempty"`
+	EnvVars   map[string]string `json:"environment_variables,omitempty"`
+	Children  []PsNode          `json:"children,omitempty"`
 }
 
 type FdNode struct {
@@ -254,36 +255,42 @@ func buildJSONPsTree(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 }
 
 func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, error) {
+	taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
 	node := PsNode{
-		PID:  psTree.PID,
-		Comm: psTree.Comm,
+		PID:       psTree.PID,
+		Comm:      psTree.Comm,
+		TaskState: taskState.String(),
 	}
 
-	if PsTreeCmd {
-		cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
-		if err != nil {
-			return PsNode{}, err
-		}
-		node.Cmdline = cmdline
-	}
-
-	if PsTreeEnv {
-		envVars, err := getPsEnvVars(checkpointOutputDir, psTree.PID)
-		if err != nil {
-			return PsNode{}, err
-		}
-		envVarMap := make(map[string]string)
-		for _, envVar := range envVars {
-			i := strings.IndexByte(envVar, '=')
-			if i == -1 || i == 0 {
-				return PsNode{}, fmt.Errorf("invalid environment variable %s", envVar)
+	// Skip dead or zombie processes as they do not have other state.
+	// Note that a zombie process can have children.
+	if taskState.IsAliveOrStopped() {
+		if PsTreeCmd {
+			cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
+			if err != nil {
+				return PsNode{}, err
 			}
-			key := envVar[:i]
-			value := envVar[i+1:]
-			envVarMap[key] = value
+			node.Cmdline = cmdline
 		}
 
-		node.EnvVars = envVarMap
+		if PsTreeEnv {
+			envVars, err := getPsEnvVars(checkpointOutputDir, psTree.PID)
+			if err != nil {
+				return PsNode{}, err
+			}
+			envVarMap := make(map[string]string)
+			for _, envVar := range envVars {
+				i := strings.IndexByte(envVar, '=')
+				if i == -1 || i == 0 {
+					return PsNode{}, fmt.Errorf("invalid environment variable %s", envVar)
+				}
+				key := envVar[:i]
+				value := envVar[i+1:]
+				envVarMap[key] = value
+			}
+
+			node.EnvVars = envVarMap
+		}
 	}
 
 	var children []PsNode
