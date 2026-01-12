@@ -681,7 +681,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search=PATH --context=10 "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"PATH"* ]]
+	[[ ${lines[2]} == *"PATH"* ]]
 }
 
 @test "Run checkpointctl memparse with --search-regex='HOME=([^?]+)' " {
@@ -712,6 +712,115 @@ function teardown() {
 	[ "$status" -eq 1 ]
 	[[ ${lines[0]} == *"no process with PID 9999"* ]]
 }
+
+@test "Run checkpointctl memparse shows N/A for zombie processes" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	(
+		cd "$TEST_TMP_DIR1"/checkpoint
+		crit decode -i core-1.img -o core.json
+		jq '.entries[0].tc.task_state = 6' core.json > core-modified.json
+		crit encode -i core-modified.json -o core-1.img
+		rm core.json core-modified.json
+	)
+	
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[3]} == *"piggie"* ]]
+	[[ ${lines[3]} == *"N/A (zombie/dead)"* ]]
+}
+
+@test "Run checkpointctl inspect with --ps-tree-env succeeds with zombie processes" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	# Keep all memory files - alive child processes (PIDs 3, 4) need their pages files
+	# Even though PID 1 is zombie, the children are still alive with memory
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	(
+		cd "$TEST_TMP_DIR1"/checkpoint
+		# Mark PID 1 (parent) as zombie (task_state = 6)
+		crit decode -i core-1.img -o core.json
+		jq '.entries[0].tc.task_state = 6' core.json > core-modified.json
+		crit encode -i core-modified.json -o core-1.img
+		rm core.json core-modified.json
+	)
+	
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-env
+	[ "$status" -eq 0 ]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
+}
+
+@test "Run checkpointctl inspect with --ps-tree-cmd succeeds with dead processes" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	# Keep all memory files - alive child processes (PIDs 3, 4) need their pages files
+	# Even though PID 1 is dead, the children are still alive with memory
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	(
+		cd "$TEST_TMP_DIR1"/checkpoint
+		# Mark PID 1 (parent) as dead (task_state = 2)
+		crit decode -i core-1.img -o core.json
+		jq '.entries[0].tc.task_state = 2' core.json > core-modified.json
+		crit encode -i core-modified.json -o core-1.img
+		rm core.json core-modified.json
+	)
+	
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
+	[ "$status" -eq 0 ]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
+}
+
+
+@test "Run checkpointctl inspect with --ps-tree-env succeeds with zombie process without memory files" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	# Copy all memory files initially (needed for alive child processes PIDs 3 and 4)
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/files.img \
+		test-imgs/fs-*.img \
+		test-imgs/ids-*.img \
+		test-imgs/fdinfo-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	(
+		cd "$TEST_TMP_DIR1"/checkpoint
+		# Mark PID 1 as zombie (task_state = 6)
+		crit decode -i core-1.img -o core.json
+		jq '.entries[0].tc.task_state = 6' core.json > core_modified.json
+		crit encode -i core_modified.json -o core-1.img
+		# Remove only PID 1's memory files - zombie processes don't have memory
+		# Child processes (PIDs 3, 4) are still alive and keep their memory files
+		rm pagemap-1.img pages-1.img mm-1.img
+	)
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-env
+	[ "$status" -eq 0 ]
+	[[ ${lines[9]} == *"Process tree"* ]]
+}
+
 
 @test "Run checkpointctl inspect with json format" {
 	cp data/config.dump data/spec.dump test-imgs/stats-dump "$TEST_TMP_DIR1"
