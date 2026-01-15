@@ -23,6 +23,21 @@ import (
 
 var pageSize = os.Getpagesize()
 
+// Task state constants from CRIU's compel library
+// These values are defined in CRIU's compel/include/uapi/task-state.h
+// Reference: https://github.com/checkpoint-restore/criu
+const (
+	COMPEL_TASK_ALIVE   = 0x01
+	COMPEL_TASK_DEAD    = 0x02
+	COMPEL_TASK_STOPPED = 0x03
+	COMPEL_TASK_ZOMBIE  = 0x06
+)
+
+// checks if a process has memory pages.
+func ProcessHasMemory(taskState uint32) bool {
+	return taskState != COMPEL_TASK_DEAD && taskState != COMPEL_TASK_ZOMBIE
+}
+
 type containerMetadata struct {
 	Name    string `json:"name,omitempty"`
 	Attempt uint32 `json:"attempt,omitempty"`
@@ -324,7 +339,12 @@ func iterateTarArchive(archiveInput string, callback func(r *tar.Reader, header 
 	return nil
 }
 
-func getCmdline(checkpointOutputDir string, pid uint32) (cmdline string, err error) {
+func getCmdline(checkpointOutputDir string, pid uint32, taskState uint32) (cmdline string, err error) {
+	// Zombie and dead processes don't have memory pages
+	if !ProcessHasMemory(taskState) {
+		return "", nil
+	}
+
 	mr, err := crit.NewMemoryReader(filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory), pid, pageSize)
 	if err != nil {
 		return
@@ -339,7 +359,12 @@ func getCmdline(checkpointOutputDir string, pid uint32) (cmdline string, err err
 	return
 }
 
-func getPsEnvVars(checkpointOutputDir string, pid uint32) (envVars []string, err error) {
+func getPsEnvVars(checkpointOutputDir string, pid uint32, taskState uint32) (envVars []string, err error) {
+	// Zombie and dead processes don't have memory pages
+	if !ProcessHasMemory(taskState) {
+		return nil, nil
+	}
+
 	mr, err := crit.NewMemoryReader(filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory), pid, pageSize)
 	if err != nil {
 		return

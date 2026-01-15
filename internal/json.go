@@ -260,7 +260,8 @@ func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 	}
 
 	if PsTreeCmd {
-		cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
+		taskState := psTree.Core.GetTc().GetTaskState()
+		cmdline, err := getCmdline(checkpointOutputDir, psTree.PID, taskState)
 		if err != nil {
 			return PsNode{}, err
 		}
@@ -268,7 +269,8 @@ func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 	}
 
 	if PsTreeEnv {
-		envVars, err := getPsEnvVars(checkpointOutputDir, psTree.PID)
+		taskState := psTree.Core.GetTc().GetTaskState()
+		envVars, err := getPsEnvVars(checkpointOutputDir, psTree.PID, taskState)
 		if err != nil {
 			return PsNode{}, err
 		}

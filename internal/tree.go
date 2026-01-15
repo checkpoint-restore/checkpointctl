@@ -178,7 +178,8 @@ func addPsTreeToTree(
 		node := tree.AddMetaBranch(root.PID, root.Comm)
 		// attach environment variables to process
 		if PsTreeEnv {
-			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
+			taskState := root.Core.GetTc().GetTaskState()
+			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID, taskState)
 			if err != nil {
 				return err
 			}
@@ -286,7 +287,8 @@ func showSockets(sks []*crit.Sk, node treeprint.Tree, root *crit.PsTree) error {
 // Recursively updates the Comm field of the psTree struct with the command line arguments
 // from process memory pages
 func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) error {
-	cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
+	taskState := psTree.Core.GetTc().GetTaskState()
+	cmdline, err := getCmdline(checkpointOutputDir, psTree.PID, taskState)
 	if err != nil {
 		return err
 	}

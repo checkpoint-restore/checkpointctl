@@ -125,6 +125,26 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 	// Function to recursively traverse the process tree and populate the table rows
 	var traverseTree func(*crit.PsTree, string, *[][]string) error
 	traverseTree = func(root *crit.PsTree, checkpointOutputDir string, rows *[][]string) error {
+		taskState := root.Core.GetTc().GetTaskState()
+
+		// Zombie and dead processes don't have memory pages
+		if !internal.ProcessHasMemory(taskState) {
+			row := []string{
+				fmt.Sprintf("%d", root.PID),
+				root.Comm,
+				"N/A (zombie/dead)",
+				"N/A (zombie/dead)",
+			}
+			*rows = append(*rows, row)
+
+			for _, child := range root.Children {
+				if err := traverseTree(child, checkpointOutputDir, rows); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
 		memReader, err := crit.NewMemoryReader(
 			filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory),
 			root.PID, pageSize,
@@ -196,11 +216,20 @@ func printProcessMemoryPages(task internal.Task) error {
 	}
 
 	// Check if PID exist within the checkpoint
+	var ps *crit.PsTree
 	if *pID != 0 {
-		ps := psTree.FindPs(*pID)
+		ps = psTree.FindPs(*pID)
 		if ps == nil {
 			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", *pID)
 		}
+	} else {
+		ps = psTree
+	}
+
+	// Check if the process has memory (not zombie/dead)
+	taskState := ps.Core.GetTc().GetTaskState()
+	if !internal.ProcessHasMemory(taskState) {
+		return fmt.Errorf("process %d is in zombie or dead state and has no memory pages", ps.PID)
 	}
 
 	memReader, err := crit.NewMemoryReader(
@@ -313,6 +342,12 @@ func printMemorySearchResultForPID(task internal.Task) error {
 	ps := psTree.FindPs(*pID)
 	if ps == nil {
 		return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", *pID)
+	}
+
+	// Check if the process has memory (not zombie/dead)
+	taskState := ps.Core.GetTc().GetTaskState()
+	if !internal.ProcessHasMemory(taskState) {
+		return fmt.Errorf("process %d is in zombie or dead state and has no memory pages", ps.PID)
 	}
 
 	memReader, err := crit.NewMemoryReader(
