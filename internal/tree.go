@@ -175,28 +175,48 @@ func addPsTreeToTree(
 	// processes as child nodes of the branch.
 	var processNodes func(treeprint.Tree, *crit.PsTree) error
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) error {
-		node := tree.AddMetaBranch(root.PID, root.Comm)
-		// attach environment variables to process
-		if PsTreeEnv {
-			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
-			if err != nil {
+		var metaBranchTag string
+		var metaBranchValue string
+
+		taskState := crit.TaskState(root.Core.GetTc().GetTaskState())
+		if taskState.IsAlive() {
+			metaBranchTag = fmt.Sprintf("%d", root.PID)
+			metaBranchValue = root.Comm
+		} else if taskState.IsStopped() {
+			metaBranchTag = fmt.Sprintf("%d (%s)", root.PID, taskState.String())
+			metaBranchValue = root.Comm
+		} else {
+			metaBranchTag = fmt.Sprintf("%d", root.PID)
+			metaBranchValue = fmt.Sprintf("%s (%s)", root.Comm, taskState.String())
+		}
+
+		node := tree.AddMetaBranch(metaBranchTag, metaBranchValue)
+
+		// Skip dead or zombie processes as they do not have other state.
+		// Note that a zombie process can have children.
+		if taskState.IsAliveOrStopped() {
+			// attach environment variables to process
+			if PsTreeEnv {
+				envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
+				if err != nil {
+					return err
+				}
+
+				if len(envVars) > 0 {
+					nodeSubtree := node.AddBranch("Environment variables")
+					for _, env := range envVars {
+						nodeSubtree.AddBranch(env)
+					}
+				}
+			}
+
+			if err := showFiles(fds, node, root); err != nil {
 				return err
 			}
 
-			if len(envVars) > 0 {
-				nodeSubtree := node.AddBranch("Environment variables")
-				for _, env := range envVars {
-					nodeSubtree.AddBranch(env)
-				}
+			if err := showSockets(sks, node, root); err != nil {
+				return err
 			}
-		}
-
-		if err := showFiles(fds, node, root); err != nil {
-			return err
-		}
-
-		if err := showSockets(sks, node, root); err != nil {
-			return err
 		}
 
 		for _, child := range root.Children {
@@ -286,6 +306,11 @@ func showSockets(sks []*crit.Sk, node treeprint.Tree, root *crit.PsTree) error {
 // Recursively updates the Comm field of the psTree struct with the command line arguments
 // from process memory pages
 func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) error {
+	taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
+	if !taskState.IsAliveOrStopped() {
+		return nil
+	}
+
 	cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
 	if err != nil {
 		return err
