@@ -1,10 +1,28 @@
----
+version: "2"
 run:
   concurrency: 6
-  timeout: 5m
 linters:
   enable:
     - errorlint
     - unconvert
-    - gofumpt
     - unparam
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
