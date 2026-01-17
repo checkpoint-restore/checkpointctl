@@ -79,7 +79,9 @@ void run_tcp_server(void)
 
 	while (1) {
 		memset(buffer, 0, sizeof(buffer));
-		recv(client_socket, buffer, sizeof(buffer), 0);
+		ssize_t n = recv(client_socket, buffer, sizeof(buffer), 0);
+		if (n <= 0)
+			break;
 	}
 
 	close(server_socket);
