@@ -170,10 +170,17 @@ static int do_test(void *opts_ptr)
 
 	if (opts->log_file) {
 		fd = open(opts->log_file, O_WRONLY | O_TRUNC | O_CREAT, 0600);
-		dup2(fd, 1);
-		dup2(fd, 2);
-		if (fd != 1 && fd != 2)
+		if (fd < 0) {
+			perror("open");
+			return -1;
+		}
+
+		dup2(fd, STDOUT_FILENO);
+		dup2(fd, STDERR_FILENO);
+
+		if (fd != STDOUT_FILENO && fd != STDERR_FILENO) {
 			close(fd);
+		}
 	}
 
 	if (opts->use_tcp_socket) {
