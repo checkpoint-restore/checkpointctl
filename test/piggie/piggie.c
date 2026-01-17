@@ -26,7 +26,53 @@
 typedef struct {
 	char *log_file;
 	bool use_tcp_socket;
+	bool create_zombie;
 } opts_t;
+
+static void create_zombie(void)
+{
+	pid_t zombie_pid = fork();
+
+	if (zombie_pid < 0) {
+		perror("zombie: fork failed");
+		return;
+	}
+
+	if (zombie_pid == 0) {
+		/* This process will become the zombie */
+
+		prctl(PR_SET_NAME, "piggie-zombie");
+
+		/* First alive child */
+		pid_t c1 = fork();
+		if (c1 == 0) {
+			prctl(PR_SET_NAME, "stopped-child");
+			raise(SIGSTOP);   /* enters stopped task state */
+			while (1)
+				sleep(1);
+		}
+
+		/* Second alive child */
+		pid_t c2 = fork();
+		if (c2 == 0) {
+			prctl(PR_SET_NAME, "alive-child");
+			while (1)
+				sleep(1);
+		}
+
+		/*
+		 * Parent of the two children exits immediately.
+		 * Since *its* parent does not wait(), this
+		 * process becomes a zombie.
+		 */
+		_exit(0);
+	}
+
+	/*
+	 * Original parent intentionally does NOT wait()
+	 * zombie_pid stays as a zombie.
+	 */
+}
 
 void run_tcp_server(void)
 {
@@ -192,6 +238,10 @@ static int do_test(void *opts_ptr)
 		run_tcp_client();
 	}
 
+	if (opts->create_zombie) {
+		create_zombie();
+	}
+
 	while (1) {
 		sleep(1);
 		printf("%d\n", i++);
@@ -223,6 +273,12 @@ static int parse_options(int argc, char **argv, bool *usage_error, opts_t *opts)
 			continue;
 		}
 
+		if (!strcmp(argv[i], "--zombie") || !strcmp(argv[i], "-z")) {
+			opts->create_zombie = true;
+			i++;
+			continue;
+		}
+
 		printf("Unknown option: %s\n", argv[i]);
 		*usage_error = true;
 		goto out;
@@ -242,7 +298,7 @@ int main(int argc, char **argv) {
 
 	ret = parse_options(argc, argv, &usage_error, &opts);
 	if (ret) {
-		fprintf(stderr, "Usage: %s -o/--log-file <log_file> [-t/--tcp-socket]\n", argv[0]);
+		fprintf(stderr, "Usage: %s -o/--log-file <log_file> [-t/--tcp-socket] [-z|--zombie]\n", argv[0]);
 		return (usage_error != false);
 	}
 
