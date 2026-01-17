@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -191,6 +192,11 @@ func addPsTreeToTree(
 		if !taskState.IsAliveOrStopped() {
 			return nil
 		}
+
+		// Sort children by PID for consistent output
+		sort.Slice(root.Children, func(i, j int) bool {
+			return root.Children[i].PID < root.Children[j].PID
+		})
 
 		// attach environment variables to process
 		if PsTreeEnv {
