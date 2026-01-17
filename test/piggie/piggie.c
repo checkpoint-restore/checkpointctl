@@ -94,6 +94,7 @@ void run_tcp_client(void)
 	int client_socket, max_connection_tries = 5;
 	struct sockaddr_in server_address = {0};
 	char buffer[MAX_BUFFER_SIZE];
+	const char msg[] = "ping";
 	bool connected = false;
 	pid_t ret;
 
@@ -137,7 +138,11 @@ void run_tcp_client(void)
 	}
 
 	while (1) {
-		send(client_socket, "ping", 5, 0);
+		ssize_t sent = send(client_socket, msg, sizeof(msg) - 1, 0);
+		if (sent == -1) {
+			perror("send");
+		}
+
 		/* Send messages every second */
 		sleep(1);
 	}
