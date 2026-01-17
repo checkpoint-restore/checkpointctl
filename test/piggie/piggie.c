@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
 	void *stk;
 	int i, pid, log_fd, option;
 	bool usage_error = false;
-	opts_t opts = {NULL};
+	opts_t opts = {0};
 	int ret;
 
 	ret = parse_options(argc, argv, &usage_error, &opts);
