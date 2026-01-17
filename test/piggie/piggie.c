@@ -90,7 +90,8 @@ void run_tcp_client(void)
 	int client_socket, max_connection_tries = 5;
 	struct sockaddr_in server_address;
 	char buffer[MAX_BUFFER_SIZE];
-	bool connected = false, ret;
+	bool connected = false;
+	pid_t ret;
 
 	ret = fork();
 	if (ret < 0) {
