@@ -31,7 +31,7 @@ typedef struct {
 void run_tcp_server(void)
 {
 	int server_socket, client_socket, ret;
-	struct sockaddr_in server_address, client_address;
+	struct sockaddr_in server_address = {0}, client_address = {0};
 	char buffer[MAX_BUFFER_SIZE];
 	const int enable = 1;
 
@@ -90,7 +90,7 @@ void run_tcp_server(void)
 void run_tcp_client(void)
 {
 	int client_socket, max_connection_tries = 5;
-	struct sockaddr_in server_address;
+	struct sockaddr_in server_address = {0};
 	char buffer[MAX_BUFFER_SIZE];
 	bool connected = false;
 	pid_t ret;
