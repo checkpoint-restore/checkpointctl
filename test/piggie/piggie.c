@@ -53,8 +53,8 @@ void run_tcp_server(void)
 		exit(EXIT_FAILURE);
 	}
 
-	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
-	setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int));
+	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+	setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
 
 	server_address.sin_family = AF_INET;
 	server_address.sin_addr.s_addr = INADDR_ANY;
