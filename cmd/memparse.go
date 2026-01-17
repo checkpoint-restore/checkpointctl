@@ -125,6 +125,13 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 	// Function to recursively traverse the process tree and populate the table rows
 	var traverseTree func(*crit.PsTree, string, *[][]string) error
 	traverseTree = func(root *crit.PsTree, checkpointOutputDir string, rows *[][]string) error {
+		taskState := crit.TaskState(root.Core.GetTc().GetTaskState())
+
+		// Ignore zombies and dead processes as they don't have memory pages.
+		if !taskState.IsAliveOrStopped() {
+			return nil
+		}
+
 		memReader, err := crit.NewMemoryReader(
 			filepath.Join(checkpointOutputDir, metadata.CheckpointDirectory),
 			root.PID, pageSize,
@@ -195,11 +202,18 @@ func printProcessMemoryPages(task internal.Task) error {
 		return fmt.Errorf("failed to get process tree: %w", err)
 	}
 
-	// Check if PID exist within the checkpoint
+	// If PID=0, show all PIDs; otherwise, parse the specified PID's memory.
 	if *pID != 0 {
+		// Check if PID exist within the checkpoint
 		ps := psTree.FindPs(*pID)
 		if ps == nil {
 			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", *pID)
+		}
+
+		// Check if the specified process has memory pages
+		taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
+		if !taskState.IsAliveOrStopped() {
+			return fmt.Errorf("process %d has no memory pages (task state is zombie or dead)", ps.PID)
 		}
 	}
 
@@ -313,6 +327,12 @@ func printMemorySearchResultForPID(task internal.Task) error {
 	ps := psTree.FindPs(*pID)
 	if ps == nil {
 		return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", *pID)
+	}
+
+	// Check if the process has memory pages
+	taskState := crit.TaskState(ps.Core.GetTc().GetTaskState())
+	if !taskState.IsAliveOrStopped() {
+		return fmt.Errorf("process %d has no memory pages (task state is zombie or dead)", ps.PID)
 	}
 
 	memReader, err := crit.NewMemoryReader(

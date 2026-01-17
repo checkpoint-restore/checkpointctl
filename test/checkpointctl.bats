@@ -386,9 +386,15 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --files
 	[ "$status" -eq 0 ]
+
 	[[ ${lines[11]} == *"[REG 0]"* ]]
 	[[ ${lines[25]} == *"[cwd]"* ]]
 	[[ ${lines[26]} == *"[root]"* ]]
+
+	[[ ${lines[27]} == *"[5 (Dead)]  piggie-zombie"* ]]
+	[[ ${lines[28]} == *"[6 (Stopped)]  stopped-child"* ]]
+	[[ ${lines[29]} == *"Open files"* ]]
+	[[ ${lines[33]} == *"[7]  alive-child"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --files and missing files.img" {
@@ -681,7 +687,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search=PATH --context=10 "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"PATH"* ]]
+	[[ "$(printf '%s\n' "${lines[@]}")" == *"PATH"* ]]
 }
 
 @test "Run checkpointctl memparse with --search-regex='HOME=([^?]+)' " {

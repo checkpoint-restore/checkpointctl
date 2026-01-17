@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -175,7 +176,28 @@ func addPsTreeToTree(
 	// processes as child nodes of the branch.
 	var processNodes func(treeprint.Tree, *crit.PsTree) error
 	processNodes = func(tree treeprint.Tree, root *crit.PsTree) error {
-		node := tree.AddMetaBranch(root.PID, root.Comm)
+		var metaBranchTag string
+
+		taskState := crit.TaskState(root.Core.GetTc().GetTaskState())
+		if taskState.IsAlive() {
+			metaBranchTag = fmt.Sprintf("%d", root.PID)
+		} else {
+			metaBranchTag = fmt.Sprintf("%d (%s)", root.PID, taskState.String())
+		}
+
+		node := tree.AddMetaBranch(metaBranchTag, root.Comm)
+
+		// Skip dead or zombie processes as they do not have other state, and
+		// their children are inherited by init or the nearest subreaper process.
+		if !taskState.IsAliveOrStopped() {
+			return nil
+		}
+
+		// Sort children by PID for consistent output
+		sort.Slice(root.Children, func(i, j int) bool {
+			return root.Children[i].PID < root.Children[j].PID
+		})
+
 		// attach environment variables to process
 		if PsTreeEnv {
 			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
@@ -286,6 +308,11 @@ func showSockets(sks []*crit.Sk, node treeprint.Tree, root *crit.PsTree) error {
 // Recursively updates the Comm field of the psTree struct with the command line arguments
 // from process memory pages
 func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) error {
+	taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
+	if !taskState.IsAliveOrStopped() {
+		return nil
+	}
+
 	cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
 	if err != nil {
 		return err
@@ -293,6 +320,7 @@ func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) 
 	if cmdline != "" {
 		psTree.Comm = cmdline
 	}
+
 	for _, child := range psTree.Children {
 		if err := updatePsTreeCommToCmdline(checkpointOutputDir, child); err != nil {
 			return err

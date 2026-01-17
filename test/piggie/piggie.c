@@ -10,6 +10,8 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #define STKS	(4*4096)
 
@@ -24,12 +26,58 @@
 typedef struct {
 	char *log_file;
 	bool use_tcp_socket;
+	bool create_zombie;
 } opts_t;
+
+static void create_zombie(void)
+{
+	pid_t zombie_pid = fork();
+
+	if (zombie_pid < 0) {
+		perror("zombie: fork failed");
+		return;
+	}
+
+	if (zombie_pid == 0) {
+		/* This process will become the zombie */
+
+		prctl(PR_SET_NAME, "piggie-zombie");
+
+		/* First alive child */
+		pid_t c1 = fork();
+		if (c1 == 0) {
+			prctl(PR_SET_NAME, "stopped-child");
+			raise(SIGSTOP);   /* enters stopped task state */
+			while (1)
+				sleep(1);
+		}
+
+		/* Second alive child */
+		pid_t c2 = fork();
+		if (c2 == 0) {
+			prctl(PR_SET_NAME, "alive-child");
+			while (1)
+				sleep(1);
+		}
+
+		/*
+		 * Parent of the two children exits immediately.
+		 * Since *its* parent does not wait(), this
+		 * process becomes a zombie.
+		 */
+		_exit(0);
+	}
+
+	/*
+	 * Original parent intentionally does NOT wait()
+	 * zombie_pid stays as a zombie.
+	 */
+}
 
 void run_tcp_server(void)
 {
 	int server_socket, client_socket, ret;
-	struct sockaddr_in server_address, client_address;
+	struct sockaddr_in server_address = {0}, client_address = {0};
 	char buffer[MAX_BUFFER_SIZE];
 	const int enable = 1;
 
@@ -51,8 +99,8 @@ void run_tcp_server(void)
 		exit(EXIT_FAILURE);
 	}
 
-	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
-	setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int));
+	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+	setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
 
 	server_address.sin_family = AF_INET;
 	server_address.sin_addr.s_addr = INADDR_ANY;
@@ -77,7 +125,9 @@ void run_tcp_server(void)
 
 	while (1) {
 		memset(buffer, 0, sizeof(buffer));
-		recv(client_socket, buffer, sizeof(buffer), 0);
+		ssize_t n = recv(client_socket, buffer, sizeof(buffer), 0);
+		if (n <= 0)
+			break;
 	}
 
 	close(server_socket);
@@ -88,9 +138,11 @@ void run_tcp_server(void)
 void run_tcp_client(void)
 {
 	int client_socket, max_connection_tries = 5;
-	struct sockaddr_in server_address;
+	struct sockaddr_in server_address = {0};
 	char buffer[MAX_BUFFER_SIZE];
-	bool connected = false, ret;
+	const char msg[] = "ping";
+	bool connected = false;
+	pid_t ret;
 
 	ret = fork();
 	if (ret < 0) {
@@ -132,7 +184,11 @@ void run_tcp_client(void)
 	}
 
 	while (1) {
-		send(client_socket, "ping", 5, 0);
+		ssize_t sent = send(client_socket, msg, sizeof(msg) - 1, 0);
+		if (sent == -1) {
+			perror("send");
+		}
+
 		/* Send messages every second */
 		sleep(1);
 	}
@@ -160,10 +216,17 @@ static int do_test(void *opts_ptr)
 
 	if (opts->log_file) {
 		fd = open(opts->log_file, O_WRONLY | O_TRUNC | O_CREAT, 0600);
-		dup2(fd, 1);
-		dup2(fd, 2);
-		if (fd != 1 && fd != 2)
+		if (fd < 0) {
+			perror("open");
+			return -1;
+		}
+
+		dup2(fd, STDOUT_FILENO);
+		dup2(fd, STDERR_FILENO);
+
+		if (fd != STDOUT_FILENO && fd != STDERR_FILENO) {
 			close(fd);
+		}
 	}
 
 	if (opts->use_tcp_socket) {
@@ -173,6 +236,10 @@ static int do_test(void *opts_ptr)
 			return 1;
 		run_tcp_server();
 		run_tcp_client();
+	}
+
+	if (opts->create_zombie) {
+		create_zombie();
 	}
 
 	while (1) {
@@ -206,6 +273,12 @@ static int parse_options(int argc, char **argv, bool *usage_error, opts_t *opts)
 			continue;
 		}
 
+		if (!strcmp(argv[i], "--zombie") || !strcmp(argv[i], "-z")) {
+			opts->create_zombie = true;
+			i++;
+			continue;
+		}
+
 		printf("Unknown option: %s\n", argv[i]);
 		*usage_error = true;
 		goto out;
@@ -220,17 +293,17 @@ int main(int argc, char **argv) {
 	void *stk;
 	int i, pid, log_fd, option;
 	bool usage_error = false;
-	opts_t opts = {NULL};
+	opts_t opts = {0};
 	int ret;
 
 	ret = parse_options(argc, argv, &usage_error, &opts);
 	if (ret) {
-		fprintf(stderr, "Usage: %s -o/--log-file <log_file> [-t/--tcp-socket]\n", argv[0]);
+		fprintf(stderr, "Usage: %s -o/--log-file <log_file> [-t/--tcp-socket] [-z|--zombie]\n", argv[0]);
 		return (usage_error != false);
 	}
 
 	stk = mmap(NULL, STKS, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_GROWSDOWN, 0, 0);
-	pid = clone(do_test, stk + STKS, SIGCHLD | CLONE_NEWPID, (void*)&opts);
+	pid = clone(do_test, (char *)stk + STKS, SIGCHLD | CLONE_NEWPID, (void*)&opts);
 	if (pid < 0) {
 		fprintf(stderr, "clone() failed: %m\n");
 		return 1;
