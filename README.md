@@ -80,6 +80,44 @@ awesome_booth
 
 For a complete list of flags supported, use `checkpointctl inspect --help`.
 
+### `diff` sub-command
+
+To compare two container checkpoints and analyze changes between them, use the checkpointctl `diff` command.
+
+```console
+$ checkpointctl diff checkpoint1.tar checkpoint2.tar
+
+╔════════════════════════════════════════════════════════════════╗
+║ Checkpoint Diff                                                ║
+╠════════════════════════════════════════════════════════════════╣
+║ Container: web-server                                          ║
+║ Image:     docker.io/library/nginx:latest                      ║
+╚════════════════════════════════════════════════════════════════╝
+
+Checkpoint A:
+  Created: 2026-02-15T10:00:00Z
+  Size:    2.1 MiB
+
+Checkpoint B:
+  Created: 2026-02-15T10:05:00Z
+  Size:    2.3 MiB
+
+┌─ Memory Changes ─────────────────────────────────────────────┐
+│ ↑ Increased by 0.15 MB
+└──────────────────────────────────────────────────────────────┘
+
+┌─ Process Changes ────────────────────────────────────────────┐
+│ Added:
+│   + PID 42    xmrig
+│ Unchanged: 3
+└──────────────────────────────────────────────────────────────┘
+
+Summary:
+Checkpoint comparison for container web-server
+Processes: +1 -0 ~0
+Memory: +0.15 MB
+```
+
 ### `memparse` sub-command
 
 To perform memory analysis of container checkpoints, you can use the `checkpointctl memparse` command.
