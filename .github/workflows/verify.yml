@@ -19,6 +19,7 @@ jobs:
       uses: codespell-project/actions-codespell@v2
       with:
         skip: vendor,*.svg
+        ignore_words_list: metadataA,metadataB
 
   gomod:
     runs-on: ubuntu-latest
