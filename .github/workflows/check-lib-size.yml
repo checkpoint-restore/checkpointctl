@@ -1,0 +1,83 @@
+name: Check library size
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  check_lib_size:
+    runs-on: ubuntu-latest
+    # Check if pull request does not have label "lib-bloat-ok".
+    if: "!contains(github.event.pull_request.labels.*.name, 'lib-bloat-ok')"
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # Needed to rebase against the base branch
+        fetch-depth: 0
+        # Checkout pull request HEAD commit instead of merge commit
+        ref: ${{ github.event.pull_request.head.sha }}
+    - uses: actions/setup-go@v5
+      with:
+        go-version: stable
+    - name: Configure git user details
+      run: |
+        git config --global user.email "checkpoint-restore@users.noreply.github.com"
+        git config --global user.name "checkpoint-restore"
+    - name: Configure base branch without switching current branch
+      run: git fetch origin ${GITHUB_BASE_REF}:${GITHUB_BASE_REF}
+    - name: Save PR context
+      env:
+        EVENT_JSON: ${{ toJSON(github.event) }}
+      run: |
+        mkdir -p artifacts
+        printenv EVENT_JSON > artifacts/event.json
+    - name: Save check script and test files
+      run: |
+        # Copy script and test files outside git tree so they persist
+        # across rebase checkouts to older commits where they don't exist
+        cp test/check-lib-size.sh /tmp/check-lib-size.sh
+        cp -r test/lib-size /tmp/lib-size
+    - name: Compare library size change across each commit
+      id: size-check
+      # Use the last non-merge commit from the base branch as the baseline
+      run: |
+        set +e
+        OUTPUT=$(git rebase -v $(git rev-list --no-merges -n 1 ${GITHUB_BASE_REF})^ -x /tmp/check-lib-size.sh 2>&1)
+        EXIT_CODE=$?
+        echo "$OUTPUT"
+        echo "$OUTPUT" > artifacts/output.txt
+        echo "exit_code=${EXIT_CODE}" >> $GITHUB_OUTPUT
+        exit $EXIT_CODE
+    - name: Generate size check comment
+      if: failure()
+      run: |
+        cat > artifacts/comment.md << 'EOF'
+        ## Library Size Check Failed
+
+        The library size increase exceeds the allowed threshold.
+
+        ### Size Check Output
+        ```
+        EOF
+        cat artifacts/output.txt >> artifacts/comment.md
+        cat >> artifacts/comment.md << 'EOF'
+        ```
+
+        ### How to resolve
+
+        If this size increase is expected and acceptable, a maintainer can add
+        the `lib-bloat-ok` label to this PR to bypass the size check.
+
+        ---
+        *Library size check performed by CI*
+        EOF
+    - name: Upload size check results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: lib-size-check-results
+        retention-days: 5
+        path: artifacts/

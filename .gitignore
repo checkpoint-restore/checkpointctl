@@ -3,4 +3,5 @@ checkpointctl.coverage
 .coverage
 junit.xml
 test/piggie/piggie
+test/lib-size/lib-size-test
 test/test-imgs
