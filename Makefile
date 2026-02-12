@@ -74,6 +74,7 @@ test-junit: $(NAME)
 .PHONY: coverage
 coverage: $(NAME).coverage
 	mkdir -p $(COVERAGE_PATH)
+	$(GO) test -cover ./... -args -test.gocoverdir=$(COVERAGE_PATH)
 	COVERAGE_PATH=$(COVERAGE_PATH) COVERAGE=1 make -C test
 	# Print coverage from this run
 	$(GO) tool covdata percent -i=${COVERAGE_PATH}
