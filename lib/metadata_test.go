@@ -8,10 +8,11 @@ import (
 
 func TestReadContainerCheckpointPodOptions(t *testing.T) {
 	tests := []struct {
-		name        string
-		podOptions  CheckpointedPodOptions
-		wantVersion int
-		wantContLen int
+		name            string
+		podOptions      CheckpointedPodOptions
+		wantVersion     int
+		wantContLen     int
+		wantAnnotations map[string]string
 	}{
 		{
 			name: "valid pod options",
@@ -33,6 +34,27 @@ func TestReadContainerCheckpointPodOptions(t *testing.T) {
 			},
 			wantVersion: 2,
 			wantContLen: 0,
+		},
+		{
+			name: "with annotations",
+			podOptions: CheckpointedPodOptions{
+				Version: 1,
+				Containers: map[string]string{
+					"test": "test-container",
+				},
+				Annotations: map[string]string{
+					CheckpointAnnotationEngine:        "podman",
+					CheckpointAnnotationEngineVersion: "4.0.0",
+					CheckpointAnnotationPod:           "test-pod",
+				},
+			},
+			wantVersion: 1,
+			wantContLen: 1,
+			wantAnnotations: map[string]string{
+				CheckpointAnnotationEngine:        "podman",
+				CheckpointAnnotationEngineVersion: "4.0.0",
+				CheckpointAnnotationPod:           "test-pod",
+			},
 		},
 	}
 
@@ -56,6 +78,17 @@ func TestReadContainerCheckpointPodOptions(t *testing.T) {
 
 			if len(podOptions.Containers) != tt.wantContLen {
 				t.Errorf("expected %d containers, got %d", tt.wantContLen, len(podOptions.Containers))
+			}
+
+			if tt.wantAnnotations != nil {
+				if len(podOptions.Annotations) != len(tt.wantAnnotations) {
+					t.Errorf("expected %d annotations, got %d", len(tt.wantAnnotations), len(podOptions.Annotations))
+				}
+				for k, v := range tt.wantAnnotations {
+					if podOptions.Annotations[k] != v {
+						t.Errorf("expected annotation %s=%s, got %s", k, v, podOptions.Annotations[k])
+					}
+				}
 			}
 		})
 	}
