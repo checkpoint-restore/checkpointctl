@@ -85,6 +85,8 @@ type CheckpointedPodOptions struct {
 	Version int `json:"version"`
 	// Containers is a map with the short container name as key and the full name as value
 	Containers map[string]string `json:"containers"`
+	// Annotations stores checkpoint-related annotations (keys defined in annotations.go)
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 func ReadContainerCheckpointSpecDump(checkpointDirectory string) (*spec.Spec, string, error) {
