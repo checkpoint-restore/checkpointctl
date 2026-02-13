@@ -117,7 +117,7 @@ func ReadContainerCheckpointStatusFile(checkpointDirectory string) (*ContainerdS
 	return &containerdStatus, statusFile, err
 }
 
-func ReadContainerCheckpointPodOptions(checkpointDirectory string) (*CheckpointedPodOptions, string, error) {
+func ReadCheckpointPodOptions(checkpointDirectory string) (*CheckpointedPodOptions, string, error) {
 	var podOptions CheckpointedPodOptions
 	podOptionsFile, err := ReadJSONFile(&podOptions, checkpointDirectory, PodOptionsFile)
 

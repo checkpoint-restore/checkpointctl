@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestReadContainerCheckpointPodOptions(t *testing.T) {
+func TestReadCheckpointPodOptions(t *testing.T) {
 	tests := []struct {
 		name            string
 		podOptions      CheckpointedPodOptions
@@ -66,7 +66,7 @@ func TestReadContainerCheckpointPodOptions(t *testing.T) {
 				t.Fatalf("failed to write test file: %v", err)
 			}
 
-			podOptions, _, err := ReadContainerCheckpointPodOptions(tmpDir)
+			podOptions, _, err := ReadCheckpointPodOptions(tmpDir)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -94,10 +94,10 @@ func TestReadContainerCheckpointPodOptions(t *testing.T) {
 	}
 }
 
-func TestReadContainerCheckpointPodOptionsFileNotFound(t *testing.T) {
+func TestReadCheckpointPodOptionsFileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	_, _, err := ReadContainerCheckpointPodOptions(tmpDir)
+	_, _, err := ReadCheckpointPodOptions(tmpDir)
 	if err == nil {
 		t.Errorf("expected error for non-existent file, got nil")
 	}
