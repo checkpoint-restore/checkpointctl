@@ -33,6 +33,8 @@ func main() {
 
 	rootCommand.AddCommand(cmd.BuildCmd())
 
+	rootCommand.AddCommand(cmd.Diff())
+
 	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {

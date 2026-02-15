@@ -831,3 +831,230 @@ function teardown() {
 	[[ "${lines[4]}" == *"CRI-O"* ]]
 	[[ "${lines[4]}" == *"checkpoint-valid-config.tar"* ]]
 }
+
+@test "Run checkpointctl diff with no arguments" {
+	checkpointctl diff
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"Error: accepts 2 arg(s), received 0"* ]]
+}
+
+@test "Run checkpointctl diff with only one argument" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl diff "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"Error: accepts 2 arg(s), received 1"* ]]
+}
+
+@test "Run checkpointctl diff with non-existing checkpoint" {
+	checkpointctl diff /does-not-exist1.tar /does-not-exist2.tar
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"failed to load checkpoint"* ]]
+}
+
+@test "Run checkpointctl diff with invalid format" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --format=invalid
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"invalid output format"* ]]
+}
+
+@test "Run checkpointctl diff with two identical checkpoints (tree format)" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"Checkpoint Diff"* ]]
+	[[ "$output" == *"Memory Changes"* ]]
+	[[ "$output" == *"No change"* ]]
+}
+
+@test "Run checkpointctl diff with two identical checkpoints (json format)" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	
+	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --format=json
+	[ "$status" -eq 0 ]
+	
+	# Validate JSON output
+	test_container_id() { jq -e '.container_id != null'; }
+	export -f test_container_id
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_container_id"
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl diff with checkpoints from different containers" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	
+	# Create first checkpoint with process tree
+	if [ -d "test-imgs" ]; then
+		cp test-imgs/pstree.img test-imgs/core-*.img "$TEST_TMP_DIR1"/checkpoint
+	fi
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+	
+	# Modify container ID for second checkpoint
+	jq '.annotations["io.container.manager"] = "different-runtime"' "$TEST_TMP_DIR1"/config.dump > "$TEST_TMP_DIR1"/config_modified.dump
+	mv "$TEST_TMP_DIR1"/config_modified.dump "$TEST_TMP_DIR1"/config.dump
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	
+	# This should work since both checkpoints have minimal data
+	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar
+	# Accept that it completes - the test data doesn't have real IDs
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl diff with --ps-tree-cmd flag" {
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	
+	# Only create checkpoint files if test-imgs exists (optional test)
+	if [ -d "test-imgs" ]; then
+		cp test-imgs/pstree.img \
+			test-imgs/core-*.img \
+			test-imgs/pagemap-*.img \
+			test-imgs/pages-*.img \
+			test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+		
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+		
+		checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --ps-tree-cmd
+		[ "$status" -eq 0 ]
+		[[ "$output" == *"Process Changes"* ]]
+	else
+		skip "test-imgs directory not available"
+	fi
+}
+
+@test "Run checkpointctl diff with --files flag" {
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	
+	# Only create checkpoint files if test-imgs exists (optional test)
+	if [ -d "test-imgs" ]; then
+		cp test-imgs/pstree.img \
+			test-imgs/core-*.img \
+			test-imgs/files.img \
+			test-imgs/fs-*.img \
+			test-imgs/ids-*.img \
+			test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+		
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+		
+		checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --files
+		[ "$status" -eq 0 ]
+		[[ "$output" == *"File Descriptor Changes"* ]]
+	else
+		skip "test-imgs directory not available"
+	fi
+}
+
+@test "Run checkpointctl diff json output validation" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	
+	# Test function definitions for JSON output validation
+	test_has_container_id() { jq -e '.container_id != null'; }
+	export -f test_has_container_id
+	
+	test_has_container_name() { jq -e '.container_name != null'; }
+	export -f test_has_container_name
+	
+	test_has_checkpoint_a() { jq -e '.checkpoint_a != null'; }
+	export -f test_has_checkpoint_a
+	
+	test_has_checkpoint_b() { jq -e '.checkpoint_b != null'; }
+	export -f test_has_checkpoint_b
+	
+	test_has_memory_changes() { jq -e '.memory_changes != null'; }
+	export -f test_has_memory_changes
+	
+	test_memory_size_change() { jq -e '.memory_changes.size_change_bytes == 0'; }
+	export -f test_memory_size_change
+	
+	test_has_summary() { jq -e '.summary != ""'; }
+	export -f test_has_summary
+	
+	# Run validation tests
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_has_container_id"
+	[ "$status" -eq 0 ]
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_has_container_name"
+	[ "$status" -eq 0 ]
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_has_checkpoint_a"
+	[ "$status" -eq 0 ]
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_has_checkpoint_b"
+	[ "$status" -eq 0 ]
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_has_memory_changes"
+	[ "$status" -eq 0 ]
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_memory_size_change"
+	[ "$status" -eq 0 ]
+	
+	run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --format=json | test_has_summary"
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl diff with compressed checkpoints" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test1.tar.gz . )
+	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test2.tar.gz . )
+	
+	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar.gz "$TEST_TMP_DIR2"/test2.tar.gz
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"Checkpoint Diff"* ]]
+}
+
+@test "Run checkpointctl diff output contains expected sections" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+	
+	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar
+	[ "$status" -eq 0 ]
+	
+	# Verify expected sections are present
+	expected_sections=(
+		"Checkpoint Diff"
+		"Container:"
+		"Image:"
+		"Checkpoint A:"
+		"Checkpoint B:"
+		"Memory Changes"
+		"Process Changes"
+		"Summary"
+	)
+	
+	for section in "${expected_sections[@]}"; do
+		if ! grep -q "$section" <<< "$output"; then
+			echo "Error: Expected section '$section' not found in output"
+			false
+		fi
+	done
+}
