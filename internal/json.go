@@ -88,10 +88,13 @@ type DisplayNode struct {
 	MAC                string         `json:"mac,omitempty"`
 	CheckpointSize     CheckpointSize `json:"checkpoint_size"`
 	CriuDumpStatistics *StatsNode     `json:"statistics,omitempty"`
+	Metadata           *MetadataNode  `json:"metadata,omitempty"`
 	ProcessTree        *PsNode        `json:"process_tree,omitempty"`
 	FileDescriptors    []FdNode       `json:"file_descriptors,omitempty"`
 	Sockets            []SkNode       `json:"sockets,omitempty"`
 	Mounts             []MountNode    `json:"mounts,omitempty"`
+	// Internal fields for tree rendering (not serialized to JSON)
+	checkpointFilePath string
 }
 
 type MountNode struct {
@@ -100,22 +103,32 @@ type MountNode struct {
 	Source      string `json:"source"`
 }
 
-func RenderJSONView(tasks []Task) error {
+type MetadataNode struct {
+	PodName             string            `json:"pod_name,omitempty"`
+	KubernetesNamespace string            `json:"kubernetes_namespace,omitempty"`
+	Annotations         map[string]string `json:"annotations,omitempty"`
+}
+
+// CollectCheckpointData collects all checkpoint data into DisplayNode structures.
+// This is the single source of truth for checkpoint data that can be rendered
+// in multiple formats (JSON, tree, etc.).
+func CollectCheckpointData(tasks []Task) ([]DisplayNode, error) {
 	var result []DisplayNode
 
 	for _, task := range tasks {
 		info, err := getCheckpointInfo(task)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		node := DisplayNode{
-			ContainerName: info.containerInfo.Name,
-			Image:         info.configDump.RootfsImageName,
-			ID:            info.configDump.ID,
-			Runtime:       info.configDump.OCIRuntime,
-			Created:       info.containerInfo.Created,
-			Engine:        info.containerInfo.Engine,
+			ContainerName:      info.containerInfo.Name,
+			Image:              info.configDump.RootfsImageName,
+			ID:                 info.configDump.ID,
+			Runtime:            info.configDump.OCIRuntime,
+			Created:            info.containerInfo.Created,
+			Engine:             info.containerInfo.Engine,
+			checkpointFilePath: task.CheckpointFilePath,
 		}
 
 		if !info.configDump.CheckpointedAt.IsZero() {
@@ -150,7 +163,7 @@ func RenderJSONView(tasks []Task) error {
 		if Stats {
 			dumpStats, err := crit.GetDumpStats(task.OutputDir)
 			if err != nil {
-				return fmt.Errorf("failed to get dump statistics: %w", err)
+				return nil, fmt.Errorf("failed to get dump statistics: %w", err)
 			}
 
 			statsNode := StatsNode{
@@ -165,47 +178,71 @@ func RenderJSONView(tasks []Task) error {
 			node.CriuDumpStatistics = &statsNode
 		}
 
+		if Metadata {
+			metadataNode := MetadataNode{}
+			if info.containerInfo.Pod != "" {
+				metadataNode.PodName = info.containerInfo.Pod
+			}
+			if info.containerInfo.Namespace != "" {
+				metadataNode.KubernetesNamespace = info.containerInfo.Namespace
+			}
+			if len(info.specDump.Annotations) > 0 {
+				metadataNode.Annotations = info.specDump.Annotations
+			}
+			node.Metadata = &metadataNode
+		}
+
+		checkpointDirectory := filepath.Join(task.OutputDir, "checkpoint")
+
 		if PsTree {
-			psTree, err := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false).ExplorePs()
+			psTree, err := crit.New(nil, nil, checkpointDirectory, false, false).ExplorePs()
 			if err != nil {
-				return fmt.Errorf("failed to get process tree: %w", err)
+				return nil, fmt.Errorf("failed to get process tree: %w", err)
 			}
 
 			psTreeNode, err := buildJSONPsTree(psTree, task.OutputDir)
 			if err != nil {
-				return fmt.Errorf("failed to get process tree: %w", err)
+				return nil, fmt.Errorf("failed to get process tree: %w", err)
 			}
 
 			node.ProcessTree = &psTreeNode
 		}
 
 		if Files {
-			fds, err := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false).ExploreFds()
+			fds, err := crit.New(nil, nil, checkpointDirectory, false, false).ExploreFds()
 			if err != nil {
-				return fmt.Errorf("failed to get file descriptors: %w", err)
+				return nil, fmt.Errorf("failed to get file descriptors: %w", err)
 			}
 
 			node.FileDescriptors = buildJSONFds(fds)
 		}
 
 		if Sockets {
-			fds, err := crit.New(nil, nil, filepath.Join(task.OutputDir, "checkpoint"), false, false).ExploreSk()
+			sks, err := crit.New(nil, nil, checkpointDirectory, false, false).ExploreSk()
 			if err != nil {
-				return fmt.Errorf("failed to get sockets: %w", err)
+				return nil, fmt.Errorf("failed to get sockets: %w", err)
 			}
 
-			node.Sockets, err = buildJSONSks(fds)
+			node.Sockets, err = buildJSONSks(sks)
 			if err != nil {
-				return fmt.Errorf("failed to build sockets: %w", err)
+				return nil, fmt.Errorf("failed to build sockets: %w", err)
 			}
 		}
 
 		if Mounts {
-			specDump := info.specDump
-			node.Mounts = buildJSONMounts(specDump)
+			node.Mounts = buildJSONMounts(info.specDump)
 		}
 
 		result = append(result, node)
+	}
+
+	return result, nil
+}
+
+func RenderJSONView(tasks []Task) error {
+	result, err := CollectCheckpointData(tasks)
+	if err != nil {
+		return err
 	}
 
 	jsonData, err := json.MarshalIndent(result, "", "  ")
@@ -269,7 +306,7 @@ func buildJSONPsNode(psTree *crit.PsTree, checkpointOutputDir string) (PsNode, e
 	if PsTreeCmd {
 		cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
 		if err != nil {
-			return PsNode{}, err
+			return PsNode{}, fmt.Errorf("failed to process command line arguments: %w", err)
 		}
 		node.Cmdline = cmdline
 	}
