@@ -1,0 +1,74 @@
+= checkpointctl-plugin(1)
+include::footer.adoc[]
+
+== Name
+
+*checkpointctl-plugin* - Manage checkpointctl plugins
+
+== Synopsis
+
+*checkpointctl plugin* _COMMAND_
+
+== Description
+
+The *checkpointctl plugin* command manages external plugins that extend
+checkpointctl with additional subcommands.
+
+Plugins are standalone executables located in PATH with names matching the
+pattern `checkpointctl-<name>`. When checkpointctl starts, it discovers these
+plugins and registers them as subcommands. For example, if `checkpointctl-foo`
+exists in PATH, it becomes available as `checkpointctl foo`.
+
+This plugin architecture allows extending checkpointctl functionality without
+increasing the binary size of the core tool. Plugins can be implemented in any
+programming language.
+
+== Commands
+
+*list*::
+  List all available plugins discovered in PATH.
+
+== Plugin Development
+
+To create a plugin:
+
+1. Create an executable named `checkpointctl-<name>` (e.g., `checkpointctl-hello`)
+2. Place it in a directory included in PATH
+3. Make it executable (`chmod +x`)
+
+=== Plugin Description
+
+Plugins can provide a description shown in `checkpointctl --help` by supporting
+the `--plugin-description` flag. The plugin must exit with code 42 to indicate
+that it supports this flag:
+
+----
+#!/bin/sh
+if [ "$1" = "--plugin-description" ]; then
+    echo "My plugin description"
+    exit 42
+fi
+# Normal plugin logic here
+----
+
+If a plugin does not exit with code 42 when called with `--plugin-description`,
+a default description showing the plugin path will be used.
+
+== Options
+
+*-h*, *--help*::
+  Show help for checkpointctl plugin
+
+== Examples
+
+List available plugins:
+
+  $ checkpointctl plugin list
+
+Run a plugin (assuming checkpointctl-hello exists in PATH):
+
+  $ checkpointctl hello
+
+== See also
+
+checkpointctl(1)

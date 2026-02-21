@@ -30,14 +30,23 @@ container, and perform in-depth analysis of checkpoint memory.
 |===
 |Command |Description
 
+|checkpointctl-build(1)
+|Create OCI image from a checkpoint tar file
+
 |checkpointctl-completion
 |Generate shell completion scripts
 
 |checkpointctl-inspect(1)
 |Display low-level information about a container checkpoint
 
+|checkpointctl-list(1)
+|List checkpoints stored in the default and additional directories
+
 |checkpointctl-memparse(1)
 |Analyze container checkpoint memory
+
+|checkpointctl-plugin(1)
+|Manage checkpointctl plugins
 
 |checkpointctl-show(1)
 |Show an overview of container checkpoints
@@ -46,4 +55,5 @@ container, and perform in-depth analysis of checkpoint memory.
 
 == SEE ALSO
 
-checkpointctl-inspect(1), checkpointctl-memparse(1), checkpointctl-show(1)
+checkpointctl-build(1), checkpointctl-inspect(1), checkpointctl-list(1),
+checkpointctl-memparse(1), checkpointctl-plugin(1), checkpointctl-show(1)
