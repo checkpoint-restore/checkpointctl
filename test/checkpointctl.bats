@@ -1,3 +1,6 @@
+# shellcheck disable=SC2030,SC2031
+# SC2030/SC2031: PATH modifications in bats tests are intentionally local to each test
+
 if [ -n "$COVERAGE" ]; then
 	export GOCOVERDIR="${COVERAGE_PATH}"
 	CHECKPOINTCTL="../checkpointctl.coverage"
@@ -1057,4 +1060,179 @@ function teardown() {
 			false
 		fi
 	done
+}
+
+# Plugin system tests
+
+@test "Run checkpointctl plugin list with no plugins" {
+	# Save original PATH and set to empty temp dir
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1"
+	checkpointctl plugin list
+	PATH="$ORIG_PATH"
+	[ "$status" -eq 0 ]
+	[[ "${lines[0]}" == *"No plugins found"* ]]
+}
+
+@test "Run checkpointctl plugin list discovers plugin" {
+	# Create a fake plugin without description support (exits with error for unknown flags)
+	cat > "$TEST_TMP_DIR1"/checkpointctl-testplugin << 'EOF'
+#!/bin/sh
+case "$1" in
+    --plugin-description)
+        exit 1  # Simulate not supporting this flag
+        ;;
+    *)
+        echo "test plugin running"
+        ;;
+esac
+EOF
+	chmod +x "$TEST_TMP_DIR1"/checkpointctl-testplugin
+
+	# Prepend temp dir to PATH
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1:$PATH"
+	checkpointctl plugin list
+	PATH="$ORIG_PATH"
+	[ "$status" -eq 0 ]
+	[[ "${output}" == *"testplugin"* ]]
+	[[ "${output}" == *"$TEST_TMP_DIR1/checkpointctl-testplugin"* ]]
+	[[ "${output}" == *"(no description)"* ]]
+}
+
+@test "Run checkpointctl with plugin as subcommand" {
+	# Create a plugin that outputs a known string
+	cat > "$TEST_TMP_DIR1"/checkpointctl-hello << 'EOF'
+#!/bin/sh
+echo "Hello from plugin!"
+echo "Args: $@"
+EOF
+	chmod +x "$TEST_TMP_DIR1"/checkpointctl-hello
+
+	# Prepend temp dir to PATH and run the plugin subcommand
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1:$PATH"
+	run $CHECKPOINTCTL hello world --flag
+	echo "$output"
+	PATH="$ORIG_PATH"
+	[ "$status" -eq 0 ]
+	[[ "${lines[0]}" == "Hello from plugin!" ]]
+	[[ "${lines[1]}" == "Args: world --flag" ]]
+}
+
+@test "Run checkpointctl plugin does not shadow builtin commands" {
+	# Create a plugin named after a builtin command
+	cat > "$TEST_TMP_DIR1"/checkpointctl-show << 'EOF'
+#!/bin/sh
+echo "This should not run"
+EOF
+	chmod +x "$TEST_TMP_DIR1"/checkpointctl-show
+
+	# The builtin show command should still work, not the plugin
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1:$PATH"
+	checkpointctl show /does-not-exist
+	PATH="$ORIG_PATH"
+	[ "$status" -eq 1 ]
+	# Should get the builtin error, not the plugin output
+	[[ "${lines[0]}" == *"no such file or directory"* ]]
+}
+
+@test "Run checkpointctl plugin ignores non-executable files" {
+	# Create a non-executable file with the plugin prefix
+	echo '#!/bin/sh' > "$TEST_TMP_DIR1"/checkpointctl-nonexec
+	echo 'echo "should not appear"' >> "$TEST_TMP_DIR1"/checkpointctl-nonexec
+	# Note: not setting executable permission
+
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1:$PATH"
+	checkpointctl plugin list
+	PATH="$ORIG_PATH"
+	[ "$status" -eq 0 ]
+	# Should not find the non-executable file
+	[[ "${output}" != *"nonexec"* ]]
+}
+
+@test "Run checkpointctl plugin first in PATH wins" {
+	# Create two plugins with the same name in different directories
+	mkdir -p "$TEST_TMP_DIR1"/dir1 "$TEST_TMP_DIR1"/dir2
+
+	cat > "$TEST_TMP_DIR1"/dir1/checkpointctl-dupe << 'EOF'
+#!/bin/sh
+echo "first"
+EOF
+	chmod +x "$TEST_TMP_DIR1"/dir1/checkpointctl-dupe
+
+	cat > "$TEST_TMP_DIR1"/dir2/checkpointctl-dupe << 'EOF'
+#!/bin/sh
+echo "second"
+EOF
+	chmod +x "$TEST_TMP_DIR1"/dir2/checkpointctl-dupe
+
+	# dir1 comes first in PATH
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1/dir1:$TEST_TMP_DIR1/dir2:$PATH"
+	run $CHECKPOINTCTL dupe
+	echo "$output"
+	PATH="$ORIG_PATH"
+	[ "$status" -eq 0 ]
+	[[ "${lines[0]}" == "first" ]]
+}
+
+@test "Run checkpointctl plugin with --plugin-description" {
+	# Create a plugin that supports --plugin-description (must exit with code 42)
+	cat > "$TEST_TMP_DIR1"/checkpointctl-described << 'EOF'
+#!/bin/sh
+if [ "$1" = "--plugin-description" ]; then
+    echo "My custom plugin description"
+    exit 42
+fi
+echo "Plugin running normally"
+EOF
+	chmod +x "$TEST_TMP_DIR1"/checkpointctl-described
+
+	# Prepend temp dir to PATH
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1:$PATH"
+
+	# Check plugin list shows the description
+	checkpointctl plugin list
+	[ "$status" -eq 0 ]
+	[[ "${output}" == *"described"* ]]
+	[[ "${output}" == *"My custom plugin description"* ]]
+
+	# Check help shows the description
+	checkpointctl --help
+	[ "$status" -eq 0 ]
+	[[ "${output}" == *"My custom plugin description"* ]]
+
+	PATH="$ORIG_PATH"
+}
+
+@test "Run checkpointctl plugin description fallback when not supported" {
+	# Create a plugin without --plugin-description support (exits with error)
+	cat > "$TEST_TMP_DIR1"/checkpointctl-nodesc << 'EOF'
+#!/bin/sh
+case "$1" in
+    --plugin-description)
+        exit 1  # Simulate not supporting this flag
+        ;;
+    *)
+        echo "Just a plugin"
+        ;;
+esac
+EOF
+	chmod +x "$TEST_TMP_DIR1"/checkpointctl-nodesc
+
+	# Prepend temp dir to PATH
+	ORIG_PATH="$PATH"
+	PATH="$TEST_TMP_DIR1:$PATH"
+
+	# Check help shows fallback description with path
+	checkpointctl --help
+	[ "$status" -eq 0 ]
+	[[ "${output}" == *"nodesc"* ]]
+	[[ "${output}" == *"Plugin provided by"* ]]
+
+	PATH="$ORIG_PATH"
 }

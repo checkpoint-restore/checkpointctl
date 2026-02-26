@@ -216,6 +216,45 @@ In this example, the `checkpointctl build` command converts the `checkpoint.tar`
 OCI-compatible image and tags it as `quay.io/foo/bar:latest`. The following `buildah push` command
 then uploads the newly created OCI image to the container registry, making it available for deployment.
 
+### `plugin` sub-command
+
+The `plugin` sub-command manages external plugins that extend checkpointctl
+with additional subcommands. Plugins are standalone executables in PATH with
+names matching the pattern `checkpointctl-<name>`.
+
+```console
+$ checkpointctl plugin list
+Available plugins:
+  hello                My custom plugin description
+                       /usr/local/bin/checkpointctl-hello
+```
+
+This plugin architecture allows extending checkpointctl functionality without
+increasing the binary size of the core tool. Plugins with larger dependencies
+can be distributed separately, and can be implemented in any programming
+language.
+
+#### Creating a plugin
+
+To create a plugin, create an executable named `checkpointctl-<name>`:
+
+```bash
+#!/bin/sh
+# Support --plugin-description for help text (must exit with code 42)
+if [ "$1" = "--plugin-description" ]; then
+    echo "Say hello"
+    exit 42
+fi
+echo "Hello, world!"
+```
+
+Save it as `checkpointctl-hello` in a directory in your PATH and make it
+executable. It will then be available as `checkpointctl hello`.
+
+Note: The exit code 42 is required to indicate that the plugin supports
+the `--plugin-description` flag. Any other exit code will result in a
+default description being used.
+
 ## Installing from source code
 
 1. Clone the repository.
