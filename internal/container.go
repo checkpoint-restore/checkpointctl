@@ -234,12 +234,6 @@ func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 
 // UntarFiles unpack only specified files from an archive to the destination directory.
 func UntarFiles(src, dest string, files []string) error {
-	archiveFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer archiveFile.Close()
-
 	if err := iterateTarArchive(src, func(r *tar.Reader, header *tar.Header) error {
 		// Check if the current entry is one of the target files
 		for _, file := range files {
