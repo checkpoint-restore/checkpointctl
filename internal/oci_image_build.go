@@ -80,10 +80,31 @@ func (ic *ImageBuilder) CreateImageFromCheckpoint(ctx context.Context) error {
 	}
 
 	// Step 4: Commit the container to an image
-	_, err = runBuildahCommand("commit", newContainer, ic.imageName)
+	imageID, err := runBuildahCommand("commit", newContainer, ic.imageName)
 	if err != nil {
 		return fmt.Errorf("committing container annotations failed: %w", err)
 	}
+
+	// Step 5: Create a manifest for containerd compatibility
+	manifestName := ic.imageName + "-manifest"
+	// Remove any existing manifest with the same name
+	_, _ = runBuildahCommand("manifest", "rm", manifestName)
+	if _, err := runBuildahCommand("manifest", "create", manifestName, strings.TrimSpace(imageID)); err != nil {
+		return fmt.Errorf("creating manifest failed: %w", err)
+	}
+
+	// Step 6: Annotate the manifest with checkpoint annotations
+	for key, value := range checkpointImageAnnotations {
+		if _, err := runBuildahCommand("manifest", "annotate", "--index", "--annotation", fmt.Sprintf("%s=%s", key, value), manifestName); err != nil {
+			return fmt.Errorf("annotating manifest failed: %w", err)
+		}
+	}
+
+	// Step 7: Tag the manifest with the final image name and clean up
+	if _, err := runBuildahCommand("tag", manifestName, ic.imageName); err != nil {
+		return fmt.Errorf("tagging manifest failed: %w", err)
+	}
+	_, _ = runBuildahCommand("manifest", "rm", manifestName) // Remove temp manifest name
 
 	return nil
 }
