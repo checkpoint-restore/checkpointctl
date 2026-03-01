@@ -3,330 +3,248 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
-	"strings"
-	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
-	"github.com/checkpoint-restore/go-criu/v8/crit"
-	stats_pb "github.com/checkpoint-restore/go-criu/v8/crit/images/stats"
-	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/xlab/treeprint"
 )
 
 func RenderTreeView(tasks []Task) error {
-	for _, task := range tasks {
-		info, err := getCheckpointInfo(task)
-		if err != nil {
-			return err
-		}
+	data, err := CollectCheckpointData(tasks)
+	if err != nil {
+		return err
+	}
 
-		tree := buildTree(info.containerInfo, info.configDump, info.archiveSizes)
-
-		checkpointDirectory := filepath.Join(task.OutputDir, metadata.CheckpointDirectory)
-		if Stats {
-			dumpStats, err := crit.GetDumpStats(task.OutputDir)
-			if err != nil {
-				return fmt.Errorf("failed to get dump statistics: %w", err)
-			}
-
-			addDumpStatsToTree(tree, dumpStats)
-		}
-
-		if Metadata {
-			addPodInfoToTree(tree, info)
-		}
-
-		if PsTree {
-			c := crit.New(nil, nil, checkpointDirectory, false, false)
-			psTree, err := c.ExplorePs()
-			if err != nil {
-				return fmt.Errorf("failed to get process tree: %w", err)
-			}
-
-			if PsTreeCmd {
-				if err := updatePsTreeCommToCmdline(task.OutputDir, psTree); err != nil {
-					return fmt.Errorf("failed to process command line arguments: %w", err)
-				}
-			}
-
-			fds, err := func() ([]*crit.Fd, error) {
-				if !Files {
-					return nil, nil
-				}
-				c := crit.New(nil, nil, checkpointDirectory, false, false)
-				fds, err := c.ExploreFds()
-				if err != nil {
-					return nil, fmt.Errorf("failed to get file descriptors: %w", err)
-				}
-				return fds, nil
-			}()
-			if err != nil {
-				return err
-			}
-
-			sks, err := func() ([]*crit.Sk, error) {
-				if !Sockets {
-					return nil, nil
-				}
-				c := crit.New(nil, nil, checkpointDirectory, false, false)
-				sks, err := c.ExploreSk()
-				if err != nil {
-					return nil, fmt.Errorf("failed to get sockets: %w", err)
-				}
-				return sks, nil
-			}()
-			if err != nil {
-				return err
-			}
-
-			if err = addPsTreeToTree(tree, psTree, fds, sks, task.OutputDir); err != nil {
-				return fmt.Errorf("failed to get process tree: %w", err)
-			}
-		}
-
-		if Mounts {
-			addMountsToTree(tree, info.specDump)
-		}
-
-		fmt.Printf("\nDisplaying container checkpoint tree view from %s\n\n", task.CheckpointFilePath)
+	for _, node := range data {
+		tree := buildTreeFromDisplayNode(node)
+		fmt.Printf("\nDisplaying container checkpoint tree view from %s\n\n", node.checkpointFilePath)
 		fmt.Println(tree.String())
 	}
 
 	return nil
 }
 
-func buildTree(ci *containerInfo, containerConfig *metadata.ContainerConfig, archiveSizes *archiveSizes) treeprint.Tree {
-	if ci.Name == "" {
-		ci.Name = "Container"
+func buildTreeFromDisplayNode(node DisplayNode) treeprint.Tree {
+	name := node.ContainerName
+	if name == "" {
+		name = "Container"
 	}
-	tree := treeprint.NewWithRoot(ci.Name)
+	tree := treeprint.NewWithRoot(name)
 
-	tree.AddBranch(fmt.Sprintf("Image: %s", containerConfig.RootfsImageName))
-	tree.AddBranch(fmt.Sprintf("ID: %s", containerConfig.ID))
-	tree.AddBranch(fmt.Sprintf("Runtime: %s", containerConfig.OCIRuntime))
-	tree.AddBranch(fmt.Sprintf("Created: %s", ci.Created))
-	if !containerConfig.CheckpointedAt.IsZero() {
-		tree.AddBranch(fmt.Sprintf("Checkpointed: %s", containerConfig.CheckpointedAt.Format(time.RFC3339)))
+	tree.AddBranch(fmt.Sprintf("Image: %s", node.Image))
+	tree.AddBranch(fmt.Sprintf("ID: %s", node.ID))
+	tree.AddBranch(fmt.Sprintf("Runtime: %s", node.Runtime))
+	tree.AddBranch(fmt.Sprintf("Created: %s", node.Created))
+	if node.Checkpointed != "" {
+		tree.AddBranch(fmt.Sprintf("Checkpointed: %s", node.Checkpointed))
 	}
-	tree.AddBranch(fmt.Sprintf("Engine: %s", ci.Engine))
+	tree.AddBranch(fmt.Sprintf("Engine: %s", node.Engine))
 
-	if ci.IP != "" {
-		tree.AddBranch(fmt.Sprintf("IP: %s", ci.IP))
+	if node.IP != "" {
+		tree.AddBranch(fmt.Sprintf("IP: %s", node.IP))
 	}
-	if ci.MAC != "" {
-		tree.AddBranch(fmt.Sprintf("MAC: %s", ci.MAC))
-	}
-
-	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(archiveSizes.checkpointSize)))
-	if archiveSizes.pagesSize != 0 {
-		checkpointSize.AddNode(fmt.Sprintf("Memory pages size: %s", metadata.ByteToString(archiveSizes.pagesSize)))
-	}
-	if archiveSizes.amdgpuPagesSize != 0 {
-		checkpointSize.AddNode(fmt.Sprintf("AMD GPU memory pages size: %s", metadata.ByteToString(archiveSizes.amdgpuPagesSize)))
+	if node.MAC != "" {
+		tree.AddBranch(fmt.Sprintf("MAC: %s", node.MAC))
 	}
 
-	if archiveSizes.rootFsDiffTarSize != 0 {
-		tree.AddBranch(fmt.Sprintf("Root FS diff size: %s", metadata.ByteToString(archiveSizes.rootFsDiffTarSize)))
+	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(node.CheckpointSize.TotalSize)))
+	if node.CheckpointSize.MemoryPagesSize != 0 {
+		checkpointSize.AddNode(fmt.Sprintf("Memory pages size: %s", metadata.ByteToString(node.CheckpointSize.MemoryPagesSize)))
+	}
+	if node.CheckpointSize.AmdGpuMemoryPagesSize != 0 {
+		checkpointSize.AddNode(fmt.Sprintf("AMD GPU memory pages size: %s", metadata.ByteToString(node.CheckpointSize.AmdGpuMemoryPagesSize)))
+	}
+
+	if node.CheckpointSize.RootFsDiffSize != 0 {
+		tree.AddBranch(fmt.Sprintf("Root FS diff size: %s", metadata.ByteToString(node.CheckpointSize.RootFsDiffSize)))
+	}
+
+	if node.CriuDumpStatistics != nil {
+		addStatsNodeToTree(tree, node.CriuDumpStatistics)
+	}
+
+	if node.Metadata != nil {
+		addMetadataNodeToTree(tree, node.Metadata)
+	}
+
+	if node.ProcessTree != nil {
+		addPsNodeToTree(tree, node.ProcessTree, node.FileDescriptors, node.Sockets)
+	}
+
+	if len(node.Mounts) > 0 {
+		addMountNodesToTree(tree, node.Mounts)
 	}
 
 	return tree
 }
 
-func addMountsToTree(tree treeprint.Tree, specDump *spec.Spec) {
-	mountsTree := tree.AddBranch("Overview of mounts")
-	for _, data := range specDump.Mounts {
-		mountTree := mountsTree.AddBranch(fmt.Sprintf("Destination: %s", data.Destination))
-		mountTree.AddBranch(fmt.Sprintf("Type: %s", data.Type))
-		mountTree.AddBranch(fmt.Sprintf("Source: %s", func() string {
-			return data.Source
-		}()))
-	}
-}
-
-func addDumpStatsToTree(tree treeprint.Tree, dumpStats *stats_pb.DumpStatsEntry) {
+func addStatsNodeToTree(tree treeprint.Tree, stats *StatsNode) {
 	statsTree := tree.AddBranch("CRIU dump statistics")
-	statsTree.AddBranch(fmt.Sprintf("Freezing time: %s", FormatTime(dumpStats.GetFreezingTime())))
-	statsTree.AddBranch(fmt.Sprintf("Frozen time: %s", FormatTime(dumpStats.GetFrozenTime())))
-	statsTree.AddBranch(fmt.Sprintf("Memdump time: %s", FormatTime(dumpStats.GetMemdumpTime())))
-	statsTree.AddBranch(fmt.Sprintf("Memwrite time: %s", FormatTime(dumpStats.GetMemwriteTime())))
-	statsTree.AddBranch(fmt.Sprintf("Pages scanned: %d", dumpStats.GetPagesScanned()))
-	statsTree.AddBranch(fmt.Sprintf("Pages written: %d", dumpStats.GetPagesWritten()))
+	statsTree.AddBranch(fmt.Sprintf("Freezing time: %s", FormatTime(stats.FreezingTime)))
+	statsTree.AddBranch(fmt.Sprintf("Frozen time: %s", FormatTime(stats.FrozenTime)))
+	statsTree.AddBranch(fmt.Sprintf("Memdump time: %s", FormatTime(stats.MemdumpTime)))
+	statsTree.AddBranch(fmt.Sprintf("Memwrite time: %s", FormatTime(stats.MemwriteTime)))
+	statsTree.AddBranch(fmt.Sprintf("Pages scanned: %d", stats.PagesScanned))
+	statsTree.AddBranch(fmt.Sprintf("Pages written: %d", stats.PagesWritten))
 }
 
-func addPsTreeToTree(
-	tree treeprint.Tree,
-	psTree *crit.PsTree,
-	fds []*crit.Fd,
-	sks []*crit.Sk,
-	checkpointOutputDir string,
-) error {
-	psRoot := psTree
-	if PID != 0 {
-		ps := psTree.FindPs(PID)
-		if ps == nil {
-			return fmt.Errorf("no process with PID %d (use `inspect --ps-tree` to view all PIDs)", PID)
-		}
-		psRoot = ps
+func addMetadataNodeToTree(tree treeprint.Tree, meta *MetadataNode) {
+	podTree := tree.AddBranch("Metadata")
+	if meta.PodName != "" {
+		podTree.AddBranch(fmt.Sprintf("Pod name: %s", meta.PodName))
 	}
-
-	// processNodes is a recursive function to create
-	// a new branch for each process and add its child
-	// processes as child nodes of the branch.
-	var processNodes func(treeprint.Tree, *crit.PsTree) error
-	processNodes = func(tree treeprint.Tree, root *crit.PsTree) error {
-		var metaBranchTag string
-
-		taskState := crit.TaskState(root.Core.GetTc().GetTaskState())
-		if taskState.IsAlive() {
-			metaBranchTag = fmt.Sprintf("%d", root.PID)
-		} else {
-			metaBranchTag = fmt.Sprintf("%d (%s)", root.PID, taskState.String())
-		}
-
-		node := tree.AddMetaBranch(metaBranchTag, root.Comm)
-
-		// Skip dead or zombie processes as they do not have other state, and
-		// their children are inherited by init or the nearest subreaper process.
-		if !taskState.IsAliveOrStopped() {
-			return nil
-		}
-
-		// Sort children by PID for consistent output
-		sort.Slice(root.Children, func(i, j int) bool {
-			return root.Children[i].PID < root.Children[j].PID
-		})
-
-		// attach environment variables to process
-		if PsTreeEnv {
-			envVars, err := getPsEnvVars(checkpointOutputDir, root.PID)
-			if err != nil {
-				return err
-			}
-
-			if len(envVars) > 0 {
-				nodeSubtree := node.AddBranch("Environment variables")
-				for _, env := range envVars {
-					nodeSubtree.AddBranch(env)
+	if meta.KubernetesNamespace != "" {
+		podTree.AddBranch(fmt.Sprintf("Kubernetes namespace: %s", meta.KubernetesNamespace))
+	}
+	if len(meta.Annotations) > 0 {
+		annotationTree := podTree.AddBranch("Annotations")
+		for key, value := range meta.Annotations {
+			switch key {
+			case "io.kubernetes.cri-o.Labels",
+				"io.kubernetes.cri-o.Annotations",
+				"io.kubernetes.cri-o.Metadata",
+				"kubectl.kubernetes.io/last-applied-configuration":
+				// We know that some annotations contain a JSON string we can pretty print
+				local := make(map[string]interface{})
+				if err := json.Unmarshal([]byte(value), &local); err != nil {
+					continue
 				}
+				localTree := annotationTree.AddBranch(key)
+				addMapToTree(localTree, local)
+			case "io.kubernetes.cri-o.Volumes":
+				var local []mountAnnotations
+				if err := json.Unmarshal([]byte(value), &local); err != nil {
+					continue
+				}
+				localTree := annotationTree.AddBranch(key)
+				for _, mount := range local {
+					containerPath := localTree.AddBranch(mount.ContainerPath)
+					containerPath.AddBranch(fmt.Sprintf("host path: %s", mount.HostPath))
+					containerPath.AddBranch(fmt.Sprintf("read-only: %t", mount.Readonly))
+					containerPath.AddBranch(fmt.Sprintf("selinux relabel: %t", mount.SelinuxRelabel))
+					containerPath.AddBranch(fmt.Sprintf("recursive read-only: %t", mount.RecursiveReadOnly))
+					containerPath.AddBranch(fmt.Sprintf("propagation: %d", mount.Propagation))
+				}
+			default:
+				annotationTree.AddBranch(fmt.Sprintf("%s: %s", key, value))
 			}
 		}
-
-		if err := showFiles(fds, node, root); err != nil {
-			return err
-		}
-
-		if err := showSockets(sks, node, root); err != nil {
-			return err
-		}
-
-		for _, child := range root.Children {
-			if err := processNodes(node, child); err != nil {
-				return err
-			}
-		}
-		return nil
 	}
+}
+
+func addPsNodeToTree(tree treeprint.Tree, ps *PsNode, fds []FdNode, sks []SkNode) {
 	psTreeNode := tree.AddBranch("Process tree")
-
-	return processNodes(psTreeNode, psRoot)
+	addPsNodeBranch(psTreeNode, ps, fds, sks)
 }
 
-func showFiles(fds []*crit.Fd, node treeprint.Tree, root *crit.PsTree) error {
-	if !Files {
-		return nil
+func addPsNodeBranch(tree treeprint.Tree, ps *PsNode, fds []FdNode, sks []SkNode) {
+	var metaBranchTag string
+	// "Alive" is what CRIU returns for running processes
+	if ps.TaskState == "" || ps.TaskState == "Alive" || ps.TaskState == "Running" {
+		metaBranchTag = fmt.Sprintf("%d", ps.PID)
+	} else {
+		metaBranchTag = fmt.Sprintf("%d (%s)", ps.PID, ps.TaskState)
 	}
-	if fds == nil {
-		return fmt.Errorf("failed to get file descriptors")
+
+	// Use cmdline if available (when --ps-tree-cmd is used), otherwise use command
+	displayName := ps.Comm
+	if ps.Cmdline != "" {
+		displayName = ps.Cmdline
 	}
+	node := tree.AddMetaBranch(metaBranchTag, displayName)
+
+	// Skip adding children/files/sockets for dead/zombie processes
+	// "Alive" and "Stopped" are valid states from CRIU that should show file descriptors
+	if ps.TaskState != "" && ps.TaskState != "Alive" && ps.TaskState != "Running" && ps.TaskState != "Stopped" {
+		return
+	}
+
+	// Add environment variables if present
+	if len(ps.EnvVars) > 0 {
+		envTree := node.AddBranch("Environment variables")
+		for key, value := range ps.EnvVars {
+			envTree.AddBranch(fmt.Sprintf("%s=%s", key, value))
+		}
+	}
+
+	// Add file descriptors for this process
 	for _, fd := range fds {
-		var nodeSubtree treeprint.Tree
-		if fd.PId != root.PID {
+		if fd.PID != ps.PID {
 			continue
-		} else {
-			nodeSubtree = node.AddBranch("Open files")
 		}
-		for _, file := range fd.Files {
-			nodeSubtree.AddMetaBranch(strings.TrimSpace(file.Type+" "+file.Fd), file.Path)
-		}
-	}
-	return nil
-}
-
-func showSockets(sks []*crit.Sk, node treeprint.Tree, root *crit.PsTree) error {
-	if !Sockets {
-		return nil
-	}
-	if sks == nil {
-		return fmt.Errorf("failed to get sockets")
-	}
-	for _, sk := range sks {
-		var nodeSubtree treeprint.Tree
-		if sk.PId != root.PID {
-			continue
-		} else {
-			nodeSubtree = node.AddBranch("Open sockets")
-		}
-		var data string
-		var protocol string
-		for _, socket := range sk.Sockets {
-			protocol = socket.Protocol
-			switch socket.FdType {
-			case "UNIXSK":
-				// UNIX sockets do not have a protocol assigned.
-				// Hence, the meta value for the socket is just
-				// the socket type.
-				protocol = fmt.Sprintf("UNIX (%s)", socket.Type)
-				data = socket.SrcAddr
-				if len(data) == 0 {
-					// Use an abstract socket address
-					data = "@"
-				}
-			case "INETSK":
-				if protocol == "TCP" {
-					protocol = fmt.Sprintf("%s (%s)", socket.Protocol, socket.State)
-				}
-				data = fmt.Sprintf(
-					"%s:%d -> %s:%d (↑ %s ↓ %s)",
-					socket.SrcAddr, socket.SrcPort,
-					socket.DestAddr, socket.DestPort,
-					socket.SendBuf, socket.RecvBuf,
-				)
-			case "PACKETSK":
-				data = fmt.Sprintf("↑ %s ↓ %s", socket.SendBuf, socket.RecvBuf)
-			case "NETLINKSK":
-				data = fmt.Sprintf("↑ %s ↓ %s", socket.SendBuf, socket.RecvBuf)
+		if len(fd.OpenFiles) > 0 {
+			filesTree := node.AddBranch("Open files")
+			for _, file := range fd.OpenFiles {
+				filesTree.AddMetaBranch(file.FD, file.Path)
 			}
-
-			nodeSubtree.AddMetaBranch(protocol, data)
 		}
 	}
-	return nil
+
+	// Add sockets for this process
+	for _, sk := range sks {
+		if sk.PID != ps.PID {
+			continue
+		}
+		if len(sk.OpenSockets) > 0 {
+			socketsTree := node.AddBranch("Open sockets")
+			for _, socket := range sk.OpenSockets {
+				protocol, data := formatSocketForTree(socket)
+				socketsTree.AddMetaBranch(protocol, data)
+			}
+		}
+	}
+
+	// Sort children by PID for consistent output
+	children := make([]PsNode, len(ps.Children))
+	copy(children, ps.Children)
+	sort.Slice(children, func(i, j int) bool {
+		return children[i].PID < children[j].PID
+	})
+
+	// Recursively add children
+	for i := range children {
+		addPsNodeBranch(node, &children[i], fds, sks)
+	}
 }
 
-// Recursively updates the Comm field of the psTree struct with the command line arguments
-// from process memory pages
-func updatePsTreeCommToCmdline(checkpointOutputDir string, psTree *crit.PsTree) error {
-	taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
-	if !taskState.IsAliveOrStopped() {
-		return nil
-	}
+func formatSocketForTree(socket SocketNode) (protocol, data string) {
+	protocol = socket.Protocol
+	skData := socket.Data
 
-	cmdline, err := getCmdline(checkpointOutputDir, psTree.PID)
-	if err != nil {
-		return err
-	}
-	if cmdline != "" {
-		psTree.Comm = cmdline
-	}
-
-	for _, child := range psTree.Children {
-		if err := updatePsTreeCommToCmdline(checkpointOutputDir, child); err != nil {
-			return err
+	switch skData.Type {
+	case "UNIX":
+		protocol = fmt.Sprintf("UNIX (%s)", socket.Protocol)
+		data = skData.Address
+		if len(data) == 0 {
+			data = "@"
 		}
+	case "TCP", "UDP":
+		if skData.Type == "TCP" && skData.State != "" {
+			protocol = fmt.Sprintf("%s (%s)", skData.Type, skData.State)
+		} else {
+			protocol = skData.Type
+		}
+		data = fmt.Sprintf(
+			"%s:%d -> %s:%d (↑ %s ↓ %s)",
+			skData.Source, skData.SourcePort,
+			skData.Dest, skData.DestPort,
+			skData.SendBuf, skData.RecvBuf,
+		)
+	default:
+		// PACKETSK, NETLINKSK
+		data = fmt.Sprintf("↑ %s ↓ %s", skData.SendBuf, skData.RecvBuf)
 	}
-	return nil
+
+	return protocol, data
+}
+
+func addMountNodesToTree(tree treeprint.Tree, mounts []MountNode) {
+	mountsTree := tree.AddBranch("Overview of mounts")
+	for _, mount := range mounts {
+		mountTree := mountsTree.AddBranch(fmt.Sprintf("Destination: %s", mount.Destination))
+		mountTree.AddBranch(fmt.Sprintf("Type: %s", mount.Type))
+		mountTree.AddBranch(fmt.Sprintf("Source: %s", mount.Source))
+	}
 }
 
 // Taken from the CRI API
@@ -339,52 +257,6 @@ type mountAnnotations struct {
 	UidMappings       []*int `json:"uidMappings,omitempty"`
 	GidMappings       []*int `json:"gidMappings,omitempty"`
 	RecursiveReadOnly bool   `json:"recursive_read_only,omitempty"`
-}
-
-func addPodInfoToTree(tree treeprint.Tree, info *checkpointInfo) {
-	podTree := tree.AddBranch("Metadata")
-	if len(info.containerInfo.Pod) > 0 {
-		podTree.AddBranch(fmt.Sprintf("Pod name: %s", info.containerInfo.Pod))
-	}
-	if len(info.containerInfo.Namespace) > 0 {
-		podTree.AddBranch(fmt.Sprintf("Kubernetes namespace: %s", info.containerInfo.Namespace))
-	}
-	if len(info.specDump.Annotations) > 0 {
-		annotationTree := podTree.AddBranch("Annotations")
-		for key := range info.specDump.Annotations {
-			switch key {
-			case "io.kubernetes.cri-o.Labels",
-				"io.kubernetes.cri-o.Annotations",
-				"io.kubernetes.cri-o.Metadata",
-				"kubectl.kubernetes.io/last-applied-configuration":
-				// We know that some annotations contain a JSON string we can pretty print
-				local := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(info.specDump.Annotations[key]), &local); err != nil {
-					continue
-				}
-				localTree := annotationTree.AddBranch(key)
-				// Recursively add array/map JSON fields to the tree
-				addMapToTree(localTree, local)
-			case "io.kubernetes.cri-o.Volumes":
-				// We know that some annotations contain a JSON string we can pretty print
-				var local []mountAnnotations
-				if err := json.Unmarshal([]byte(info.specDump.Annotations[key]), &local); err != nil {
-					fmt.Printf("error: %s", err)
-				}
-				localTree := annotationTree.AddBranch(key)
-				for _, mount := range local {
-					containerPath := localTree.AddBranch(mount.ContainerPath)
-					containerPath.AddBranch(fmt.Sprintf("host path: %s", mount.HostPath))
-					containerPath.AddBranch(fmt.Sprintf("read-only: %t", mount.Readonly))
-					containerPath.AddBranch(fmt.Sprintf("selinux relabel: %t", mount.SelinuxRelabel))
-					containerPath.AddBranch(fmt.Sprintf("recursive read-only: %t", mount.RecursiveReadOnly))
-					containerPath.AddBranch(fmt.Sprintf("propagation: %d", mount.Propagation))
-				}
-			default:
-				annotationTree.AddBranch(fmt.Sprintf("%s: %s", key, info.specDump.Annotations[key]))
-			}
-		}
-	}
 }
 
 func addMapToTree(tree treeprint.Tree, data map[string]interface{}) {
