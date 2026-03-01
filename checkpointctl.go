@@ -29,6 +29,7 @@ func main() {
 	rootCommand.AddCommand(cmd.List())
 	rootCommand.AddCommand(cmd.BuildCmd())
 	rootCommand.AddCommand(cmd.PluginCmd())
+	rootCommand.AddCommand(cmd.EditCmd())
 
 	// Discover and register external plugins from PATH.
 	// Plugins are executables named checkpointctl-<name> where <name>
