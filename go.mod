@@ -3,7 +3,7 @@ module github.com/checkpoint-restore/checkpointctl
 go 1.24.6
 
 require (
-	github.com/checkpoint-restore/go-criu/v8 v8.1.0
+	github.com/checkpoint-restore/go-criu/v8 v8.2.0
 	github.com/containers/storage v1.59.1
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/spf13/cobra v1.10.2
