@@ -100,7 +100,7 @@ func inspect(cmd *cobra.Command, args []string) error {
 		*showMetdata = true
 	}
 
-	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile, metadata.NetworkStatusFile}
 
 	if *stats {
 		requiredFiles = append(requiredFiles, "stats-dump")

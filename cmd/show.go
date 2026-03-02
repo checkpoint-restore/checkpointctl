@@ -19,8 +19,7 @@ func Show() *cobra.Command {
 }
 
 func show(cmd *cobra.Command, args []string) error {
-	// Only "spec.dump" and "config.dump" are need when for the show sub-command
-	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile}
+	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile, metadata.NetworkStatusFile}
 	tasks, err := internal.CreateTasks(args, requiredFiles)
 	if err != nil {
 		return err
