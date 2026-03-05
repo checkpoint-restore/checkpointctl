@@ -45,12 +45,37 @@ type checkpointInfo struct {
 	archiveSizes  *archiveSizes
 }
 
-func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *containerInfo {
-	return &containerInfo{
+func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, checkpointDirectory string) *containerInfo {
+	ci := &containerInfo{
 		Name:    containerConfig.Name,
 		Created: containerConfig.CreatedTime.Format(time.RFC3339),
 		Engine:  "Podman",
 	}
+
+	networkStatus, _, err := metadata.ReadContainerCheckpointNetworkStatus(checkpointDirectory)
+	if err != nil {
+		return ci
+	}
+
+	for _, network := range *networkStatus {
+		for _, iface := range network.Interfaces {
+			if ci.MAC == "" && iface.MacAddress != "" {
+				ci.MAC = iface.MacAddress
+			}
+			if ci.IP == "" && len(iface.Subnets) > 0 {
+				ip := iface.Subnets[0].IPNet
+				if idx := strings.Index(ip, "/"); idx != -1 {
+					ip = ip[:idx]
+				}
+				ci.IP = ip
+			}
+			if ci.IP != "" && ci.MAC != "" {
+				return ci
+			}
+		}
+	}
+
+	return ci
 }
 
 func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) *containerInfo {
@@ -92,7 +117,7 @@ func getCheckpointInfo(task Task) (*checkpointInfo, error) {
 		return nil, err
 	}
 
-	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump)
+	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump, task.OutputDir)
 	if err != nil {
 		return nil, err
 	}
@@ -179,11 +204,11 @@ func ShowContainerCheckpoints(tasks []Task) error {
 	return nil
 }
 
-func getContainerInfo(specDump *spec.Spec, containerConfig *metadata.ContainerConfig) (*containerInfo, error) {
+func getContainerInfo(specDump *spec.Spec, containerConfig *metadata.ContainerConfig, checkpointDirectory string) (*containerInfo, error) {
 	var ci *containerInfo
 	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
-		ci = getPodmanInfo(containerConfig, specDump)
+		ci = getPodmanInfo(containerConfig, specDump, checkpointDirectory)
 	case "cri-o":
 		var err error
 		ci, err = getCRIOInfo(containerConfig, specDump)

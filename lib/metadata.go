@@ -89,6 +89,33 @@ type CheckpointedPodOptions struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// PodmanNetworkSubnet represents a single subnet entry in the Podman network status
+type PodmanNetworkSubnet struct {
+	IPNet   string `json:"ipnet"`
+	Gateway string `json:"gateway"`
+}
+
+// PodmanNetworkInterface represents a network interface in the Podman network status
+type PodmanNetworkInterface struct {
+	Subnets    []PodmanNetworkSubnet `json:"subnets"`
+	MacAddress string                `json:"mac_address"`
+}
+
+// PodmanNetworkResult represents the network status for a single CNI/netavark network
+type PodmanNetworkResult struct {
+	Interfaces map[string]PodmanNetworkInterface `json:"interfaces"`
+}
+
+// PodmanNetworkStatus maps network names to their results in the network.status file
+type PodmanNetworkStatus map[string]PodmanNetworkResult
+
+func ReadContainerCheckpointNetworkStatus(checkpointDirectory string) (*PodmanNetworkStatus, string, error) {
+	var networkStatus PodmanNetworkStatus
+	networkStatusFile, err := ReadJSONFile(&networkStatus, checkpointDirectory, NetworkStatusFile)
+
+	return &networkStatus, networkStatusFile, err
+}
+
 func ReadContainerCheckpointSpecDump(checkpointDirectory string) (*spec.Spec, string, error) {
 	var specDump spec.Spec
 	specDumpFile, err := ReadJSONFile(&specDump, checkpointDirectory, SpecDumpFile)
