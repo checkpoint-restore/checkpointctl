@@ -1,11 +1,11 @@
-SHELL = /bin/bash
+SHELL ?= /bin/bash
 PREFIX ?= $(DESTDIR)/usr/local
 BINDIR ?= $(PREFIX)/bin
 GO ?= go
-GOPATH := $(shell $(GO) env GOPATH)
-GOBIN := $(shell $(GO) env GOBIN)
+GOPATH ?= $(shell $(GO) env GOPATH)
+GOBIN ?= $(shell $(GO) env GOBIN)
 GO_SRC = $(shell find . -name \*.go)
-GO_BUILD = $(GO) build
+GO_BUILD ?= $(GO) build
 NAME = checkpointctl
 
 BASHINSTALLDIR=${PREFIX}/share/bash-completion/completions
