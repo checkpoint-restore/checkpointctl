@@ -57,23 +57,28 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, chec
 		return ci
 	}
 
+	var ips []string
+	var macs []string
+
 	for _, network := range *networkStatus {
 		for _, iface := range network.Interfaces {
-			if ci.MAC == "" && iface.MacAddress != "" {
-				ci.MAC = iface.MacAddress
+			if iface.MacAddress != "" {
+				macs = append(macs, iface.MacAddress)
 			}
-			if ci.IP == "" && len(iface.Subnets) > 0 {
-				ip := iface.Subnets[0].IPNet
+			for _, subnet := range iface.Subnets {
+				ip := subnet.IPNet
 				if idx := strings.Index(ip, "/"); idx != -1 {
 					ip = ip[:idx]
 				}
-				ci.IP = ip
-			}
-			if ci.IP != "" && ci.MAC != "" {
-				return ci
+				if ip != "" {
+					ips = append(ips, ip)
+				}
 			}
 		}
 	}
+
+	ci.IP = strings.Join(ips, ", ")
+	ci.MAC = strings.Join(macs, ", ")
 
 	return ci
 }

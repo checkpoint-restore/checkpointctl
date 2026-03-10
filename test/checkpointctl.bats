@@ -114,6 +114,22 @@ function teardown() {
 	[[ ${lines[3]} == *"f2:99:8d:fb:5a:57"* ]]
 }
 
+@test "Run checkpointctl show with tar file with valid config.dump and valid spec.dump and multi-network network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status.multi "$TEST_TMP_DIR1"/network.status
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl show "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[1]} == *"IP"* ]]
+	[[ ${lines[3]} == *"10.89.0.2"* ]]
+	[[ ${lines[3]} == *"10.89.1.2"* ]]
+	[[ ${lines[1]} == *"MAC"* ]]
+	[[ ${lines[3]} == *"32:ba:b8:45:bc:84"* ]]
+	[[ ${lines[3]} == *"5e:b7:fe:ee:e0:d8"* ]]
+}
+
 @test "Run checkpointctl show with tar file with broken network.status" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
@@ -581,6 +597,41 @@ function teardown() {
 	[ "$status" -eq 0 ]
 
 	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_mac"
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump and multi-network network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status.multi "$TEST_TMP_DIR1"/network.status
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Podman"* ]]
+	[[ ${lines[7]} == *"10.89.0.2"* ]]
+	[[ ${lines[7]} == *"10.89.1.2"* ]]
+	[[ ${lines[8]} == *"32:ba:b8:45:bc:84"* ]]
+	[[ ${lines[8]} == *"5e:b7:fe:ee:e0:d8"* ]]
+}
+
+@test "Run checkpointctl inspect with json format and multi-network network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status.multi "$TEST_TMP_DIR1"/network.status
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	test_ips() { jq -e '.[0].ip | test("10\\.89\\.0\\.2") and test("10\\.89\\.1\\.2")'; }
+	export -f test_ips
+
+	test_macs() { jq -e '.[0].mac | test("32:ba:b8:45:bc:84") and test("5e:b7:fe:ee:e0:d8")'; }
+	export -f test_macs
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_ips"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_macs"
 	[ "$status" -eq 0 ]
 }
 

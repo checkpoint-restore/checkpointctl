@@ -154,6 +154,32 @@ func TestReadContainerCheckpointNetworkStatus(t *testing.T) {
 			wantGW:     "10.88.0.1",
 			wantIfaces: 1,
 		},
+		{
+			name: "multiple networks multiple interfaces",
+			status: PodmanNetworkStatus{
+				"net1": PodmanNetworkResult{
+					Interfaces: map[string]PodmanNetworkInterface{
+						"eth0": {
+							Subnets: []PodmanNetworkSubnet{
+								{IPNet: "10.89.0.2/24", Gateway: "10.89.0.1"},
+							},
+							MacAddress: "32:ba:b8:45:bc:84",
+						},
+					},
+				},
+				"net2": PodmanNetworkResult{
+					Interfaces: map[string]PodmanNetworkInterface{
+						"eth1": {
+							Subnets: []PodmanNetworkSubnet{
+								{IPNet: "10.89.1.2/24", Gateway: "10.89.1.1"},
+							},
+							MacAddress: "5e:b7:fe:ee:e0:d8",
+						},
+					},
+				},
+			},
+			wantIfaces: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -175,14 +201,14 @@ func TestReadContainerCheckpointNetworkStatus(t *testing.T) {
 					t.Errorf("expected %d interfaces, got %d", tt.wantIfaces, len(network.Interfaces))
 				}
 				for _, iface := range network.Interfaces {
-					if iface.MacAddress != tt.wantMAC {
+					if tt.wantMAC != "" && iface.MacAddress != tt.wantMAC {
 						t.Errorf("expected MAC %s, got %s", tt.wantMAC, iface.MacAddress)
 					}
 					if len(iface.Subnets) > 0 {
-						if iface.Subnets[0].IPNet != tt.wantIP {
+						if tt.wantIP != "" && iface.Subnets[0].IPNet != tt.wantIP {
 							t.Errorf("expected IP %s, got %s", tt.wantIP, iface.Subnets[0].IPNet)
 						}
-						if iface.Subnets[0].Gateway != tt.wantGW {
+						if tt.wantGW != "" && iface.Subnets[0].Gateway != tt.wantGW {
 							t.Errorf("expected gateway %s, got %s", tt.wantGW, iface.Subnets[0].Gateway)
 						}
 					}
