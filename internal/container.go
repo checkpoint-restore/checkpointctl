@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -60,8 +61,24 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, chec
 	var ips []string
 	var macs []string
 
-	for _, network := range *networkStatus {
-		for _, iface := range network.Interfaces {
+	// Sort network names for deterministic output
+	networkNames := make([]string, 0, len(*networkStatus))
+	for name := range *networkStatus {
+		networkNames = append(networkNames, name)
+	}
+	sort.Strings(networkNames)
+
+	for _, name := range networkNames {
+		network := (*networkStatus)[name]
+		// Sort interface names for deterministic output
+		ifaceNames := make([]string, 0, len(network.Interfaces))
+		for ifName := range network.Interfaces {
+			ifaceNames = append(ifaceNames, ifName)
+		}
+		sort.Strings(ifaceNames)
+
+		for _, ifName := range ifaceNames {
+			iface := network.Interfaces[ifName]
 			if iface.MacAddress != "" {
 				macs = append(macs, iface.MacAddress)
 			}
@@ -237,7 +254,6 @@ type archiveSizes struct {
 	pagesSize         int64
 	amdgpuPagesSize   int64
 }
-
 // getArchiveSizes calculates the sizes of different components within a container checkpoint.
 func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 	result := &archiveSizes{}
@@ -376,7 +392,7 @@ func getPsEnvVars(checkpointOutputDir string, pid uint32) (envVars []string, err
 
 	for _, envVar := range strings.Split(buffer.String(), "\x00") {
 		if envVar != "" {
-			envVars = append(envVars, envVar)
+		envVars = append(envVars, envVar)
 		}
 	}
 
