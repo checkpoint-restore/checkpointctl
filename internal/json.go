@@ -93,8 +93,22 @@ type DisplayNode struct {
 	FileDescriptors    []FdNode       `json:"file_descriptors,omitempty"`
 	Sockets            []SkNode       `json:"sockets,omitempty"`
 	Mounts             []MountNode    `json:"mounts,omitempty"`
+	Networks           []NetworkNode  `json:"networks,omitempty"`
 	// Internal fields for tree rendering (not serialized to JSON)
 	checkpointFilePath string
+}
+
+// NetworkInterfaceNode holds per-interface network details (Podman inspect tree).
+type NetworkInterfaceNode struct {
+	IP      string `json:"ip,omitempty"`
+	MAC     string `json:"mac,omitempty"`
+	Gateway string `json:"gateway,omitempty"`
+}
+
+// NetworkNode holds a network name and its interfaces (Podman inspect tree).
+type NetworkNode struct {
+	Name       string                          `json:"name"`
+	Interfaces map[string]NetworkInterfaceNode `json:"interfaces"`
 }
 
 type MountNode struct {
@@ -140,6 +154,9 @@ func CollectCheckpointData(tasks []Task) ([]DisplayNode, error) {
 		}
 		if info.containerInfo.MAC != "" {
 			node.MAC = info.containerInfo.MAC
+		}
+		if len(info.containerInfo.Networks) > 0 {
+			node.Networks = info.containerInfo.Networks
 		}
 
 		checkpointSizeNode := CheckpointSize{

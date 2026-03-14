@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ type containerInfo struct {
 	Name      string
 	IP        string
 	MAC       string
+	Networks  []NetworkNode
 	Created   string
 	Engine    string
 	Namespace string
@@ -45,12 +47,78 @@ type checkpointInfo struct {
 	archiveSizes  *archiveSizes
 }
 
-func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec) *containerInfo {
-	return &containerInfo{
+func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, checkpointDirectory string) *containerInfo {
+	ci := &containerInfo{
 		Name:    containerConfig.Name,
 		Created: containerConfig.CreatedTime.Format(time.RFC3339),
 		Engine:  "Podman",
 	}
+
+	networkStatus, _, err := metadata.ReadContainerCheckpointNetworkStatus(checkpointDirectory)
+	if err != nil {
+		return ci
+	}
+
+	var ips []string
+	var macs []string
+	var networks []NetworkNode
+
+	// Sort network names for deterministic output
+	networkNames := make([]string, 0, len(*networkStatus))
+	for name := range *networkStatus {
+		networkNames = append(networkNames, name)
+	}
+	sort.Strings(networkNames)
+
+	for _, name := range networkNames {
+		network := (*networkStatus)[name]
+		networkNode := NetworkNode{
+			Name:       name,
+			Interfaces: make(map[string]NetworkInterfaceNode),
+		}
+
+		// Sort interface names for deterministic output
+		ifaceNames := make([]string, 0, len(network.Interfaces))
+		for ifName := range network.Interfaces {
+			ifaceNames = append(ifaceNames, ifName)
+		}
+		sort.Strings(ifaceNames)
+
+		for _, ifName := range ifaceNames {
+			iface := network.Interfaces[ifName]
+			ifaceNode := NetworkInterfaceNode{}
+
+			if iface.MacAddress != "" {
+				macs = append(macs, iface.MacAddress)
+				ifaceNode.MAC = iface.MacAddress
+			}
+			for _, subnet := range iface.Subnets {
+				if subnet.IPNet != "" {
+					ifaceNode.IP = subnet.IPNet
+					ip := subnet.IPNet
+					if idx := strings.Index(ip, "/"); idx != -1 {
+						ip = ip[:idx]
+					}
+					if ip != "" {
+						ips = append(ips, ip)
+					}
+				}
+				if subnet.Gateway != "" {
+					ifaceNode.Gateway = subnet.Gateway
+				}
+			}
+
+			networkNode.Interfaces[ifName] = ifaceNode
+		}
+
+		networks = append(networks, networkNode)
+	}
+
+	ci.IP = strings.Join(ips, ", ")
+	ci.MAC = strings.Join(macs, ", ")
+	ci.Networks = networks
+
+	return ci
 }
 
 func getContainerdInfo(containerConfig *metadata.ContainerConfig, specDump *spec.Spec) *containerInfo {
@@ -92,7 +160,7 @@ func getCheckpointInfo(task Task) (*checkpointInfo, error) {
 		return nil, err
 	}
 
-	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump)
+	info.containerInfo, err = getContainerInfo(info.specDump, info.configDump, task.OutputDir)
 	if err != nil {
 		return nil, err
 	}
@@ -179,11 +247,11 @@ func ShowContainerCheckpoints(tasks []Task) error {
 	return nil
 }
 
-func getContainerInfo(specDump *spec.Spec, containerConfig *metadata.ContainerConfig) (*containerInfo, error) {
+func getContainerInfo(specDump *spec.Spec, containerConfig *metadata.ContainerConfig, checkpointDirectory string) (*containerInfo, error) {
 	var ci *containerInfo
 	switch m := specDump.Annotations["io.container.manager"]; m {
 	case "libpod":
-		ci = getPodmanInfo(containerConfig, specDump)
+		ci = getPodmanInfo(containerConfig, specDump, checkpointDirectory)
 	case "cri-o":
 		var err error
 		ci, err = getCRIOInfo(containerConfig, specDump)
