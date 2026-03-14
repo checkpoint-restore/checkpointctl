@@ -33,6 +33,7 @@ type containerInfo struct {
 	Name      string
 	IP        string
 	MAC       string
+	Networks  []NetworkNode
 	Created   string
 	Engine    string
 	Namespace string
@@ -60,6 +61,7 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, chec
 
 	var ips []string
 	var macs []string
+	var networks []NetworkNode
 
 	// Sort network names for deterministic output
 	networkNames := make([]string, 0, len(*networkStatus))
@@ -70,6 +72,11 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, chec
 
 	for _, name := range networkNames {
 		network := (*networkStatus)[name]
+		networkNode := NetworkNode{
+			Name:       name,
+			Interfaces: make(map[string]NetworkInterfaceNode),
+		}
+
 		// Sort interface names for deterministic output
 		ifaceNames := make([]string, 0, len(network.Interfaces))
 		for ifName := range network.Interfaces {
@@ -79,23 +86,37 @@ func getPodmanInfo(containerConfig *metadata.ContainerConfig, _ *spec.Spec, chec
 
 		for _, ifName := range ifaceNames {
 			iface := network.Interfaces[ifName]
+			ifaceNode := NetworkInterfaceNode{}
+
 			if iface.MacAddress != "" {
 				macs = append(macs, iface.MacAddress)
+				ifaceNode.MAC = iface.MacAddress
 			}
 			for _, subnet := range iface.Subnets {
-				ip := subnet.IPNet
-				if idx := strings.Index(ip, "/"); idx != -1 {
-					ip = ip[:idx]
+				if subnet.IPNet != "" {
+					ifaceNode.IP = subnet.IPNet
+					ip := subnet.IPNet
+					if idx := strings.Index(ip, "/"); idx != -1 {
+						ip = ip[:idx]
+					}
+					if ip != "" {
+						ips = append(ips, ip)
+					}
 				}
-				if ip != "" {
-					ips = append(ips, ip)
+				if subnet.Gateway != "" {
+					ifaceNode.Gateway = subnet.Gateway
 				}
 			}
+
+			networkNode.Interfaces[ifName] = ifaceNode
 		}
+
+		networks = append(networks, networkNode)
 	}
 
 	ci.IP = strings.Join(ips, ", ")
 	ci.MAC = strings.Join(macs, ", ")
+	ci.Networks = networks
 
 	return ci
 }
@@ -254,6 +275,7 @@ type archiveSizes struct {
 	pagesSize         int64
 	amdgpuPagesSize   int64
 }
+
 // getArchiveSizes calculates the sizes of different components within a container checkpoint.
 func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 	result := &archiveSizes{}
@@ -392,7 +414,7 @@ func getPsEnvVars(checkpointOutputDir string, pid uint32) (envVars []string, err
 
 	for _, envVar := range strings.Split(buffer.String(), "\x00") {
 		if envVar != "" {
-		envVars = append(envVars, envVar)
+			envVars = append(envVars, envVar)
 		}
 	}
 
