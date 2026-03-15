@@ -1,0 +1,18 @@
+{
+  "net1": {
+    "interfaces": {
+      "eth0": {
+        "subnets": [{"ipnet": "10.89.0.2/24", "gateway": "10.89.0.1"}],
+        "mac_address": "32:ba:b8:45:bc:84"
+      }
+    }
+  },
+  "net2": {
+    "interfaces": {
+      "eth1": {
+        "subnets": [{"ipnet": "10.89.1.2/24", "gateway": "10.89.1.1"}],
+        "mac_address": "5e:b7:fe:ee:e0:d8"
+      }
+    }
+  }
+}

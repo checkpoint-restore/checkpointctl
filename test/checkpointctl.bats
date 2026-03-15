@@ -526,6 +526,98 @@ function teardown() {
 	[[ ${lines[6]} == *"Podman"* ]]
 }
 
+@test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump and network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Podman"* ]]
+	[[ ${lines[7]} == *"Network Interfaces"* ]]
+	[[ "$output" == *"podman (eth0)"* ]]
+	[[ "$output" == *"IP: 10.88.0.9/16"* ]]
+	[[ "$output" == *"MAC: f2:99:8d:fb:5a:57"* ]]
+	[[ "$output" == *"Gateway: 10.88.0.1"* ]]
+}
+
+@test "Run checkpointctl inspect with json format and network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	test_ip() { jq -e '.[0].ip == "10.88.0.9"'; }
+	export -f test_ip
+
+	test_mac() { jq -e '.[0].mac == "f2:99:8d:fb:5a:57"'; }
+	export -f test_mac
+
+	test_network() { jq -e '.[0].networks[0].name == "podman" and .[0].networks[0].interfaces.eth0.ip == "10.88.0.9/16" and .[0].networks[0].interfaces.eth0.gateway == "10.88.0.1"'; }
+	export -f test_network
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_ip"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_mac"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_network"
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl inspect with tar file with valid config.dump and valid spec.dump and multi-network network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status.multi "$TEST_TMP_DIR1"/network.status
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Podman"* ]]
+	[[ ${lines[7]} == *"Network Interfaces"* ]]
+	[[ ${lines[8]} == *"net1 (eth0)"* ]]
+	[[ "$output" == *"IP: 10.89.0.2/24"* ]]
+	[[ "$output" == *"IP: 10.89.1.2/24"* ]]
+	[[ "$output" == *"MAC: 32:ba:b8:45:bc:84"* ]]
+	[[ "$output" == *"MAC: 5e:b7:fe:ee:e0:d8"* ]]
+	[[ "$output" == *"Gateway: 10.89.0.1"* ]]
+	[[ "$output" == *"Gateway: 10.89.1.1"* ]]
+}
+
+@test "Run checkpointctl inspect with json format and multi-network network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	cp data/network.status.multi "$TEST_TMP_DIR1"/network.status
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	test_ips() { jq -e '.[0].ip | test("10\\.89\\.0\\.2") and test("10\\.89\\.1\\.2")'; }
+	export -f test_ips
+
+	test_macs() { jq -e '.[0].mac | test("32:ba:b8:45:bc:84") and test("5e:b7:fe:ee:e0:d8")'; }
+	export -f test_macs
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_ips"
+	[ "$status" -eq 0 ]
+
+	run bash -c "$CHECKPOINTCTL inspect $TEST_TMP_DIR2/test.tar --format=json | test_macs"
+	[ "$status" -eq 0 ]
+}
+
+@test "Run checkpointctl inspect with tar file with broken network.status" {
+	cp data/config.dump "$TEST_TMP_DIR1"
+	cp data/spec.dump "$TEST_TMP_DIR1"
+	echo "not-valid-json" > "$TEST_TMP_DIR1"/network.status
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	[[ ${lines[6]} == *"Podman"* ]]
+}
+
 @test "Run checkpointctl inspect with tar file from containerd with valid config.dump and valid spec.dump and checkpoint directory" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
