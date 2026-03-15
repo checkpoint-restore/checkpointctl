@@ -99,6 +99,150 @@ func TestBuildTreeFromDisplayNodeWithOptionalFields(t *testing.T) {
 	}
 }
 
+func TestBuildTreeFromDisplayNodeWithSingleNetwork(t *testing.T) {
+	node := DisplayNode{
+		ContainerName: "looper",
+		Image:         "docker.io/library/busybox:latest",
+		ID:            "c00a173fe724",
+		Runtime:       "crun",
+		Created:       "2026-03-13T21:11:20Z",
+		Engine:        "Podman",
+		IP:            "10.88.0.21",
+		MAC:           "f6:92:a1:69:c2:49",
+		Networks: []NetworkNode{
+			{
+				Name: "podman",
+				Interfaces: map[string]NetworkInterfaceNode{
+					"eth0": {
+						IP:      "10.88.0.21/16",
+						MAC:     "f6:92:a1:69:c2:49",
+						Gateway: "10.88.0.1",
+					},
+				},
+			},
+		},
+		CheckpointSize: CheckpointSize{
+			TotalSize:       344166,
+			MemoryPagesSize: 307200,
+		},
+	}
+
+	tree := buildTreeFromDisplayNode(node)
+	result := tree.String()
+
+	expectedStrings := []string{
+		"Network Interfaces",
+		"podman (eth0)",
+		"IP: 10.88.0.21/16",
+		"MAC: f6:92:a1:69:c2:49",
+		"Gateway: 10.88.0.1",
+	}
+
+	for _, expected := range expectedStrings {
+		if !strings.Contains(result, expected) {
+			t.Errorf("Expected tree to contain %q, but it didn't.\nTree:\n%s", expected, result)
+		}
+	}
+}
+
+func TestBuildTreeFromDisplayNodeWithNetworks(t *testing.T) {
+	node := DisplayNode{
+		ContainerName: "looper",
+		Image:         "docker.io/library/busybox:latest",
+		ID:            "c00a173fe724",
+		Runtime:       "crun",
+		Created:       "2026-03-13T21:11:20Z",
+		Engine:        "Podman",
+		IP:            "10.89.0.2, 10.89.1.2",
+		MAC:           "32:ba:b8:45:bc:84, 5e:b7:fe:ee:e0:d8",
+		Networks: []NetworkNode{
+			{
+				Name: "net1",
+				Interfaces: map[string]NetworkInterfaceNode{
+					"eth0": {
+						IP:      "10.89.0.2/24",
+						MAC:     "32:ba:b8:45:bc:84",
+						Gateway: "10.89.0.1",
+					},
+				},
+			},
+			{
+				Name: "net2",
+				Interfaces: map[string]NetworkInterfaceNode{
+					"eth1": {
+						IP:      "10.89.1.2/24",
+						MAC:     "5e:b7:fe:ee:e0:d8",
+						Gateway: "10.89.1.1",
+					},
+				},
+			},
+		},
+		CheckpointSize: CheckpointSize{
+			TotalSize:       344166,
+			MemoryPagesSize: 307200,
+		},
+	}
+
+	tree := buildTreeFromDisplayNode(node)
+	result := tree.String()
+
+	expectedStrings := []string{
+		"Network Interfaces",
+		"net1 (eth0)",
+		"IP: 10.89.0.2/24",
+		"MAC: 32:ba:b8:45:bc:84",
+		"Gateway: 10.89.0.1",
+		"net2 (eth1)",
+		"IP: 10.89.1.2/24",
+		"MAC: 5e:b7:fe:ee:e0:d8",
+		"Gateway: 10.89.1.1",
+	}
+
+	for _, expected := range expectedStrings {
+		if !strings.Contains(result, expected) {
+			t.Errorf("Expected tree to contain %q, but it didn't.\nTree:\n%s", expected, result)
+		}
+	}
+
+	// When Networks is set, flat IP/MAC should NOT appear
+	if strings.Contains(result, "IP: 10.89.0.2, 10.89.1.2") {
+		t.Errorf("Expected flat IP to NOT appear when Networks is set.\nTree:\n%s", result)
+	}
+}
+
+func TestAddNetworkNodesToTree(t *testing.T) {
+	tree := treeprint.New()
+	networks := []NetworkNode{
+		{
+			Name: "podman",
+			Interfaces: map[string]NetworkInterfaceNode{
+				"eth0": {
+					IP:      "10.88.0.5/16",
+					MAC:     "aa:bb:cc:dd:ee:ff",
+					Gateway: "10.88.0.1",
+				},
+			},
+		},
+	}
+
+	addNetworkNodesToTree(tree, networks)
+	result := tree.String()
+
+	expectedStrings := []string{
+		"Network Interfaces",
+		"podman (eth0)",
+		"IP: 10.88.0.5/16",
+		"MAC: aa:bb:cc:dd:ee:ff",
+		"Gateway: 10.88.0.1",
+	}
+
+	for _, expected := range expectedStrings {
+		if !strings.Contains(result, expected) {
+			t.Errorf("Expected tree to contain %q, but it didn't.\nTree:\n%s", expected, result)
+		}
+	}
+}
+
 func TestAddStatsNodeToTree(t *testing.T) {
 	tree := treeprint.New()
 	stats := &StatsNode{
