@@ -44,6 +44,8 @@ func main() {
 
 	rootCommand.AddCommand(cmd.Diff())
 
+	rootCommand.AddCommand(cmd.Remap())
+
 	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {
