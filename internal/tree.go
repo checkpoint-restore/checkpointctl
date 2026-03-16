@@ -40,11 +40,15 @@ func buildTreeFromDisplayNode(node DisplayNode) treeprint.Tree {
 	}
 	tree.AddBranch(fmt.Sprintf("Engine: %s", node.Engine))
 
-	if node.IP != "" {
-		tree.AddBranch(fmt.Sprintf("IP: %s", node.IP))
-	}
-	if node.MAC != "" {
-		tree.AddBranch(fmt.Sprintf("MAC: %s", node.MAC))
+	if len(node.Networks) > 0 {
+		addNetworkNodesToTree(tree, node.Networks)
+	} else {
+		if node.IP != "" {
+			tree.AddBranch(fmt.Sprintf("IP: %s", node.IP))
+		}
+		if node.MAC != "" {
+			tree.AddBranch(fmt.Sprintf("MAC: %s", node.MAC))
+		}
 	}
 
 	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(node.CheckpointSize.TotalSize)))
@@ -236,6 +240,31 @@ func formatSocketForTree(socket SocketNode) (protocol, data string) {
 	}
 
 	return protocol, data
+}
+
+func addNetworkNodesToTree(tree treeprint.Tree, networks []NetworkNode) {
+	networksTree := tree.AddBranch("Network Interfaces")
+	for _, network := range networks {
+		ifaceNames := make([]string, 0, len(network.Interfaces))
+		for ifName := range network.Interfaces {
+			ifaceNames = append(ifaceNames, ifName)
+		}
+		sort.Strings(ifaceNames)
+
+		for _, ifName := range ifaceNames {
+			iface := network.Interfaces[ifName]
+			netBranch := networksTree.AddBranch(fmt.Sprintf("%s (%s)", network.Name, ifName))
+			if iface.IP != "" {
+				netBranch.AddBranch(fmt.Sprintf("IP: %s", iface.IP))
+			}
+			if iface.MAC != "" {
+				netBranch.AddBranch(fmt.Sprintf("MAC: %s", iface.MAC))
+			}
+			if iface.Gateway != "" {
+				netBranch.AddBranch(fmt.Sprintf("Gateway: %s", iface.Gateway))
+			}
+		}
+	}
 }
 
 func addMountNodesToTree(tree treeprint.Tree, mounts []MountNode) {

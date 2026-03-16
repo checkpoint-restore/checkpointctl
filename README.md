@@ -30,25 +30,24 @@ To display an overview of a checkpoint archive you can just use
 ```console
 $ checkpointctl show /tmp/dump.tar
 
-Displaying container checkpoint data from /root/dump.tar
+Displaying container checkpoint data from /tmp/dump.tar
 
-CONTAINER  IMAGE                             ID            RUNTIME  CREATED               ENGINE  CHKPT SIZE ROOT FS DIFF SIZE
----------  -----                             --            -------  -------               ------  ---------- -----------------
-looper     docker.io/library/busybox:latest  8b5c2ca15082  crun     2021-09-28T10:03:56Z  Podman  130.8 KiB  204 B
+CONTAINER   IMAGE                              ID             RUNTIME   CREATED                ENGINE   CHKPT SIZE   ROOT FS DIFF SIZE
+---------   -----                              --             -------   -------                ------   ----------   -----------------
+looper      docker.io/library/busybox:latest   8b5c2ca15082   crun      2021-09-28T10:03:56Z   Podman   130.8 KiB    204 B
 ```
 
 For a checkpoint archive created by Kubernetes with *CRI-O* the output would
 look like this:
 
 ```console
-$ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-counters_default-counter-2025-05-22T14\:31\:35Z.tar
+$ checkpointctl show /var/lib/kubelet/checkpoints/checkpoint-checkpoint-test_default-checkpoint-test-2026-03-13T21:43:06Z.tar
 
-Displaying container checkpoint data from /var/lib/kubelet/checkpoints/checkpoint-counters_default-counter-2025-05-22T14:31:35Z.tar
+Displaying container checkpoint data from /var/lib/kubelet/checkpoints/checkpoint-checkpoint-test_default-checkpoint-test-2026-03-13T21:43:06Z.tar
 
-CONTAINER  IMAGE                               ID            RUNTIME  CREATED                         ENGINE  IP         CHKPT SIZE  ROOT FS DIFF SIZE
----------  -----                               --            -------  -------                         ------  --         ----------  -----------------
-counter    quay.io/adrianreber/counter:latest  29ed106ef467  runc     2025-05-22T14:31:24.818422898Z  CRI-O   10.0.0.70  9.2 MiB     2.0 KiB
-
+CONTAINER         IMAGE                              ID             RUNTIME   CREATED                         ENGINE   CHKPT SIZE   ROOT FS DIFF SIZE
+---------         -----                              --             -------   -------                         ------   ----------   -----------------
+checkpoint-test   docker.io/library/busybox:latest   68bb2fa6a176   crun      2026-03-13T21:42:59.05135916Z   CRI-O    314.6 KiB    3.5 KiB
 ```
 
 ### `inspect` sub-command
@@ -56,26 +55,27 @@ counter    quay.io/adrianreber/counter:latest  29ed106ef467  runc     2025-05-22
 To retrieve low-level information about a container checkpoint, use the `checkpointctl inspect` command:
 
 ```console
-$ checkpointctl inspect /tmp/ubuntu_looper.tar.gz --ps-tree --metadata
+Displaying container checkpoint tree view from /tmp/ubuntu_looper.tar.gz
 
 awesome_booth
 ├── Image: docker.io/library/ubuntu:latest
-├── ID: 695b77deb38281244a114da111e2ee606ab9464ffa94a98be382d181c2121c9c
+├── ID: 2076a99c49c959375c6ae406818a2c841744a019d30221f134db657232f133f5
 ├── Runtime: crun
-├── Created: 2023-03-08T08:45:33+03:00
+├── Created: 2026-03-16T08:00:17Z
 ├── Engine: Podman
-├── Checkpoint size: 2.8 MiB
-├── Root FS diff size: 309.0 KiB
-├── Metadata
-│   └── Annotations
-│       ├── io.container.manager: libpod
-│       └── org.opencontainers.image.stopSignal: 15
+├── Network Interfaces
+│   └── podman (eth0)
+│       ├── IP: 10.88.0.4/16
+│       ├── MAC: 2e:e1:db:6b:68:93
+│       └── Gateway: 10.88.0.1
+├── Checkpoint size: 1018.3 KiB
+│   └── Memory pages size: 952.0 KiB
+├── Root FS diff size: 2.0 KiB
 └── Process tree
     └── [1]  bash
-        └── [5]  su
-            └── [6]  bash
-                └── [47]  loop.sh
-                    └── [74]  sleep
+        └── [4]  su
+            └── [5]  bash
+                └── [6]  sleep
 ```
 
 For a complete list of flags supported, use `checkpointctl inspect --help`.
