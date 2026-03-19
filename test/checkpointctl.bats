@@ -1328,3 +1328,110 @@ EOF
 
 	PATH="$ORIG_PATH"
 }
+
+@test "Run checkpointctl edit with no flags" {
+    checkpointctl edit /does-not-exist
+    [ "$status" -eq 1 ]
+    [[ "${output}" == "Error: no edit operation specified; use --tcp-listen-remap" ]]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap and invalid port format" {
+    checkpointctl edit --tcp-listen-remap abc /does-not-exist
+    [ "$status" -eq 1 ]
+    [[ "${output}" == "Error: invalid parameters: expected oldport:newport" ]]
+
+    checkpointctl edit --tcp-listen-remap 8080:ab /does-not-exist
+    [ "$status" -eq 1 ]
+    [[ "${output}" == "Error: invalid parameters: expected oldport:newport" ]]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap and invalid port number" {
+    checkpointctl edit --tcp-listen-remap -1:8080 /does-not-exist
+    [ "$status" -eq 1 ]
+    [[ "$output" == "Error: invalid parameters: expected oldport:newport" ]]
+
+    checkpointctl edit --tcp-listen-remap 8080:65536 /does-not-exist
+    [ "$status" -eq 1 ]
+    [[ "$output" == "Error: new port 65536 is out of valid range (1-65535)" ]]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap and non existing archive" {
+    checkpointctl edit --tcp-listen-remap 80:8080 /does-not-exist
+    [ "$status" -eq 1 ]
+    [[ "$output" == "Error: open /does-not-exist: no such file or directory" ]]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap and empty archive" {
+    touch "$TEST_TMP_DIR1"/empty.tar
+    checkpointctl edit --tcp-listen-remap 80:8080 "$TEST_TMP_DIR1"/empty.tar
+    [ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"checkpoint directory is missing in the archive file"* ]]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap on uncompressed tar" {
+    cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+    cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/files.img \
+		test-imgs/ids-*.img \
+		test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl edit --tcp-listen-remap 5000:80 "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+    [[ ${lines[0]} == *"Successfully remapped port 5000 -> 80"* ]]
+
+    checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --sockets
+    [[ "$status" -eq 0 ]]
+    found=0
+    for line in "${lines[@]}"; do
+        if [[ "$line" == *"[TCP (LISTEN)]"* && "$line" == *"0.0.0.0:80"* ]]; then
+            found=1
+            break
+        fi
+    done
+
+    [ "$found" -eq 1 ]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap on compressed tar" {
+    cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+    cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/files.img \
+		test-imgs/ids-*.img \
+		test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+
+	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test.tar.gz . )
+	checkpointctl edit --tcp-listen-remap 5000:80 "$TEST_TMP_DIR2"/test.tar.gz
+	[ "$status" -eq 0 ]
+    [[ ${lines[0]} == *"Successfully remapped port 5000 -> 80"* ]]
+
+    checkpointctl inspect "$TEST_TMP_DIR2"/test.tar.gz --sockets
+    [[ "$status" -eq 0 ]]
+    found=0
+    for line in "${lines[@]}"; do
+        if [[ "$line" == *"[TCP (LISTEN)]"* && "$line" == *"0.0.0.0:80"* ]]; then
+            found=1
+            break
+        fi
+    done
+
+    [ "$found" -eq 1 ]
+}
+
+@test "Run checkpointctl edit with --tcp-listen-remap with non matching port" {
+    cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+    cp test-imgs/files.img "$TEST_TMP_DIR1"/checkpoint
+
+	( cd "$TEST_TMP_DIR1" && tar czf "$TEST_TMP_DIR2"/test.tar.gz . )
+	checkpointctl edit --tcp-listen-remap 8080:80 "$TEST_TMP_DIR2"/test.tar.gz
+	[ "$status" -eq 1 ]
+    [[ ${lines[0]} == *"no TCP listen sockets found with source port 8080"* ]]
+}
