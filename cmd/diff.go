@@ -18,12 +18,14 @@ func Diff() *cobra.Command {
 		Long: `Compare two CRIU checkpoints and show differences in:
   - Process tree (new/removed/modified processes)
   - File descriptors (opened/closed files)
+  - Sockets (new/removed network sockets)
   - Memory usage (size changes)
 
 Example:
   checkpointctl diff checkpoint1.tar checkpoint2.tar
   checkpointctl diff --format json checkpoint1.tar checkpoint2.tar
-  checkpointctl diff --files --ps-tree-cmd checkpoint1.tar checkpoint2.tar`,
+  checkpointctl diff --files --ps-tree-cmd checkpoint1.tar checkpoint2.tar
+  checkpointctl diff --files --sockets checkpoint1.tar checkpoint2.tar`,
 		Args: cobra.ExactArgs(2),
 		RunE: diff,
 	}
@@ -216,6 +218,7 @@ type CheckpointMetadata struct {
 	CheckpointSize  CheckpointSize        `json:"checkpoint_size"`
 	ProcessTree     *ProcessTree          `json:"process_tree,omitempty"`
 	FileDescriptors []FileDescriptorEntry `json:"file_descriptors,omitempty"`
+	Sockets         []SkNode              `json:"sockets,omitempty"`
 }
 
 type CheckpointSize struct {
@@ -241,6 +244,29 @@ type OpenFile struct {
 	Path string `json:"path"`
 }
 
+// Socket types (mirroring internal/json.go)
+type SkNode struct {
+	PID         uint32       `json:"pid"`
+	OpenSockets []SocketNode `json:"open_sockets,omitempty"`
+}
+
+type SocketNode struct {
+	Protocol string `json:"protocol,omitempty"`
+	Data     SkData `json:"data,omitempty"`
+}
+
+type SkData struct {
+	Type       string `json:"type,omitempty"`
+	Address    string `json:"address,omitempty"`
+	State      string `json:"state,omitempty"`
+	Source     string `json:"src,omitempty"`
+	SourcePort uint32 `json:"src_port,omitempty"`
+	Dest       string `json:"dst,omitempty"`
+	DestPort   uint32 `json:"dst_port,omitempty"`
+	SendBuf    string `json:"send_buf,omitempty"`
+	RecvBuf    string `json:"recv_buf,omitempty"`
+}
+
 // Diff result structures
 type DiffResult struct {
 	ContainerID    string         `json:"container_id"`
@@ -251,6 +277,7 @@ type DiffResult struct {
 	ProcessChanges *ProcessDiff   `json:"process_changes,omitempty"`
 	FileChanges    *FileDiff      `json:"file_changes,omitempty"`
 	MemoryChanges  *MemoryDiff    `json:"memory_changes"`
+	SocketChanges  *SocketDiff    `json:"socket_changes,omitempty"`
 	Summary        string         `json:"summary"`
 }
 
@@ -290,6 +317,24 @@ type MemoryDiff struct {
 	SizeChangeMB    float64 `json:"size_change_mb"`
 }
 
+type SocketDiff struct {
+	Added     []SocketInfo `json:"added,omitempty"`
+	Removed   []SocketInfo `json:"removed,omitempty"`
+	Unchanged int          `json:"unchanged"`
+}
+
+type SocketInfo struct {
+	PID      int    `json:"pid"`
+	Protocol string `json:"protocol"`
+	Type     string `json:"type"`
+	Address  string `json:"address,omitempty"`
+	State    string `json:"state,omitempty"`
+	Source   string `json:"source,omitempty"`
+	SrcPort  uint32 `json:"src_port,omitempty"`
+	Dest     string `json:"dest,omitempty"`
+	DstPort  uint32 `json:"dst_port,omitempty"`
+}
+
 func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 	result := &DiffResult{
 		ContainerID:   metadataA.ID,
@@ -311,6 +356,11 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 	// Compare files if requested
 	if *files {
 		result.FileChanges = compareFileDescriptors(metadataA.FileDescriptors, metadataB.FileDescriptors)
+	}
+
+	// Compare sockets if requested
+	if *sockets {
+		result.SocketChanges = compareSockets(metadataA.Sockets, metadataB.Sockets)
 	}
 
 	// Compare memory
@@ -444,6 +494,82 @@ func compareFileDescriptors(fdsA, fdsB []FileDescriptorEntry) *FileDiff {
 	return diff
 }
 
+func compareSockets(sksA, sksB []SkNode) *SocketDiff {
+	diff := &SocketDiff{}
+
+	// Build socket maps
+	// Key format: PID:Protocol:Type:Address:SrcPort:Dest:DstPort
+	mapA := make(map[string]SocketInfo)
+	mapB := make(map[string]SocketInfo)
+
+	for _, entry := range sksA {
+		for _, socket := range entry.OpenSockets {
+			key := fmt.Sprintf("%d:%s:%s:%s:%d:%s:%d",
+				entry.PID,
+				socket.Protocol,
+				socket.Data.Type,
+				socket.Data.Address,
+				socket.Data.SourcePort,
+				socket.Data.Dest,
+				socket.Data.DestPort,
+			)
+			mapA[key] = SocketInfo{
+				PID:      int(entry.PID),
+				Protocol: socket.Protocol,
+				Type:     socket.Data.Type,
+				Address:  socket.Data.Address,
+				State:    socket.Data.State,
+				Source:   socket.Data.Source,
+				SrcPort:  socket.Data.SourcePort,
+				Dest:     socket.Data.Dest,
+				DstPort:  socket.Data.DestPort,
+			}
+		}
+	}
+
+	for _, entry := range sksB {
+		for _, socket := range entry.OpenSockets {
+			key := fmt.Sprintf("%d:%s:%s:%s:%d:%s:%d",
+				entry.PID,
+				socket.Protocol,
+				socket.Data.Type,
+				socket.Data.Address,
+				socket.Data.SourcePort,
+				socket.Data.Dest,
+				socket.Data.DestPort,
+			)
+			mapB[key] = SocketInfo{
+				PID:      int(entry.PID),
+				Protocol: socket.Protocol,
+				Type:     socket.Data.Type,
+				Address:  socket.Data.Address,
+				State:    socket.Data.State,
+				Source:   socket.Data.Source,
+				SrcPort:  socket.Data.SourcePort,
+				Dest:     socket.Data.Dest,
+				DstPort:  socket.Data.DestPort,
+			}
+		}
+	}
+
+	// Find differences
+	for key, socketB := range mapB {
+		if _, exists := mapA[key]; !exists {
+			diff.Added = append(diff.Added, socketB)
+		} else {
+			diff.Unchanged++
+		}
+	}
+
+	for key, socketA := range mapA {
+		if _, exists := mapB[key]; !exists {
+			diff.Removed = append(diff.Removed, socketA)
+		}
+	}
+
+	return diff
+}
+
 func generateSummary(result *DiffResult) string {
 	summary := fmt.Sprintf("Checkpoint comparison for container %s", result.ContainerName)
 
@@ -463,6 +589,15 @@ func generateSummary(result *DiffResult) string {
 
 		if added > 0 || removed > 0 {
 			summary += fmt.Sprintf("\nFiles: +%d -%d", added, removed)
+		}
+	}
+
+	if result.SocketChanges != nil {
+		added := len(result.SocketChanges.Added)
+		removed := len(result.SocketChanges.Removed)
+
+		if added > 0 || removed > 0 {
+			summary += fmt.Sprintf("\nSockets: +%d -%d", added, removed)
 		}
 	}
 
@@ -560,6 +695,50 @@ func renderTreeDiff(result *DiffResult) {
 
 		if result.FileChanges.Unchanged > 0 {
 			fmt.Printf("│ Unchanged: %d\n", result.FileChanges.Unchanged)
+		}
+		fmt.Println("└──────────────────────────────────────────────────────────────┘")
+	}
+
+	// Socket changes
+	if result.SocketChanges != nil {
+		fmt.Println("┌─ Socket Changes ─────────────────────────────────────────────┐")
+
+		if len(result.SocketChanges.Added) > 0 {
+			fmt.Println("│ Added:")
+			for _, socket := range result.SocketChanges.Added {
+				fmt.Printf("│   + PID %-5d %-8s", socket.PID, socket.Protocol)
+				switch socket.Type {
+				case "UNIX":
+					fmt.Printf("%s\n", truncate(socket.Address, 40))
+				case "TCP", "UDP":
+					fmt.Printf("%s:%d -> %s:%d\n",
+						socket.Source, socket.SrcPort,
+						socket.Dest, socket.DstPort)
+				default:
+					fmt.Printf("%s\n", truncate(socket.Address, 40))
+				}
+			}
+		}
+
+		if len(result.SocketChanges.Removed) > 0 {
+			fmt.Println("│ Removed:")
+			for _, socket := range result.SocketChanges.Removed {
+				fmt.Printf("│   - PID %-5d %-8s", socket.PID, socket.Protocol)
+				switch socket.Type {
+				case "UNIX":
+					fmt.Printf("%s\n", truncate(socket.Address, 40))
+				case "TCP", "UDP":
+					fmt.Printf("%s:%d -> %s:%d\n",
+						socket.Source, socket.SrcPort,
+						socket.Dest, socket.DstPort)
+				default:
+					fmt.Printf("%s\n", truncate(socket.Address, 40))
+				}
+			}
+		}
+
+		if result.SocketChanges.Unchanged > 0 {
+			fmt.Printf("│ Unchanged: %d\n", result.SocketChanges.Unchanged)
 		}
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	}
