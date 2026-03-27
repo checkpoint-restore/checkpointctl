@@ -5,3 +5,4 @@ junit.xml
 test/piggie/piggie
 test/lib-size/lib-size-test
 test/test-imgs
+test/test-imgs-diff

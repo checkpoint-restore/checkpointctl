@@ -12,8 +12,11 @@
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 #define STKS	(4*4096)
+#define MAX_EXTRA_CLIENTS 16
 
 #ifndef CLONE_NEWPID
 #define CLONE_NEWPID    0x20000000
@@ -28,6 +31,105 @@ typedef struct {
 	bool use_tcp_socket;
 	bool create_zombie;
 } opts_t;
+
+static pid_t extra_clients[MAX_EXTRA_CLIENTS];
+static int extra_clients_n = 0;
+
+static int spawn_extra_client(char *err, size_t errsz);
+static int kill_extra_client(char *err, size_t errsz);
+
+/*
+ * Command FIFO actions allowing to change the piggie process state at
+ * runtime. This mechanism allows to test the `checkpointctl diff`
+ * functionality by modifying the process state (e.g., adding/removing
+ * socket connections) between checkpoints.
+ *
+ * The action functions are triggered by writing a command name into the
+ * command FIFO ($PIGGIE_CMD_FIFO). The corresponding function is then
+ * executed, and its result is sent back through the acknowledgment
+ * FIFO ($PIGGIE_ACK_FIFO) as either "ok" or "fail: <reason>".
+ */
+static struct {
+	const char *name;
+	int (*fn)(char *err, size_t errsz);
+} actions[] = {
+	{ "spawn-tcp-client", spawn_extra_client },
+	{ "kill-tcp-client",  kill_extra_client  },
+};
+
+#define N_ACTIONS ((int)(sizeof(actions) / sizeof(actions[0])))
+
+static int spawn_extra_client(char *err, size_t errsz)
+{
+	int sync_pipe[2];
+	pid_t p;
+	char ready;
+	ssize_t n;
+
+	if (extra_clients_n >= MAX_EXTRA_CLIENTS) {
+		snprintf(err, errsz, "stack full (max=%d)", MAX_EXTRA_CLIENTS);
+		return -1;
+	}
+
+	if (pipe(sync_pipe) == -1) {
+		snprintf(err, errsz, "pipe: %s", strerror(errno));
+		return -1;
+	}
+
+	p = fork();
+	if (p < 0) {
+		close(sync_pipe[0]);
+		close(sync_pipe[1]);
+		snprintf(err, errsz, "fork: %s", strerror(errno));
+		return -1;
+	}
+
+	if (p == 0) {
+		int fd;
+		char ok = 1;
+		struct sockaddr_in addr = {
+			.sin_family = AF_INET,
+			.sin_port = htons(PORT),
+		};
+
+		close(sync_pipe[0]);
+		prctl(PR_SET_NAME, "tcp-client2");
+		fd = socket(AF_INET, SOCK_STREAM, 0);
+		if (fd == -1) _exit(1);
+		if (inet_pton(AF_INET, SERVER_IP, &addr.sin_addr) <= 0) _exit(1);
+		if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) _exit(1);
+		if (write(sync_pipe[1], &ok, 1) != 1) _exit(1);
+		close(sync_pipe[1]);
+		while (1)
+			pause();
+	}
+
+	close(sync_pipe[1]);
+	n = read(sync_pipe[0], &ready, 1);
+	close(sync_pipe[0]);
+	if (n != 1) {
+		waitpid(p, NULL, 0);
+		snprintf(err, errsz, "tcp-client2 failed to connect");
+		return -1;
+	}
+	extra_clients[extra_clients_n++] = p;
+	return 0;
+}
+
+static int kill_extra_client(char *err, size_t errsz)
+{
+	pid_t p;
+
+	if (extra_clients_n == 0) {
+		snprintf(err, errsz, "no extra clients");
+		return -1;
+	}
+
+	p = extra_clients[--extra_clients_n];
+	kill(p, SIGTERM);
+	waitpid(p, NULL, 0);
+	return 0;
+}
 
 static void create_zombie(void)
 {
@@ -76,9 +178,8 @@ static void create_zombie(void)
 
 void run_tcp_server(void)
 {
-	int server_socket, client_socket, ret;
-	struct sockaddr_in server_address = {0}, client_address = {0};
-	char buffer[MAX_BUFFER_SIZE];
+	int server_socket, ret;
+	struct sockaddr_in server_address = {0};
 	const int enable = 1;
 
 	ret = fork();
@@ -92,6 +193,7 @@ void run_tcp_server(void)
 	}
 
 	prctl(PR_SET_NAME, "tcp-server");
+	signal(SIGCHLD, SIG_IGN);
 
 	server_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_socket == -1) {
@@ -116,28 +218,31 @@ void run_tcp_server(void)
 		exit(EXIT_FAILURE);
 	}
 
-	socklen_t client_address_len = sizeof(client_address);
-	client_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_address_len);
-	if (client_socket == -1) {
-		perror("tcp-server: Accept failed");
-		exit(EXIT_FAILURE);
-	}
-
 	while (1) {
-		memset(buffer, 0, sizeof(buffer));
-		ssize_t n = recv(client_socket, buffer, sizeof(buffer), 0);
-		if (n <= 0)
-			break;
-	}
+		int client_socket = accept(server_socket, NULL, NULL);
+		if (client_socket == -1) {
+			if (errno == EINTR)
+				continue;
+			perror("tcp-server: Accept failed");
+			exit(EXIT_FAILURE);
+		}
 
-	close(server_socket);
-	close(client_socket);
-	exit(0);
+		pid_t handler = fork();
+		if (handler == 0) {
+			char buffer[MAX_BUFFER_SIZE];
+			prctl(PR_SET_NAME, "tcp-conn");
+			close(server_socket);
+			while (recv(client_socket, buffer, sizeof(buffer), 0) > 0) {}
+			close(client_socket);
+			_exit(0);
+		}
+		close(client_socket);
+	}
 }
 
 void run_tcp_client(void)
 {
-	int client_socket, max_connection_tries = 5;
+	int client_socket, max_connection_tries = 50;
 	struct sockaddr_in server_address = {0};
 	char buffer[MAX_BUFFER_SIZE];
 	const char msg[] = "ping";
@@ -174,6 +279,7 @@ void run_tcp_client(void)
 		if (connect(client_socket, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
 			if (max_connection_tries > 0) {
 				max_connection_tries--;
+				usleep(50000);  /* 50ms between retries */
 				continue;
 			}
 
@@ -227,6 +333,19 @@ static int do_test(void *opts_ptr)
 		if (fd != STDOUT_FILENO && fd != STDERR_FILENO) {
 			close(fd);
 		}
+	} else {
+		/*
+		 * Reserve fd 1 and 2 with /dev/null so later opens don't
+		 * land on them (e.g. the command/ack FIFOs below) -- that
+		 * would otherwise hijack printf(stdout) writes.
+		 */
+		fd = open("/dev/null", O_WRONLY);
+		if (fd >= 0) {
+			dup2(fd, 1);
+			dup2(fd, 2);
+			if (fd != 1 && fd != 2)
+				close(fd);
+		}
 	}
 
 	if (opts->use_tcp_socket) {
@@ -242,8 +361,62 @@ static int do_test(void *opts_ptr)
 		create_zombie();
 	}
 
+	/*
+	 * Optional synchronous command channel. The test script creates two
+	 * FIFOs, points $PIGGIE_CMD_FIFO / $PIGGIE_ACK_FIFO at them, then for
+	 * each command writes one line into cmd and reads one line from ack
+	 * ("ok" or "fail: <reason>"). Both are opened O_RDWR so the script's
+	 * briefly-closed write/read ends don't produce EOFs here.
+	 */
+	int cmd_fd = -1, ack_fd = -1;
+	const char *cmd_path = getenv("PIGGIE_CMD_FIFO");
+	const char *ack_path = getenv("PIGGIE_ACK_FIFO");
+	if (cmd_path) {
+		cmd_fd = open(cmd_path, O_RDWR | O_NONBLOCK);
+		if (cmd_fd < 0) perror("piggie: open PIGGIE_CMD_FIFO");
+	}
+	if (ack_path) {
+		ack_fd = open(ack_path, O_RDWR);
+		if (ack_fd < 0) perror("piggie: open PIGGIE_ACK_FIFO");
+	}
+
 	while (1) {
-		sleep(1);
+		struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+		fd_set rfds;
+		int maxfd = -1;
+
+		FD_ZERO(&rfds);
+		if (cmd_fd >= 0) {
+			FD_SET(cmd_fd, &rfds);
+			maxfd = cmd_fd;
+		}
+
+		if (select(maxfd + 1, maxfd >= 0 ? &rfds : NULL, NULL, NULL, &tv) > 0
+		    && cmd_fd >= 0 && FD_ISSET(cmd_fd, &rfds)) {
+			char buf[256];
+			ssize_t n = read(cmd_fd, buf, sizeof(buf) - 1);
+			if (n > 0) {
+				buf[n] = 0;
+				char *line, *saveptr = NULL;
+				for (line = strtok_r(buf, "\n", &saveptr); line;
+				     line = strtok_r(NULL, "\n", &saveptr)) {
+					char err[256] = {0}, resp[288];
+					int rc = -1, rlen;
+					for (int a = 0; a < N_ACTIONS; a++) {
+						if (strcmp(line, actions[a].name) == 0) {
+							rc = actions[a].fn(err, sizeof(err));
+							break;
+						}
+					}
+					if (rc == 0) rlen = snprintf(resp, sizeof(resp), "ok\n");
+					else if (*err) rlen = snprintf(resp, sizeof(resp), "fail: %s\n", err);
+					else rlen = snprintf(resp, sizeof(resp), "fail: unknown command '%s'\n", line);
+					if (ack_fd >= 0 && rlen > 0)
+						(void)!write(ack_fd, resp, rlen);
+				}
+			}
+		}
+
 		printf("%d\n", i++);
 		fflush(stdout);
 	}

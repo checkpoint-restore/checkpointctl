@@ -390,14 +390,14 @@ function teardown() {
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --files
 	[ "$status" -eq 0 ]
 
-	[[ ${lines[11]} == *"[REG 0]"* ]]
-	[[ ${lines[25]} == *"[cwd]"* ]]
-	[[ ${lines[26]} == *"[root]"* ]]
+	[[ "$output" == *"[REG 0]"* ]]
+	[[ "$output" == *"[cwd]"* ]]
+	[[ "$output" == *"[root]"* ]]
 
-	[[ ${lines[27]} == *"[5 (Dead)]  piggie-zombie"* ]]
-	[[ ${lines[28]} == *"[6 (Stopped)]  stopped-child"* ]]
-	[[ ${lines[29]} == *"Open files"* ]]
-	[[ ${lines[33]} == *"[7]  alive-child"* ]]
+	[[ "$output" == *"(Dead)]  piggie-zombie"* ]]
+	[[ "$output" == *"(Stopped)]  stopped-child"* ]]
+	[[ "$output" == *"Open files"* ]]
+	[[ "$output" == *"alive-child"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --files and missing files.img" {
@@ -1059,6 +1059,54 @@ function teardown() {
 		skip "test-imgs directory not available"
 	fi
 }
+
+function build_sk_diff_tars() {
+	mkdir "$TEST_TMP_DIR1"/a "$TEST_TMP_DIR1"/b
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"/a
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"/b
+	mkdir "$TEST_TMP_DIR1"/a/checkpoint "$TEST_TMP_DIR1"/b/checkpoint
+	cp test-imgs-diff/a/* "$TEST_TMP_DIR1"/a/checkpoint/
+	cp test-imgs-diff/b/* "$TEST_TMP_DIR1"/b/checkpoint/
+	( cd "$TEST_TMP_DIR1"/a && tar cf "$TEST_TMP_DIR2"/a.tar . )
+	( cd "$TEST_TMP_DIR1"/b && tar cf "$TEST_TMP_DIR2"/b.tar . )
+}
+
+@test "Run checkpointctl diff with --sockets flag (added, removed, unchanged)" {
+	build_sk_diff_tars
+
+	checkpointctl diff "$TEST_TMP_DIR2"/a.tar "$TEST_TMP_DIR2"/b.tar --sockets --show-unchanged
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"+"*"TCP"*"ESTABLISHED"*"127.0.0.1:5000"* ]]
+	[[ "$output" == *"-"*"TCP"*"ESTABLISHED"*"127.0.0.1:5000"* ]]
+	[[ "$output" == *"="*"TCP"*"LISTEN"*"0.0.0.0:5000"* ]]
+	[[ "$output" == *"="*"TCP"*"ESTABLISHED"*"127.0.0.1:5000"* ]]
+	[[ "$output" == *"Sockets: +2 -4"* ]]
+}
+
+@test "Run checkpointctl diff with --sockets flag (json format)" {
+	build_sk_diff_tars
+
+	run bash -c "$CHECKPOINTCTL diff --sockets --show-unchanged --format=json $TEST_TMP_DIR2/a.tar $TEST_TMP_DIR2/b.tar"
+	[ "$status" -eq 0 ]
+	echo "$output" | jq -e '.socket_changes.added | length == 2'
+	echo "$output" | jq -e '.socket_changes.removed | length == 4'
+	echo "$output" | jq -e '.socket_changes.unchanged | length == 3'
+	echo "$output" | jq -e '[.socket_changes.added[] | select(.state == "ESTABLISHED")] | length == 2'
+	echo "$output" | jq -e '[.socket_changes.removed[] | select(.state == "ESTABLISHED")] | length == 4'
+	echo "$output" | jq -e '[.socket_changes.unchanged[] | select(.state == "LISTEN" and .src_port == 5000)] | length == 1'
+	echo "$output" | jq -e '[.socket_changes.unchanged[] | select(.state == "ESTABLISHED")] | length == 2'
+}
+
+@test "Run checkpointctl diff with --files and --sockets flags" {
+	build_sk_diff_tars
+
+	checkpointctl diff "$TEST_TMP_DIR2"/a.tar "$TEST_TMP_DIR2"/b.tar --files --sockets
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"File Descriptor Changes"* ]]
+	[[ "$output" == *"Socket Changes"* ]]
+	[[ "$output" == *"Sockets: +2 -4"* ]]
+}
+
 
 @test "Run checkpointctl diff json output validation" {
 	cp data/config.dump "$TEST_TMP_DIR1"
