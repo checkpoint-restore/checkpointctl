@@ -1060,6 +1060,77 @@ function teardown() {
 	fi
 }
 
+@test "Run checkpointctl diff with --sockets flag" {
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+
+	if [ -f "test-imgs/pstree.img" ]; then
+		cp test-imgs/pstree.img \
+			test-imgs/core-*.img \
+			test-imgs/files.img \
+			test-imgs/ids-*.img \
+			test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+
+		checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --sockets
+		[ "$status" -eq 0 ]
+		[[ "$output" == *"Socket Changes"* ]]
+	else
+		skip "test-imgs directory not populated"
+	fi
+}
+
+@test "Run checkpointctl diff with --sockets flag (json format)" {
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+
+	if [ -f "test-imgs/pstree.img" ]; then
+		cp test-imgs/pstree.img \
+			test-imgs/core-*.img \
+			test-imgs/files.img \
+			test-imgs/ids-*.img \
+			test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+
+		test_has_socket_changes() { jq -e '.socket_changes != null'; }
+		export -f test_has_socket_changes
+
+		run bash -c "$CHECKPOINTCTL diff $TEST_TMP_DIR2/test1.tar $TEST_TMP_DIR2/test2.tar --sockets --format=json | test_has_socket_changes"
+		[ "$status" -eq 0 ]
+	else
+		skip "test-imgs directory not populate"
+	fi
+}
+
+@test "Run checkpointctl diff with --files and --sockets flags" {
+	cp data/config.dump data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+
+	if [ -f "test-imgs/pstree.img" ]; then
+		cp test-imgs/pstree.img \
+			test-imgs/core-*.img \
+			test-imgs/files.img \
+			test-imgs/fs-*.img \
+			test-imgs/ids-*.img \
+			test-imgs/fdinfo-*.img "$TEST_TMP_DIR1"/checkpoint
+
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test1.tar . )
+		( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test2.tar . )
+
+		checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --files --sockets
+		[ "$status" -eq 0 ]
+		[[ "$output" == *"File Descriptor Changes"* ]]
+		[[ "$output" == *"Socket Changes"* ]]
+	else
+		skip "test-imgs directory not populated"
+	fi
+}
+
+
 @test "Run checkpointctl diff json output validation" {
 	cp data/config.dump "$TEST_TMP_DIR1"
 	cp data/spec.dump "$TEST_TMP_DIR1"
