@@ -4,11 +4,13 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/checkpoint-restore/checkpointctl/internal"
 )
 
 // compareSockets [empty inputs]
 func TestCompareSocketsEmptyInputs(t *testing.T) {
-	result := compareSockets([]SkNode{}, []SkNode{})
+	result := compareSockets([]internal.SkNode{}, []internal.SkNode{})
 
 	if result == nil {
 		t.Fatal("Expected non-nil result for empty inputs")
@@ -49,12 +51,12 @@ func TestCompareSocketsNilInputs(t *testing.T) {
 
 // added sockets
 func TestCompareSocketsAddedSockets(t *testing.T) {
-	socketA := SkNode{
+	socketA := internal.SkNode{
 		PID: 1234,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 8080,
@@ -65,12 +67,12 @@ func TestCompareSocketsAddedSockets(t *testing.T) {
 		},
 	}
 
-	socketB := SkNode{
+	socketB := internal.SkNode{
 		PID: 1234,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 8080,
@@ -80,7 +82,7 @@ func TestCompareSocketsAddedSockets(t *testing.T) {
 			},
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 8081,
@@ -91,7 +93,7 @@ func TestCompareSocketsAddedSockets(t *testing.T) {
 		},
 	}
 
-	result := compareSockets([]SkNode{socketA}, []SkNode{socketB})
+	result := compareSockets([]internal.SkNode{socketA}, []internal.SkNode{socketB})
 
 	if result == nil {
 		t.Fatal("Expected non-nil result")
@@ -117,12 +119,12 @@ func TestCompareSocketsAddedSockets(t *testing.T) {
 
 // removed sockets
 func TestCompareSocketsRemovedSockets(t *testing.T) {
-	socketA := SkNode{
+	socketA := internal.SkNode{
 		PID: 1234,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 8080,
@@ -132,7 +134,7 @@ func TestCompareSocketsRemovedSockets(t *testing.T) {
 			},
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 8081,
@@ -143,12 +145,12 @@ func TestCompareSocketsRemovedSockets(t *testing.T) {
 		},
 	}
 
-	socketB := SkNode{
+	socketB := internal.SkNode{
 		PID: 1234,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 8081,
@@ -159,7 +161,7 @@ func TestCompareSocketsRemovedSockets(t *testing.T) {
 		},
 	}
 
-	result := compareSockets([]SkNode{socketA}, []SkNode{socketB})
+	result := compareSockets([]internal.SkNode{socketA}, []internal.SkNode{socketB})
 
 	if result == nil {
 		t.Fatal("Expected non-nil result")
@@ -185,12 +187,12 @@ func TestCompareSocketsRemovedSockets(t *testing.T) {
 
 // comparing sockets from different processes
 func TestCompareSocketsMultiplePIDs(t *testing.T) {
-	socketPID1 := SkNode{
+	socketPID1 := internal.SkNode{
 		PID: 1,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 80,
@@ -201,12 +203,12 @@ func TestCompareSocketsMultiplePIDs(t *testing.T) {
 		},
 	}
 
-	socketPID2 := SkNode{
+	socketPID2 := internal.SkNode{
 		PID: 2,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "TCP",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:       "TCP",
 					Source:     "0.0.0.0",
 					SourcePort: 443,
@@ -217,7 +219,7 @@ func TestCompareSocketsMultiplePIDs(t *testing.T) {
 		},
 	}
 
-	result := compareSockets([]SkNode{socketPID1, socketPID2}, []SkNode{socketPID1})
+	result := compareSockets([]internal.SkNode{socketPID1, socketPID2}, []internal.SkNode{socketPID1})
 
 	if result == nil {
 		t.Fatal("Expected non-nil result")
@@ -271,12 +273,12 @@ func TestGenerateSummaryWithSocketChanges(t *testing.T) {
 
 // tests sockets with missing/empty field values
 func TestCompareSocketsWithEmptyFields(t *testing.T) {
-	socketA := SkNode{
+	socketA := internal.SkNode{
 		PID: 1234,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "UNIX",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:    "UNIX",
 					Address: "", // Empty address
 				},
@@ -284,12 +286,12 @@ func TestCompareSocketsWithEmptyFields(t *testing.T) {
 		},
 	}
 
-	socketB := SkNode{
+	socketB := internal.SkNode{
 		PID: 1234,
-		OpenSockets: []SocketNode{
+		OpenSockets: []internal.SocketNode{
 			{
 				Protocol: "UNIX",
-				Data: SkData{
+				Data: internal.SkData{
 					Type:    "UNIX",
 					Address: "", //
 				},
@@ -297,7 +299,7 @@ func TestCompareSocketsWithEmptyFields(t *testing.T) {
 		},
 	}
 
-	result := compareSockets([]SkNode{socketA}, []SkNode{socketB})
+	result := compareSockets([]internal.SkNode{socketA}, []internal.SkNode{socketB})
 
 	if result == nil {
 		t.Fatal("Expected non-nil result")

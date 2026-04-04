@@ -218,7 +218,7 @@ type CheckpointMetadata struct {
 	CheckpointSize  CheckpointSize        `json:"checkpoint_size"`
 	ProcessTree     *ProcessTree          `json:"process_tree,omitempty"`
 	FileDescriptors []FileDescriptorEntry `json:"file_descriptors,omitempty"`
-	Sockets         []SkNode              `json:"sockets,omitempty"`
+	Sockets         []internal.SkNode     `json:"sockets,omitempty"`
 }
 
 type CheckpointSize struct {
@@ -242,29 +242,6 @@ type OpenFile struct {
 	Type string `json:"type"`
 	FD   string `json:"fd"`
 	Path string `json:"path"`
-}
-
-// Socket types (mirroring internal/json.go)
-type SkNode struct {
-	PID         uint32       `json:"pid"`
-	OpenSockets []SocketNode `json:"open_sockets,omitempty"`
-}
-
-type SocketNode struct {
-	Protocol string `json:"protocol,omitempty"`
-	Data     SkData `json:"data,omitempty"`
-}
-
-type SkData struct {
-	Type       string `json:"type,omitempty"`
-	Address    string `json:"address,omitempty"`
-	State      string `json:"state,omitempty"`
-	Source     string `json:"src,omitempty"`
-	SourcePort uint32 `json:"src_port,omitempty"`
-	Dest       string `json:"dst,omitempty"`
-	DestPort   uint32 `json:"dst_port,omitempty"`
-	SendBuf    string `json:"send_buf,omitempty"`
-	RecvBuf    string `json:"recv_buf,omitempty"`
 }
 
 // Diff result structures
@@ -494,7 +471,7 @@ func compareFileDescriptors(fdsA, fdsB []FileDescriptorEntry) *FileDiff {
 	return diff
 }
 
-func compareSockets(sksA, sksB []SkNode) *SocketDiff {
+func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
 	diff := &SocketDiff{}
 
 	// Build socket maps
@@ -706,34 +683,16 @@ func renderTreeDiff(result *DiffResult) {
 		if len(result.SocketChanges.Added) > 0 {
 			fmt.Println("│ Added:")
 			for _, socket := range result.SocketChanges.Added {
-				fmt.Printf("│   + PID %-5d %-8s", socket.PID, socket.Protocol)
-				switch socket.Type {
-				case "UNIX":
-					fmt.Printf("%s\n", truncate(socket.Address, 40))
-				case "TCP", "UDP":
-					fmt.Printf("%s:%d -> %s:%d\n",
-						socket.Source, socket.SrcPort,
-						socket.Dest, socket.DstPort)
-				default:
-					fmt.Printf("%s\n", truncate(socket.Address, 40))
-				}
+				fmt.Printf("│   + PID %-5d %-8s%s\n",
+					socket.PID, socket.Protocol, formatSocketEndpoint(socket))
 			}
 		}
 
 		if len(result.SocketChanges.Removed) > 0 {
 			fmt.Println("│ Removed:")
 			for _, socket := range result.SocketChanges.Removed {
-				fmt.Printf("│   - PID %-5d %-8s", socket.PID, socket.Protocol)
-				switch socket.Type {
-				case "UNIX":
-					fmt.Printf("%s\n", truncate(socket.Address, 40))
-				case "TCP", "UDP":
-					fmt.Printf("%s:%d -> %s:%d\n",
-						socket.Source, socket.SrcPort,
-						socket.Dest, socket.DstPort)
-				default:
-					fmt.Printf("%s\n", truncate(socket.Address, 40))
-				}
+				fmt.Printf("│   - PID %-5d %-8s%s\n",
+					socket.PID, socket.Protocol, formatSocketEndpoint(socket))
 			}
 		}
 
@@ -752,6 +711,17 @@ func renderJSONDiff(result *DiffResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
+}
+
+func formatSocketEndpoint(socket SocketInfo) string {
+	switch socket.Type {
+	case "TCP", "UDP":
+		return fmt.Sprintf("%s:%d -> %s:%d",
+			socket.Source, socket.SrcPort,
+			socket.Dest, socket.DstPort)
+	default:
+		return truncate(socket.Address, 40)
+	}
 }
 
 func truncate(s string, maxLen int) string {
