@@ -13,6 +13,7 @@ var (
 	psTreeEnv          *bool   = &internal.PsTreeEnv
 	files              *bool   = &internal.Files
 	sockets            *bool   = &internal.Sockets
+	showUnchanged      *bool   = &internal.ShowUnchanged
 	showAll            *bool   = &internal.ShowAll
 	searchPattern      *string = &internal.SearchPattern
 	searchRegexPattern *string = &internal.SearchRegexPattern

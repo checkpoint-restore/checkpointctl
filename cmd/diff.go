@@ -61,6 +61,12 @@ Example:
 		false,
 		"Include sockets in the diff",
 	)
+	flags.BoolVar(
+		showUnchanged,
+		"show-unchanged",
+		false,
+		"Show entries that are identical between the two checkpoints",
+	)
 
 	return cmd
 }
@@ -267,7 +273,7 @@ type ProcessDiff struct {
 	Added     []ProcessInfo `json:"added,omitempty"`
 	Removed   []ProcessInfo `json:"removed,omitempty"`
 	Modified  []ProcessInfo `json:"modified,omitempty"`
-	Unchanged int           `json:"unchanged"`
+	Unchanged []ProcessInfo `json:"unchanged,omitempty"`
 }
 
 type ProcessInfo struct {
@@ -279,7 +285,7 @@ type ProcessInfo struct {
 type FileDiff struct {
 	Added     []FileInfo `json:"added,omitempty"`
 	Removed   []FileInfo `json:"removed,omitempty"`
-	Unchanged int        `json:"unchanged"`
+	Unchanged []FileInfo `json:"unchanged,omitempty"`
 }
 
 type FileInfo struct {
@@ -297,7 +303,7 @@ type MemoryDiff struct {
 type SocketDiff struct {
 	Added     []SocketInfo `json:"added,omitempty"`
 	Removed   []SocketInfo `json:"removed,omitempty"`
-	Unchanged int          `json:"unchanged"`
+	Unchanged []SocketInfo `json:"unchanged,omitempty"`
 }
 
 type SocketInfo struct {
@@ -378,7 +384,7 @@ func compareProcessTrees(treeA, treeB *ProcessTree) *ProcessDiff {
 		} else if *psTreeCmd && procA.Cmdline != procB.Cmdline {
 			diff.Modified = append(diff.Modified, procB)
 		} else {
-			diff.Unchanged++
+			diff.Unchanged = append(diff.Unchanged, procB)
 		}
 	}
 
@@ -458,7 +464,7 @@ func compareFileDescriptors(fdsA, fdsB []FileDescriptorEntry) *FileDiff {
 		if _, exists := mapA[key]; !exists {
 			diff.Added = append(diff.Added, fileB)
 		} else {
-			diff.Unchanged++
+			diff.Unchanged = append(diff.Unchanged, fileB)
 		}
 	}
 
@@ -534,7 +540,7 @@ func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
 		if _, exists := mapA[key]; !exists {
 			diff.Added = append(diff.Added, socketB)
 		} else {
-			diff.Unchanged++
+			diff.Unchanged = append(diff.Unchanged, socketB)
 		}
 	}
 
@@ -644,8 +650,11 @@ func renderTreeDiff(result *DiffResult) {
 			}
 		}
 
-		if result.ProcessChanges.Unchanged > 0 {
-			fmt.Printf("│ Unchanged: %d\n", result.ProcessChanges.Unchanged)
+		if *showUnchanged && len(result.ProcessChanges.Unchanged) > 0 {
+			fmt.Println("│ Unchanged:")
+			for _, proc := range result.ProcessChanges.Unchanged {
+				fmt.Printf("│   = PID %-5d %s\n", proc.PID, proc.Command)
+			}
 		}
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	}
@@ -670,8 +679,12 @@ func renderTreeDiff(result *DiffResult) {
 			}
 		}
 
-		if result.FileChanges.Unchanged > 0 {
-			fmt.Printf("│ Unchanged: %d\n", result.FileChanges.Unchanged)
+		if *showUnchanged && len(result.FileChanges.Unchanged) > 0 {
+			fmt.Println("│ Unchanged:")
+			for _, file := range result.FileChanges.Unchanged {
+				fmt.Printf("│   = PID %-5d %-8s %s\n",
+					file.PID, file.Type, truncate(file.Path, 38))
+			}
 		}
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	}
@@ -680,7 +693,10 @@ func renderTreeDiff(result *DiffResult) {
 	if result.SocketChanges != nil {
 		fmt.Println("┌─ Socket Changes ──────────────────────────────────────────────────────┐")
 
-		if len(result.SocketChanges.Added) > 0 || len(result.SocketChanges.Removed) > 0 {
+		hasChanges := len(result.SocketChanges.Added) > 0 || len(result.SocketChanges.Removed) > 0
+		showUnchangedRows := *showUnchanged && len(result.SocketChanges.Unchanged) > 0
+
+		if hasChanges || showUnchangedRows {
 			fmt.Printf("│     %-5s %-5s %-12s %-21s %s\n",
 				"PID", "PROTO", "STATE", "LOCAL", "PEER")
 			for _, socket := range result.SocketChanges.Added {
@@ -693,11 +709,15 @@ func renderTreeDiff(result *DiffResult) {
 				fmt.Printf("│  -  %-5d %-5s %-12s %-21s %s\n",
 					socket.PID, socket.Protocol, state, local, peer)
 			}
+			if showUnchangedRows {
+				for _, socket := range result.SocketChanges.Unchanged {
+					state, local, peer := formatSocketColumns(socket)
+					fmt.Printf("│  =  %-5d %-5s %-12s %-21s %s\n",
+						socket.PID, socket.Protocol, state, local, peer)
+				}
+			}
 		}
 
-		if result.SocketChanges.Unchanged > 0 {
-			fmt.Printf("│ Unchanged: %d\n", result.SocketChanges.Unchanged)
-		}
 		fmt.Println("└───────────────────────────────────────────────────────────────────────┘")
 	}
 
