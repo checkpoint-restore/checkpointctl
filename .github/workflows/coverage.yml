@@ -4,17 +4,18 @@ on: [push, pull_request]
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   coverage:
     runs-on: ubuntu-latest
     container:
-      image: fedora:latest
+      image: ghcr.io/${{ github.repository }}/ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged
     steps:
-      - name: Install tools
-        run: |
-          dnf install -y bats iptables iproute jq criu golang make git
       - name: Fix git safe directory
         run: git config --global --add safe.directory /__w/checkpointctl/checkpointctl
       - name: checkout

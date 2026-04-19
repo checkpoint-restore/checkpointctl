@@ -4,18 +4,23 @@ on: [push, pull_request]
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
     container:
-      image: fedora:latest
+      image: ghcr.io/${{ github.repository }}/ci:latest
+      credentials:
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged -v /lib/modules:/lib/modules
     steps:
+      - name: Fix git safe directory
+        run: git config --global --add safe.directory /__w/checkpointctl/checkpointctl
       - uses: actions/checkout@v4
-      - name: Install tools
+      - name: Load kernel modules
         run: |
-          dnf install -y golang make ShellCheck bats criu rubygem-asciidoctor iptables iproute kmod jq bash bash-completion zsh fish
           modprobe -va ip_tables ip6table_filter nf_conntrack nf_conntrack_netlink
       - name: Run make shellcheck
         run: make shellcheck
