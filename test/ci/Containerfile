@@ -1,0 +1,19 @@
+FROM registry.fedoraproject.org/fedora:latest
+
+RUN dnf install -y \
+	bash \
+	bash-completion \
+	bats \
+	criu \
+	fish \
+	git \
+	golang \
+	iptables \
+	iproute \
+	jq \
+	kmod \
+	make \
+	rubygem-asciidoctor \
+	ShellCheck \
+	zsh \
+	&& dnf clean all
