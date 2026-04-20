@@ -12,14 +12,16 @@ jobs:
       image: fedora:latest
       options: --privileged
     steps:
+      - name: Install tools
+        run: |
+          dnf install -y bats iptables iproute jq criu golang make git
+      - name: Fix git safe directory
+        run: git config --global --add safe.directory /__w/checkpointctl/checkpointctl
       - name: checkout
         uses: actions/checkout@v4
         with:
           # needed for codecov
           fetch-depth: 0
-      - name: Install tools
-        run: |
-          dnf install -y bats iptables iproute jq criu golang make
       - name: Run make coverage
         run: make coverage
 
