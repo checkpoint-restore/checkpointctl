@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/spf13/cobra"
+	"github.com/xlab/treeprint"
 )
 
 func Diff() *cobra.Command {
@@ -175,7 +178,16 @@ func diff(cmd *cobra.Command, args []string) error {
 func getTaskJSON(tasks []internal.Task) ([]CheckpointMetadata, error) {
 	var result []CheckpointMetadata
 
+	prevPsTree := internal.PsTree
+	defer func() { internal.PsTree = prevPsTree }()
+
 	for _, task := range tasks {
+		// Enable process-tree extraction only when pstree.img is present; some
+		// test fixtures carry just config/spec dumps and have no checkpoint data.
+		pstreePath := filepath.Join(task.OutputDir, metadata.CheckpointDirectory, "pstree.img")
+		_, statErr := os.Stat(pstreePath)
+		internal.PsTree = statErr == nil
+
 		// Use the same rendering logic as inspect
 		var buf []byte
 		var err error
@@ -222,7 +234,7 @@ type CheckpointMetadata struct {
 	Created         string                `json:"created"`
 	Engine          string                `json:"engine"`
 	CheckpointSize  CheckpointSize        `json:"checkpoint_size"`
-	ProcessTree     *ProcessTree          `json:"process_tree,omitempty"`
+	ProcessTree     *internal.PsNode      `json:"process_tree,omitempty"`
 	FileDescriptors []FileDescriptorEntry `json:"file_descriptors,omitempty"`
 	Sockets         []internal.SkNode     `json:"sockets,omitempty"`
 }
@@ -230,13 +242,6 @@ type CheckpointMetadata struct {
 type CheckpointSize struct {
 	TotalSize       int64 `json:"total_size"`
 	MemoryPagesSize int64 `json:"memory_pages_size"`
-}
-
-type ProcessTree struct {
-	PID      int            `json:"pid"`
-	Command  string         `json:"command"`
-	Cmdline  string         `json:"cmdline"`
-	Children []*ProcessTree `json:"children,omitempty"`
 }
 
 type FileDescriptorEntry struct {
@@ -262,6 +267,8 @@ type DiffResult struct {
 	MemoryChanges  *MemoryDiff    `json:"memory_changes"`
 	SocketChanges  *SocketDiff    `json:"socket_changes,omitempty"`
 	Summary        string         `json:"summary"`
+
+	processTreeB *internal.PsNode
 }
 
 type CheckpointInfo struct {
@@ -335,6 +342,7 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 
 	// Compare processes
 	result.ProcessChanges = compareProcessTrees(metadataA.ProcessTree, metadataB.ProcessTree)
+	result.processTreeB = metadataB.ProcessTree
 
 	// Compare files if requested
 	if *files {
@@ -359,7 +367,7 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 	return result
 }
 
-func compareProcessTrees(treeA, treeB *ProcessTree) *ProcessDiff {
+func compareProcessTrees(treeA, treeB *internal.PsNode) *ProcessDiff {
 	diff := &ProcessDiff{}
 
 	// Flatten both trees
@@ -397,30 +405,30 @@ func compareProcessTrees(treeA, treeB *ProcessTree) *ProcessDiff {
 	return diff
 }
 
-func flattenProcessTree(tree *ProcessTree) []ProcessInfo {
+func flattenProcessTree(tree *internal.PsNode) []ProcessInfo {
 	if tree == nil {
 		return nil
 	}
 
 	var processes []ProcessInfo
 
-	var flatten func(*ProcessTree)
-	flatten = func(node *ProcessTree) {
+	var flatten func(*internal.PsNode)
+	flatten = func(node *internal.PsNode) {
 		if node == nil {
 			return
 		}
 
 		proc := ProcessInfo{
-			PID:     node.PID,
-			Command: node.Command,
+			PID:     int(node.PID),
+			Command: node.Comm,
 		}
 		if *psTreeCmd {
 			proc.Cmdline = node.Cmdline
 		}
 		processes = append(processes, proc)
 
-		for _, child := range node.Children {
-			flatten(child)
+		for i := range node.Children {
+			flatten(&node.Children[i])
 		}
 	}
 
@@ -622,38 +630,51 @@ func renderTreeDiff(result *DiffResult) {
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	}
 
-	// Process changes
+	// Process tree
 	if result.ProcessChanges != nil {
-		fmt.Println("┌─ Process Changes ────────────────────────────────────────────┐")
+		fmt.Println("┌─ Process Tree ───────────────────────────────────────────────┐")
 
-		if len(result.ProcessChanges.Added) > 0 {
-			fmt.Println("│ Added:")
-			for _, proc := range result.ProcessChanges.Added {
-				fmt.Printf("│   + PID %-5d %s\n", proc.PID, proc.Command)
-				if *psTreeCmd && proc.Cmdline != "" {
-					fmt.Printf("│             %s\n", truncate(proc.Cmdline, 55))
+		added := len(result.ProcessChanges.Added)
+		removed := len(result.ProcessChanges.Removed)
+		modified := len(result.ProcessChanges.Modified)
+		hasChanges := added+removed+modified > 0
+
+		switch {
+		case *showUnchanged && result.processTreeB != nil:
+			status := buildProcessStatusMap(result.ProcessChanges)
+			rendered := renderAnnotatedProcessTree(result.processTreeB, status)
+			for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
+				fmt.Printf("│ %s\n", line)
+			}
+			if removed > 0 {
+				fmt.Println("│ Removed:")
+				for _, proc := range result.ProcessChanges.Removed {
+					fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
 				}
 			}
-		}
-
-		if len(result.ProcessChanges.Removed) > 0 {
-			fmt.Println("│ Removed:")
-			for _, proc := range result.ProcessChanges.Removed {
-				fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
+		case !hasChanges:
+			fmt.Println("│ = No change")
+		default:
+			if added > 0 {
+				fmt.Println("│ Added:")
+				for _, proc := range result.ProcessChanges.Added {
+					fmt.Printf("│   + PID %-5d %s\n", proc.PID, proc.Command)
+					if *psTreeCmd && proc.Cmdline != "" {
+						fmt.Printf("│             %s\n", truncate(proc.Cmdline, 55))
+					}
+				}
 			}
-		}
-
-		if len(result.ProcessChanges.Modified) > 0 {
-			fmt.Println("│ Modified:")
-			for _, proc := range result.ProcessChanges.Modified {
-				fmt.Printf("│   ~ PID %-5d %s\n", proc.PID, proc.Command)
+			if removed > 0 {
+				fmt.Println("│ Removed:")
+				for _, proc := range result.ProcessChanges.Removed {
+					fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
+				}
 			}
-		}
-
-		if *showUnchanged && len(result.ProcessChanges.Unchanged) > 0 {
-			fmt.Println("│ Unchanged:")
-			for _, proc := range result.ProcessChanges.Unchanged {
-				fmt.Printf("│   = PID %-5d %s\n", proc.PID, proc.Command)
+			if modified > 0 {
+				fmt.Println("│ Modified:")
+				for _, proc := range result.ProcessChanges.Modified {
+					fmt.Printf("│   ~ PID %-5d %s\n", proc.PID, proc.Command)
+				}
 			}
 		}
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
@@ -761,4 +782,51 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// buildProcessStatusMap indexes each PID in a ProcessDiff by its marker
+// character: "+" added, "~" modified, "=" unchanged. Removed processes are not
+// included because they do not appear in tree B.
+func buildProcessStatusMap(diff *ProcessDiff) map[uint32]string {
+	status := make(map[uint32]string)
+	for _, p := range diff.Added {
+		status[uint32(p.PID)] = "+"
+	}
+	for _, p := range diff.Modified {
+		status[uint32(p.PID)] = "~"
+	}
+	for _, p := range diff.Unchanged {
+		status[uint32(p.PID)] = "="
+	}
+	return status
+}
+
+// renderAnnotatedProcessTree walks tree and renders it via treeprint, prefixing
+// each node with the marker from status (blank if the PID is unknown).
+func renderAnnotatedProcessTree(tree *internal.PsNode, status map[uint32]string) string {
+	root := treeprint.NewWithRoot("Process tree")
+	addAnnotatedBranch(root, tree, status)
+	return root.String()
+}
+
+func addAnnotatedBranch(parent treeprint.Tree, ps *internal.PsNode, status map[uint32]string) {
+	if ps == nil {
+		return
+	}
+	marker, ok := status[ps.PID]
+	if !ok {
+		marker = " "
+	}
+	displayName := ps.Comm
+	if ps.Cmdline != "" {
+		displayName = ps.Cmdline
+	}
+	branch := parent.AddMetaBranch(fmt.Sprintf("%s PID %d", marker, ps.PID), displayName)
+
+	children := make([]internal.PsNode, len(ps.Children))
+	copy(children, ps.Children)
+	sort.Slice(children, func(i, j int) bool { return children[i].PID < children[j].PID })
+	for i := range children {
+		addAnnotatedBranch(branch, &children[i], status)
+	}
 }

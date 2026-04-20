@@ -1030,7 +1030,7 @@ function teardown() {
 		
 		checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar --ps-tree-cmd
 		[ "$status" -eq 0 ]
-		[[ "$output" == *"Process Changes"* ]]
+		[[ "$output" == *"Process Tree"* ]]
 	else
 		skip "test-imgs directory not available"
 	fi
@@ -1194,7 +1194,7 @@ function build_sk_diff_tars() {
 		"Checkpoint A:"
 		"Checkpoint B:"
 		"Memory Changes"
-		"Process Changes"
+		"Process Tree"
 		"Summary"
 	)
 	
