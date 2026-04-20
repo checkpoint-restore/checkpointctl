@@ -85,37 +85,41 @@ For a complete list of flags supported, use `checkpointctl inspect --help`.
 To compare two container checkpoints and analyze changes between them, use the checkpointctl `diff` command.
 
 ```console
-$ checkpointctl diff checkpoint1.tar checkpoint2.tar
-
+$ checkpointctl diff --show-unchanged --ps-tree-cmd --sockets ./cp1.tar cp2.tar 
 ╔════════════════════════════════════════════════════════════════╗
 ║ Checkpoint Diff                                                ║
 ╠════════════════════════════════════════════════════════════════╣
-║ Container: web-server                                          ║
-║ Image:     docker.io/library/nginx:latest                      ║
+║ Container: optimistic_mclean                                   ║
+║ Image:     docker.io/library/python:alpine                     ║
+║ ID:        6ebe04dda2005962a8fb4e971caedfda5e03e22c882e2334... ║
 ╚════════════════════════════════════════════════════════════════╝
 
 Checkpoint A:
-  Created: 2026-02-15T10:00:00Z
-  Size:    2.1 MiB
+  Created: 2026-04-18T10:15:41+01:00
+  Size:    15186908 bytes
 
 Checkpoint B:
-  Created: 2026-02-15T10:05:00Z
-  Size:    2.3 MiB
+  Created: 2026-04-18T10:15:41+01:00
+  Size:    15212641 bytes
 
 ┌─ Memory Changes ─────────────────────────────────────────────┐
-│ ↑ Increased by 0.15 MB
+│ ↑ Increased by 0.02 MB
 └──────────────────────────────────────────────────────────────┘
-
-┌─ Process Changes ────────────────────────────────────────────┐
-│ Added:
-│   + PID 42    xmrig
-│ Unchanged: 3
+┌─ Process Tree ───────────────────────────────────────────────┐
+│ Process tree
+│ └── [= PID 1]  sleep infinity 
+│     └── [= PID 2]  python3 -m http.server 8080 
 └──────────────────────────────────────────────────────────────┘
-
+┌─ Socket Changes ──────────────────────────────────────────────────────┐
+│     PID   PROTO STATE        LOCAL                 PEER
+│  +  2     TCP   ESTABLISHED  10.88.0.3:8080        10.88.0.1:39838
+│  =  2     TCP   LISTEN       0.0.0.0:8080          -
+└───────────────────────────────────────────────────────────────────────┘
 Summary:
-Checkpoint comparison for container web-server
-Processes: +1 -0 ~0
-Memory: +0.15 MB
+Checkpoint comparison for container optimistic_mclean
+Sockets: +1 -0
+Memory: +0.02 MB
+
 ```
 
 ### `memparse` sub-command

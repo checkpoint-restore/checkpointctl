@@ -11,6 +11,7 @@ var (
 	PsTreeEnv          bool
 	Files              bool
 	Sockets            bool
+	ShowUnchanged      bool
 	ShowAll            bool
 	SearchPattern      string
 	SearchRegexPattern string

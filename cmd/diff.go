@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/spf13/cobra"
+	"github.com/xlab/treeprint"
 )
 
 func Diff() *cobra.Command {
@@ -18,12 +21,14 @@ func Diff() *cobra.Command {
 		Long: `Compare two CRIU checkpoints and show differences in:
   - Process tree (new/removed/modified processes)
   - File descriptors (opened/closed files)
+  - Sockets (new/removed network sockets)
   - Memory usage (size changes)
 
 Example:
   checkpointctl diff checkpoint1.tar checkpoint2.tar
   checkpointctl diff --format json checkpoint1.tar checkpoint2.tar
-  checkpointctl diff --files --ps-tree-cmd checkpoint1.tar checkpoint2.tar`,
+  checkpointctl diff --files --ps-tree-cmd checkpoint1.tar checkpoint2.tar
+  checkpointctl diff --files --sockets checkpoint1.tar checkpoint2.tar`,
 		Args: cobra.ExactArgs(2),
 		RunE: diff,
 	}
@@ -58,6 +63,12 @@ Example:
 		"sockets",
 		false,
 		"Include sockets in the diff",
+	)
+	flags.BoolVar(
+		showUnchanged,
+		"show-unchanged",
+		false,
+		"Show entries that are identical between the two checkpoints",
 	)
 
 	return cmd
@@ -167,7 +178,16 @@ func diff(cmd *cobra.Command, args []string) error {
 func getTaskJSON(tasks []internal.Task) ([]CheckpointMetadata, error) {
 	var result []CheckpointMetadata
 
+	prevPsTree := internal.PsTree
+	defer func() { internal.PsTree = prevPsTree }()
+
 	for _, task := range tasks {
+		// Enable process-tree extraction only when pstree.img is present; some
+		// test fixtures carry just config/spec dumps and have no checkpoint data.
+		pstreePath := filepath.Join(task.OutputDir, metadata.CheckpointDirectory, "pstree.img")
+		_, statErr := os.Stat(pstreePath)
+		internal.PsTree = statErr == nil
+
 		// Use the same rendering logic as inspect
 		var buf []byte
 		var err error
@@ -214,20 +234,14 @@ type CheckpointMetadata struct {
 	Created         string                `json:"created"`
 	Engine          string                `json:"engine"`
 	CheckpointSize  CheckpointSize        `json:"checkpoint_size"`
-	ProcessTree     *ProcessTree          `json:"process_tree,omitempty"`
+	ProcessTree     *internal.PsNode      `json:"process_tree,omitempty"`
 	FileDescriptors []FileDescriptorEntry `json:"file_descriptors,omitempty"`
+	Sockets         []internal.SkNode     `json:"sockets,omitempty"`
 }
 
 type CheckpointSize struct {
 	TotalSize       int64 `json:"total_size"`
 	MemoryPagesSize int64 `json:"memory_pages_size"`
-}
-
-type ProcessTree struct {
-	PID      int            `json:"pid"`
-	Command  string         `json:"command"`
-	Cmdline  string         `json:"cmdline"`
-	Children []*ProcessTree `json:"children,omitempty"`
 }
 
 type FileDescriptorEntry struct {
@@ -251,7 +265,10 @@ type DiffResult struct {
 	ProcessChanges *ProcessDiff   `json:"process_changes,omitempty"`
 	FileChanges    *FileDiff      `json:"file_changes,omitempty"`
 	MemoryChanges  *MemoryDiff    `json:"memory_changes"`
+	SocketChanges  *SocketDiff    `json:"socket_changes,omitempty"`
 	Summary        string         `json:"summary"`
+
+	processTreeB *internal.PsNode
 }
 
 type CheckpointInfo struct {
@@ -263,7 +280,7 @@ type ProcessDiff struct {
 	Added     []ProcessInfo `json:"added,omitempty"`
 	Removed   []ProcessInfo `json:"removed,omitempty"`
 	Modified  []ProcessInfo `json:"modified,omitempty"`
-	Unchanged int           `json:"unchanged"`
+	Unchanged []ProcessInfo `json:"unchanged,omitempty"`
 }
 
 type ProcessInfo struct {
@@ -275,7 +292,7 @@ type ProcessInfo struct {
 type FileDiff struct {
 	Added     []FileInfo `json:"added,omitempty"`
 	Removed   []FileInfo `json:"removed,omitempty"`
-	Unchanged int        `json:"unchanged"`
+	Unchanged []FileInfo `json:"unchanged,omitempty"`
 }
 
 type FileInfo struct {
@@ -288,6 +305,24 @@ type FileInfo struct {
 type MemoryDiff struct {
 	SizeChangeBytes int64   `json:"size_change_bytes"`
 	SizeChangeMB    float64 `json:"size_change_mb"`
+}
+
+type SocketDiff struct {
+	Added     []SocketInfo `json:"added,omitempty"`
+	Removed   []SocketInfo `json:"removed,omitempty"`
+	Unchanged []SocketInfo `json:"unchanged,omitempty"`
+}
+
+type SocketInfo struct {
+	PID      int    `json:"pid"`
+	Protocol string `json:"protocol"`
+	Type     string `json:"type"`
+	Address  string `json:"address,omitempty"`
+	State    string `json:"state,omitempty"`
+	Source   string `json:"source,omitempty"`
+	SrcPort  uint32 `json:"src_port,omitempty"`
+	Dest     string `json:"dest,omitempty"`
+	DstPort  uint32 `json:"dst_port,omitempty"`
 }
 
 func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
@@ -307,10 +342,16 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 
 	// Compare processes
 	result.ProcessChanges = compareProcessTrees(metadataA.ProcessTree, metadataB.ProcessTree)
+	result.processTreeB = metadataB.ProcessTree
 
 	// Compare files if requested
 	if *files {
 		result.FileChanges = compareFileDescriptors(metadataA.FileDescriptors, metadataB.FileDescriptors)
+	}
+
+	// Compare sockets if requested
+	if *sockets {
+		result.SocketChanges = compareSockets(metadataA.Sockets, metadataB.Sockets)
 	}
 
 	// Compare memory
@@ -326,7 +367,7 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 	return result
 }
 
-func compareProcessTrees(treeA, treeB *ProcessTree) *ProcessDiff {
+func compareProcessTrees(treeA, treeB *internal.PsNode) *ProcessDiff {
 	diff := &ProcessDiff{}
 
 	// Flatten both trees
@@ -351,7 +392,7 @@ func compareProcessTrees(treeA, treeB *ProcessTree) *ProcessDiff {
 		} else if *psTreeCmd && procA.Cmdline != procB.Cmdline {
 			diff.Modified = append(diff.Modified, procB)
 		} else {
-			diff.Unchanged++
+			diff.Unchanged = append(diff.Unchanged, procB)
 		}
 	}
 
@@ -364,30 +405,30 @@ func compareProcessTrees(treeA, treeB *ProcessTree) *ProcessDiff {
 	return diff
 }
 
-func flattenProcessTree(tree *ProcessTree) []ProcessInfo {
+func flattenProcessTree(tree *internal.PsNode) []ProcessInfo {
 	if tree == nil {
 		return nil
 	}
 
 	var processes []ProcessInfo
 
-	var flatten func(*ProcessTree)
-	flatten = func(node *ProcessTree) {
+	var flatten func(*internal.PsNode)
+	flatten = func(node *internal.PsNode) {
 		if node == nil {
 			return
 		}
 
 		proc := ProcessInfo{
-			PID:     node.PID,
-			Command: node.Command,
+			PID:     int(node.PID),
+			Command: node.Comm,
 		}
 		if *psTreeCmd {
 			proc.Cmdline = node.Cmdline
 		}
 		processes = append(processes, proc)
 
-		for _, child := range node.Children {
-			flatten(child)
+		for i := range node.Children {
+			flatten(&node.Children[i])
 		}
 	}
 
@@ -431,13 +472,89 @@ func compareFileDescriptors(fdsA, fdsB []FileDescriptorEntry) *FileDiff {
 		if _, exists := mapA[key]; !exists {
 			diff.Added = append(diff.Added, fileB)
 		} else {
-			diff.Unchanged++
+			diff.Unchanged = append(diff.Unchanged, fileB)
 		}
 	}
 
 	for key, fileA := range mapA {
 		if _, exists := mapB[key]; !exists {
 			diff.Removed = append(diff.Removed, fileA)
+		}
+	}
+
+	return diff
+}
+
+func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
+	diff := &SocketDiff{}
+
+	// Build socket maps
+	// Key format: PID:Protocol:Type:Address:SrcPort:Dest:DstPort
+	mapA := make(map[string]SocketInfo)
+	mapB := make(map[string]SocketInfo)
+
+	for _, entry := range sksA {
+		for _, socket := range entry.OpenSockets {
+			key := fmt.Sprintf("%d:%s:%s:%s:%d:%s:%d",
+				entry.PID,
+				socket.Protocol,
+				socket.Data.Type,
+				socket.Data.Address,
+				socket.Data.SourcePort,
+				socket.Data.Dest,
+				socket.Data.DestPort,
+			)
+			mapA[key] = SocketInfo{
+				PID:      int(entry.PID),
+				Protocol: socket.Protocol,
+				Type:     socket.Data.Type,
+				Address:  socket.Data.Address,
+				State:    socket.Data.State,
+				Source:   socket.Data.Source,
+				SrcPort:  socket.Data.SourcePort,
+				Dest:     socket.Data.Dest,
+				DstPort:  socket.Data.DestPort,
+			}
+		}
+	}
+
+	for _, entry := range sksB {
+		for _, socket := range entry.OpenSockets {
+			key := fmt.Sprintf("%d:%s:%s:%s:%d:%s:%d",
+				entry.PID,
+				socket.Protocol,
+				socket.Data.Type,
+				socket.Data.Address,
+				socket.Data.SourcePort,
+				socket.Data.Dest,
+				socket.Data.DestPort,
+			)
+			mapB[key] = SocketInfo{
+				PID:      int(entry.PID),
+				Protocol: socket.Protocol,
+				Type:     socket.Data.Type,
+				Address:  socket.Data.Address,
+				State:    socket.Data.State,
+				Source:   socket.Data.Source,
+				SrcPort:  socket.Data.SourcePort,
+				Dest:     socket.Data.Dest,
+				DstPort:  socket.Data.DestPort,
+			}
+		}
+	}
+
+	// Find differences
+	for key, socketB := range mapB {
+		if _, exists := mapA[key]; !exists {
+			diff.Added = append(diff.Added, socketB)
+		} else {
+			diff.Unchanged = append(diff.Unchanged, socketB)
+		}
+	}
+
+	for key, socketA := range mapA {
+		if _, exists := mapB[key]; !exists {
+			diff.Removed = append(diff.Removed, socketA)
 		}
 	}
 
@@ -463,6 +580,15 @@ func generateSummary(result *DiffResult) string {
 
 		if added > 0 || removed > 0 {
 			summary += fmt.Sprintf("\nFiles: +%d -%d", added, removed)
+		}
+	}
+
+	if result.SocketChanges != nil {
+		added := len(result.SocketChanges.Added)
+		removed := len(result.SocketChanges.Removed)
+
+		if added > 0 || removed > 0 {
+			summary += fmt.Sprintf("\nSockets: +%d -%d", added, removed)
 		}
 	}
 
@@ -504,36 +630,52 @@ func renderTreeDiff(result *DiffResult) {
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	}
 
-	// Process changes
+	// Process tree
 	if result.ProcessChanges != nil {
-		fmt.Println("┌─ Process Changes ────────────────────────────────────────────┐")
+		fmt.Println("┌─ Process Tree ───────────────────────────────────────────────┐")
 
-		if len(result.ProcessChanges.Added) > 0 {
-			fmt.Println("│ Added:")
-			for _, proc := range result.ProcessChanges.Added {
-				fmt.Printf("│   + PID %-5d %s\n", proc.PID, proc.Command)
-				if *psTreeCmd && proc.Cmdline != "" {
-					fmt.Printf("│             %s\n", truncate(proc.Cmdline, 55))
+		added := len(result.ProcessChanges.Added)
+		removed := len(result.ProcessChanges.Removed)
+		modified := len(result.ProcessChanges.Modified)
+		hasChanges := added+removed+modified > 0
+
+		switch {
+		case *showUnchanged && result.processTreeB != nil:
+			status := buildProcessStatusMap(result.ProcessChanges)
+			rendered := renderAnnotatedProcessTree(result.processTreeB, status)
+			for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
+				fmt.Printf("│ %s\n", line)
+			}
+			if removed > 0 {
+				fmt.Println("│ Removed:")
+				for _, proc := range result.ProcessChanges.Removed {
+					fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
 				}
 			}
-		}
-
-		if len(result.ProcessChanges.Removed) > 0 {
-			fmt.Println("│ Removed:")
-			for _, proc := range result.ProcessChanges.Removed {
-				fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
+		case !hasChanges:
+			fmt.Println("│ = No change")
+		default:
+			if added > 0 {
+				fmt.Println("│ Added:")
+				for _, proc := range result.ProcessChanges.Added {
+					fmt.Printf("│   + PID %-5d %s\n", proc.PID, proc.Command)
+					if *psTreeCmd && proc.Cmdline != "" {
+						fmt.Printf("│             %s\n", truncate(proc.Cmdline, 55))
+					}
+				}
 			}
-		}
-
-		if len(result.ProcessChanges.Modified) > 0 {
-			fmt.Println("│ Modified:")
-			for _, proc := range result.ProcessChanges.Modified {
-				fmt.Printf("│   ~ PID %-5d %s\n", proc.PID, proc.Command)
+			if removed > 0 {
+				fmt.Println("│ Removed:")
+				for _, proc := range result.ProcessChanges.Removed {
+					fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
+				}
 			}
-		}
-
-		if result.ProcessChanges.Unchanged > 0 {
-			fmt.Printf("│ Unchanged: %d\n", result.ProcessChanges.Unchanged)
+			if modified > 0 {
+				fmt.Println("│ Modified:")
+				for _, proc := range result.ProcessChanges.Modified {
+					fmt.Printf("│   ~ PID %-5d %s\n", proc.PID, proc.Command)
+				}
+			}
 		}
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
 	}
@@ -558,10 +700,46 @@ func renderTreeDiff(result *DiffResult) {
 			}
 		}
 
-		if result.FileChanges.Unchanged > 0 {
-			fmt.Printf("│ Unchanged: %d\n", result.FileChanges.Unchanged)
+		if *showUnchanged && len(result.FileChanges.Unchanged) > 0 {
+			fmt.Println("│ Unchanged:")
+			for _, file := range result.FileChanges.Unchanged {
+				fmt.Printf("│   = PID %-5d %-8s %s\n",
+					file.PID, file.Type, truncate(file.Path, 38))
+			}
 		}
 		fmt.Println("└──────────────────────────────────────────────────────────────┘")
+	}
+
+	// Socket changes
+	if result.SocketChanges != nil {
+		fmt.Println("┌─ Socket Changes ──────────────────────────────────────────────────────┐")
+
+		hasChanges := len(result.SocketChanges.Added) > 0 || len(result.SocketChanges.Removed) > 0
+		showUnchangedRows := *showUnchanged && len(result.SocketChanges.Unchanged) > 0
+
+		if hasChanges || showUnchangedRows {
+			fmt.Printf("│     %-5s %-5s %-12s %-21s %s\n",
+				"PID", "PROTO", "STATE", "LOCAL", "PEER")
+			for _, socket := range result.SocketChanges.Added {
+				state, local, peer := formatSocketColumns(socket)
+				fmt.Printf("│  +  %-5d %-5s %-12s %-21s %s\n",
+					socket.PID, socket.Protocol, state, local, peer)
+			}
+			for _, socket := range result.SocketChanges.Removed {
+				state, local, peer := formatSocketColumns(socket)
+				fmt.Printf("│  -  %-5d %-5s %-12s %-21s %s\n",
+					socket.PID, socket.Protocol, state, local, peer)
+			}
+			if showUnchangedRows {
+				for _, socket := range result.SocketChanges.Unchanged {
+					state, local, peer := formatSocketColumns(socket)
+					fmt.Printf("│  =  %-5d %-5s %-12s %-21s %s\n",
+						socket.PID, socket.Protocol, state, local, peer)
+				}
+			}
+		}
+
+		fmt.Println("└───────────────────────────────────────────────────────────────────────┘")
 	}
 
 	// Summary
@@ -575,9 +753,80 @@ func renderJSONDiff(result *DiffResult) error {
 	return encoder.Encode(result)
 }
 
+func formatSocketColumns(socket SocketInfo) (state, local, peer string) {
+	switch socket.Type {
+	case "TCP", "UDP":
+		local = fmt.Sprintf("%s:%d", socket.Source, socket.SrcPort)
+		if socket.DstPort > 0 {
+			peer = fmt.Sprintf("%s:%d", socket.Dest, socket.DstPort)
+		} else {
+			peer = "-"
+		}
+		state = socket.State
+		if state == "" {
+			state = "-"
+		}
+	default:
+		local = socket.Address
+		if local == "" {
+			local = "@"
+		}
+		state = "-"
+		peer = "-"
+	}
+	return
+}
+
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// buildProcessStatusMap indexes each PID in a ProcessDiff by its marker
+// character: "+" added, "~" modified, "=" unchanged. Removed processes are not
+// included because they do not appear in tree B.
+func buildProcessStatusMap(diff *ProcessDiff) map[uint32]string {
+	status := make(map[uint32]string)
+	for _, p := range diff.Added {
+		status[uint32(p.PID)] = "+"
+	}
+	for _, p := range diff.Modified {
+		status[uint32(p.PID)] = "~"
+	}
+	for _, p := range diff.Unchanged {
+		status[uint32(p.PID)] = "="
+	}
+	return status
+}
+
+// renderAnnotatedProcessTree walks tree and renders it via treeprint, prefixing
+// each node with the marker from status (blank if the PID is unknown).
+func renderAnnotatedProcessTree(tree *internal.PsNode, status map[uint32]string) string {
+	root := treeprint.NewWithRoot("Process tree")
+	addAnnotatedBranch(root, tree, status)
+	return root.String()
+}
+
+func addAnnotatedBranch(parent treeprint.Tree, ps *internal.PsNode, status map[uint32]string) {
+	if ps == nil {
+		return
+	}
+	marker, ok := status[ps.PID]
+	if !ok {
+		marker = " "
+	}
+	displayName := ps.Comm
+	if ps.Cmdline != "" {
+		displayName = ps.Cmdline
+	}
+	branch := parent.AddMetaBranch(fmt.Sprintf("%s PID %d", marker, ps.PID), displayName)
+
+	children := make([]internal.PsNode, len(ps.Children))
+	copy(children, ps.Children)
+	sort.Slice(children, func(i, j int) bool { return children[i].PID < children[j].PID })
+	for i := range children {
+		addAnnotatedBranch(branch, &children[i], status)
+	}
 }
