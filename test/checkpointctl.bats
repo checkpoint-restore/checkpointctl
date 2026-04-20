@@ -970,7 +970,9 @@ function teardown() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"Checkpoint Diff"* ]]
 	[[ "$output" == *"Memory Changes"* ]]
-	[[ "$output" == *"No change"* ]]
+	[[ "$output" == *"Process Tree"* ]]
+	# Both Memory Changes and Process Tree sections emit "No change".
+	[ "$(echo "$output" | grep -c "No change")" -ge 2 ]
 }
 
 @test "Run checkpointctl diff with two identical checkpoints (json format)" {
@@ -1069,6 +1071,17 @@ function build_sk_diff_tars() {
 	cp test-imgs-diff/b/* "$TEST_TMP_DIR1"/b/checkpoint/
 	( cd "$TEST_TMP_DIR1"/a && tar cf "$TEST_TMP_DIR2"/a.tar . )
 	( cd "$TEST_TMP_DIR1"/b && tar cf "$TEST_TMP_DIR2"/b.tar . )
+}
+
+@test "Run checkpointctl diff with --show-unchanged (process tree)" {
+	build_sk_diff_tars
+
+	checkpointctl diff "$TEST_TMP_DIR2"/a.tar "$TEST_TMP_DIR2"/b.tar --show-unchanged
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"Process Tree"* ]]
+	[[ "$output" == *"= PID"* ]]
+	[[ "$output" == *"+ PID"* ]]
+	[[ "$output" == *"Removed:"* ]]
 }
 
 @test "Run checkpointctl diff with --sockets flag (added, removed, unchanged)" {
