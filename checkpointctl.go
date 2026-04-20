@@ -43,7 +43,6 @@ func main() {
 		rootCommand.AddCommand(cmd.CreatePluginCommand(plugin))
 	}
 
-
 	rootCommand.Version = version
 
 	if err := rootCommand.Execute(); err != nil {
