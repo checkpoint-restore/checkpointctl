@@ -57,7 +57,7 @@ golang-lint:
 
 .PHONY: shellcheck
 shellcheck:
-	shellcheck test/*bats
+	shellcheck test/*bats test/*.sh
 
 .PHONY: lint
 lint: golang-lint shellcheck
