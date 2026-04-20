@@ -3,6 +3,7 @@
 # Generate two CRIU checkpoints under $1 to test added, removed,
 # and unchanged state across checkpoints.
 
+
 set -eu
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -74,19 +75,24 @@ piggie_cmd() {
 # command) to establish its connection.
 wait_for_conns 1
 
-# Two extras that will only appear in A.
+# TCP + UDP extras that will only appear in A.
 piggie_cmd spawn-tcp-client
 piggie_cmd spawn-tcp-client
+piggie_cmd spawn-udp-client
+piggie_cmd spawn-udp-client
 
-# Checkpoint A: original client + two extras.
+# Checkpoint A.
 dump "$OUT/a" --leave-running
 
-# Tear down both extras.
+# Tear down every extra.
 piggie_cmd kill-tcp-client
 piggie_cmd kill-tcp-client
+piggie_cmd kill-udp-client
+piggie_cmd kill-udp-client
 
-# A fresh extra that will only appear in B.
+# Fresh extras that will only appear in B.
 piggie_cmd spawn-tcp-client
+piggie_cmd spawn-udp-client
 
-# Checkpoint B: original client + the new extra.
+# Checkpoint B.
 dump "$OUT/b"

@@ -1078,9 +1078,11 @@ function build_sk_diff_tars() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"+"*"TCP"*"ESTABLISHED"*"127.0.0.1:5000"* ]]
 	[[ "$output" == *"-"*"TCP"*"ESTABLISHED"*"127.0.0.1:5000"* ]]
+	[[ "$output" == *"+"*"UDP"*"ESTABLISHED"*"127.0.0.1:5001"* ]]
+	[[ "$output" == *"-"*"UDP"*"ESTABLISHED"*"127.0.0.1:5001"* ]]
 	[[ "$output" == *"="*"TCP"*"LISTEN"*"0.0.0.0:5000"* ]]
 	[[ "$output" == *"="*"TCP"*"ESTABLISHED"*"127.0.0.1:5000"* ]]
-	[[ "$output" == *"Sockets: +2 -4"* ]]
+	[[ "$output" == *"Sockets: +3 -6"* ]]
 }
 
 @test "Run checkpointctl diff with --sockets flag (json format)" {
@@ -1088,11 +1090,13 @@ function build_sk_diff_tars() {
 
 	run bash -c "$CHECKPOINTCTL diff --sockets --show-unchanged --format=json $TEST_TMP_DIR2/a.tar $TEST_TMP_DIR2/b.tar"
 	[ "$status" -eq 0 ]
-	echo "$output" | jq -e '.socket_changes.added | length == 2'
-	echo "$output" | jq -e '.socket_changes.removed | length == 4'
+	echo "$output" | jq -e '.socket_changes.added | length == 3'
+	echo "$output" | jq -e '.socket_changes.removed | length == 6'
 	echo "$output" | jq -e '.socket_changes.unchanged | length == 3'
-	echo "$output" | jq -e '[.socket_changes.added[] | select(.state == "ESTABLISHED")] | length == 2'
-	echo "$output" | jq -e '[.socket_changes.removed[] | select(.state == "ESTABLISHED")] | length == 4'
+	echo "$output" | jq -e '[.socket_changes.added[] | select(.protocol == "TCP")] | length == 2'
+	echo "$output" | jq -e '[.socket_changes.added[] | select(.protocol == "UDP")] | length == 1'
+	echo "$output" | jq -e '[.socket_changes.removed[] | select(.protocol == "TCP")] | length == 4'
+	echo "$output" | jq -e '[.socket_changes.removed[] | select(.protocol == "UDP")] | length == 2'
 	echo "$output" | jq -e '[.socket_changes.unchanged[] | select(.state == "LISTEN" and .src_port == 5000)] | length == 1'
 	echo "$output" | jq -e '[.socket_changes.unchanged[] | select(.state == "ESTABLISHED")] | length == 2'
 }
@@ -1104,7 +1108,7 @@ function build_sk_diff_tars() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"File Descriptor Changes"* ]]
 	[[ "$output" == *"Socket Changes"* ]]
-	[[ "$output" == *"Sockets: +2 -4"* ]]
+	[[ "$output" == *"Sockets: +3 -6"* ]]
 }
 
 

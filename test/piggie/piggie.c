@@ -24,6 +24,7 @@
 
 #define SERVER_IP "127.0.0.1"
 #define PORT 5000
+#define UDP_PORT 5001
 #define MAX_BUFFER_SIZE 1024
 
 typedef struct {
@@ -32,11 +33,15 @@ typedef struct {
 	bool create_zombie;
 } opts_t;
 
-static pid_t extra_clients[MAX_EXTRA_CLIENTS];
-static int extra_clients_n = 0;
+static pid_t tcp_extras[MAX_EXTRA_CLIENTS];
+static int tcp_extras_n = 0;
+static pid_t udp_extras[MAX_EXTRA_CLIENTS];
+static int udp_extras_n = 0;
 
-static int spawn_extra_client(char *err, size_t errsz);
-static int kill_extra_client(char *err, size_t errsz);
+static int spawn_tcp_client(char *err, size_t errsz);
+static int kill_tcp_client(char *err, size_t errsz);
+static int spawn_udp_client(char *err, size_t errsz);
+static int kill_udp_client(char *err, size_t errsz);
 
 /*
  * Command FIFO actions allowing to change the piggie process state at
@@ -53,20 +58,30 @@ static struct {
 	const char *name;
 	int (*fn)(char *err, size_t errsz);
 } actions[] = {
-	{ "spawn-tcp-client", spawn_extra_client },
-	{ "kill-tcp-client",  kill_extra_client  },
+	{ "spawn-tcp-client", spawn_tcp_client },
+	{ "kill-tcp-client",  kill_tcp_client  },
+	{ "spawn-udp-client", spawn_udp_client },
+	{ "kill-udp-client",  kill_udp_client  },
 };
 
 #define N_ACTIONS ((int)(sizeof(actions) / sizeof(actions[0])))
 
-static int spawn_extra_client(char *err, size_t errsz)
+/*
+ * Fork a child that creates an AF_INET socket of `sock_type`, connects
+ * it to 127.0.0.1:port, and parks in pause(). The child signals back on
+ * a sync pipe once connect() has returned so the caller knows the
+ * kernel-level state is in place before acking.
+ */
+static int spawn_extra(int sock_type, int port, const char *name,
+		       pid_t *stack, int *stack_n,
+		       char *err, size_t errsz)
 {
 	int sync_pipe[2];
 	pid_t p;
 	char ready;
 	ssize_t n;
 
-	if (extra_clients_n >= MAX_EXTRA_CLIENTS) {
+	if (*stack_n >= MAX_EXTRA_CLIENTS) {
 		snprintf(err, errsz, "stack full (max=%d)", MAX_EXTRA_CLIENTS);
 		return -1;
 	}
@@ -89,12 +104,12 @@ static int spawn_extra_client(char *err, size_t errsz)
 		char ok = 1;
 		struct sockaddr_in addr = {
 			.sin_family = AF_INET,
-			.sin_port = htons(PORT),
+			.sin_port = htons(port),
 		};
 
 		close(sync_pipe[0]);
-		prctl(PR_SET_NAME, "tcp-client2");
-		fd = socket(AF_INET, SOCK_STREAM, 0);
+		prctl(PR_SET_NAME, name);
+		fd = socket(AF_INET, sock_type, 0);
 		if (fd == -1) _exit(1);
 		if (inet_pton(AF_INET, SERVER_IP, &addr.sin_addr) <= 0) _exit(1);
 		if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) _exit(1);
@@ -109,26 +124,48 @@ static int spawn_extra_client(char *err, size_t errsz)
 	close(sync_pipe[0]);
 	if (n != 1) {
 		waitpid(p, NULL, 0);
-		snprintf(err, errsz, "tcp-client2 failed to connect");
+		snprintf(err, errsz, "%s failed to connect", name);
 		return -1;
 	}
-	extra_clients[extra_clients_n++] = p;
+	stack[(*stack_n)++] = p;
 	return 0;
 }
 
-static int kill_extra_client(char *err, size_t errsz)
+static int kill_extra(pid_t *stack, int *stack_n, char *err, size_t errsz)
 {
 	pid_t p;
 
-	if (extra_clients_n == 0) {
+	if (*stack_n == 0) {
 		snprintf(err, errsz, "no extra clients");
 		return -1;
 	}
 
-	p = extra_clients[--extra_clients_n];
+	p = stack[--(*stack_n)];
 	kill(p, SIGTERM);
 	waitpid(p, NULL, 0);
 	return 0;
+}
+
+static int spawn_tcp_client(char *err, size_t errsz)
+{
+	return spawn_extra(SOCK_STREAM, PORT, "tcp-client2",
+			   tcp_extras, &tcp_extras_n, err, errsz);
+}
+
+static int kill_tcp_client(char *err, size_t errsz)
+{
+	return kill_extra(tcp_extras, &tcp_extras_n, err, errsz);
+}
+
+static int spawn_udp_client(char *err, size_t errsz)
+{
+	return spawn_extra(SOCK_DGRAM, UDP_PORT, "udp-client2",
+			   udp_extras, &udp_extras_n, err, errsz);
+}
+
+static int kill_udp_client(char *err, size_t errsz)
+{
+	return kill_extra(udp_extras, &udp_extras_n, err, errsz);
 }
 
 static void create_zombie(void)
