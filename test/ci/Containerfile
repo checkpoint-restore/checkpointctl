@@ -17,3 +17,5 @@ RUN dnf install -y \
 	ShellCheck \
 	zsh \
 	&& dnf clean all
+
+RUN git config --global --add safe.directory /__w/checkpointctl/checkpointctl
