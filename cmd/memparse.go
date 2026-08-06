@@ -145,7 +145,7 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 		var memSize int64
 
 		for _, entry := range pagemapEntries {
-			memSize += int64(*entry.NrPages) * int64(pageSize)
+			memSize += int64(entry.GetNrPages()) * int64(pageSize)
 		}
 
 		shmemSize, err := memReader.GetShmemSize()
