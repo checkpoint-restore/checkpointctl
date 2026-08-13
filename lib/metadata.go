@@ -4,13 +4,17 @@ package metadata
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 )
+
+var errNotRegularFile = errors.New("not a regular file")
 
 const (
 	// container archive
@@ -165,9 +169,18 @@ func WriteJSONFile(v interface{}, dir, file string) (string, error) {
 	return file, nil
 }
 
+// ReadJSONFile reads JSON from a regular file in dir. On Unix, a symbolic link
+// in the final path component is rejected. On Linux, reopening the validated
+// file descriptor requires access to a usable procfs instance.
 func ReadJSONFile(v interface{}, dir, file string) (string, error) {
 	file = filepath.Join(dir, file)
-	content, err := os.ReadFile(file)
+	f, err := openRegularFile(file)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	content, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}
@@ -176,6 +189,27 @@ func ReadJSONFile(v interface{}, dir, file string) (string, error) {
 	}
 
 	return file, nil
+}
+
+// openRegularFile applies platform-specific opening safeguards and verifies
+// the opened descriptor before returning it.
+func openRegularFile(file string) (*os.File, error) {
+	f, err := openFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		_ = f.Close()
+		return nil, fmt.Errorf("%s is %w", file, errNotRegularFile)
+	}
+
+	return f, nil
 }
 
 func ByteToString(b int64) string {
