@@ -9,9 +9,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
         version: latest
         only-new-issues: true
@@ -24,7 +24,7 @@ jobs:
   gomod:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: verify go.mod/go.sum
       run: |
         make vendor
@@ -35,8 +35,8 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v3
+    - uses: actions/checkout@v7
+    - uses: dorny/paths-filter@v4
       id: changes
       with:
         filters: |
@@ -45,7 +45,7 @@ jobs:
             - '.github/workflows/verify.yml'
     - name: Lint markdown
       if: steps.changes.outputs.md == 'true'
-      uses: DavidAnson/markdownlint-cli2-action@v17
+      uses: DavidAnson/markdownlint-cli2-action@v24
       with:
         globs: |
           README.md

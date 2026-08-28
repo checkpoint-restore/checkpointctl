@@ -19,7 +19,7 @@ jobs:
       - name: Fix git safe directory
         run: git config --global --add safe.directory /__w/checkpointctl/checkpointctl
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # needed for codecov
           fetch-depth: 0
@@ -27,7 +27,7 @@ jobs:
         run: make coverage
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           fail_ci_if_error: true
           file: .coverage/coverage.out
