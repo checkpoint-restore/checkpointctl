@@ -58,7 +58,7 @@ jobs:
       env:
         ARTIFACT_DIR: ${{ steps.artifact_check.outputs.artifact_dir }}
         COMMENT_MARKER: ${{ steps.artifact_check.outputs.comment_marker }}
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       with:
         script: |
           const fs = require('fs');

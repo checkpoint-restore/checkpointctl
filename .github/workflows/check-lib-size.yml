@@ -13,13 +13,13 @@ jobs:
     # Check if pull request does not have label "lib-bloat-ok".
     if: "!contains(github.event.pull_request.labels.*.name, 'lib-bloat-ok')"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         # Needed to rebase against the base branch
         fetch-depth: 0
         # Checkout pull request HEAD commit instead of merge commit
         ref: ${{ github.event.pull_request.head.sha }}
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@v7
       with:
         go-version: stable
     - name: Configure git user details
@@ -76,7 +76,7 @@ jobs:
         EOF
     - name: Upload size check results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: lib-size-check-results
         retention-days: 5
