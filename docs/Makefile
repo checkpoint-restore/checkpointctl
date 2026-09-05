@@ -6,6 +6,7 @@ ASCIIDOC := asciidoctor
 FOOTER := footer.adoc
 
 SRC1 += checkpointctl-build.adoc
+SRC1 += checkpointctl-diff.adoc
 SRC1 += checkpointctl-inspect.adoc
 SRC1 += checkpointctl-list.adoc
 SRC1 += checkpointctl-memparse.adoc
