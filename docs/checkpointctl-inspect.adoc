@@ -12,7 +12,7 @@ include::footer.adoc[]
 == Options
 
 *-h*, *--help*::
-  Show help for checkpointctl memparse
+  Show help for checkpointctl inspect
 
 *--all*::
   Show all information about container checkpoints
