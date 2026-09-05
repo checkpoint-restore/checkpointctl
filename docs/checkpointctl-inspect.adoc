@@ -23,6 +23,9 @@ include::footer.adoc[]
 *--format*=_FORMAT_::
   Specify the output format: tree or json (default "tree")
 
+*--metadata*::
+  Show metadata about the container
+
 *--mounts*::
   Display an overview of mounts used in the container checkpoint
 
