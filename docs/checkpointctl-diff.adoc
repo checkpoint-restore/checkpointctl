@@ -1,0 +1,64 @@
+= checkpointctl-diff(1)
+include::footer.adoc[]
+
+== Name
+
+*checkpointctl-diff* - show changes between two container checkpoints
+
+== Synopsis
+
+*checkpointctl diff* [_OPTION_]... _CHECKPOINT_A_ _CHECKPOINT_B_
+
+== Description
+
+Compare two container checkpoints and show differences in:
+
+* Process tree (new/removed/modified processes)
+* File descriptors (opened/closed files)
+* Sockets (new/removed network sockets)
+* Memory usage (size changes)
+
+== Options
+
+*-h*, *--help*::
+  Show help for checkpointctl diff
+
+*--files*::
+  Include file descriptors in the diff
+
+*--format*=_FORMAT_::
+  Specify output format: tree or json (default "tree")
+
+*--ps-tree-cmd*::
+  Include full command lines in process tree diff
+
+*--ps-tree-env*::
+  Include environment variables in process tree diff
+
+*--show-unchanged*::
+  Show entries that are identical between the two checkpoints
+
+*--sockets*::
+  Include sockets in the diff
+
+== Examples
+
+Compare two checkpoints with default tree view:
+
+  $ checkpointctl diff checkpoint1.tar checkpoint2.tar
+
+Show differences including file descriptors and sockets:
+
+  $ checkpointctl diff --files --sockets checkpoint1.tar checkpoint2.tar
+
+Include command line arguments and unchanged entries:
+
+  $ checkpointctl diff --show-unchanged --ps-tree-cmd checkpoint1.tar checkpoint2.tar
+
+Output differences in JSON format:
+
+  $ checkpointctl diff --format json checkpoint1.tar checkpoint2.tar
+
+== See also
+
+checkpointctl(1)
