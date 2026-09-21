@@ -292,29 +292,62 @@ func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 // UntarFiles unpack only specified files from an archive to the destination directory.
 func UntarFiles(src, dest string, files []string) error {
 	if err := iterateTarArchive(src, func(r *tar.Reader, header *tar.Header) error {
-		// Check if the current entry is one of the target files
-		for _, file := range files {
-			if strings.Contains(header.Name, file) {
-				// Create the destination folder
-				if err := os.MkdirAll(filepath.Join(dest, filepath.Dir(header.Name)), 0o700); err != nil {
-					return err
-				}
-				// Create the destination file
-				destFile, err := os.Create(filepath.Join(dest, header.Name))
-				if err != nil {
-					return err
-				}
-				defer destFile.Close()
+		// Only regular files are extracted. Directories, links and other
+		// special entries are never created in the destination directory.
+		if header.Typeflag != tar.TypeReg {
+			return nil
+		}
 
-				// Copy the contents of the entry to the destination file
-				_, err = io.Copy(destFile, r)
-				if err != nil {
-					return err
-				}
-
-				// File successfully extracted, move to the next file
-				break
+		// Normalize name and reject any path escaping dest or containing relative traversal segments.
+		cleaned := filepath.Clean(header.Name)
+		if !filepath.IsLocal(cleaned) {
+			return fmt.Errorf("archive entry %q escapes destination directory", header.Name)
+		}
+		for _, part := range strings.FieldsFunc(header.Name, func(r rune) bool { return r == '/' || r == '\\' }) {
+			if part == ".." {
+				return fmt.Errorf("archive entry %q contains relative traversal element", header.Name)
 			}
+		}
+
+		name := strings.TrimPrefix(cleaned, "./")
+
+		// Check if the current entry matches any of the target files.
+		for _, file := range files {
+			matched := false
+			if strings.HasSuffix(file, "-") {
+				// CRIU numbered images (e.g., "checkpoint/core-", "checkpoint/pages-")
+				matched = strings.HasPrefix(name, file) && filepath.Dir(name) == filepath.Dir(file)
+			} else {
+				// Exact match for dumps and fixed images (e.g., "spec.dump", "config.dump", "checkpoint/pstree.img")
+				matched = (name == file)
+			}
+
+			if !matched {
+				continue
+			}
+
+			destPath := filepath.Join(dest, name)
+			// Create the destination folder
+			if err := os.MkdirAll(filepath.Dir(destPath), 0o700); err != nil {
+				return err
+			}
+			// Create the destination file
+			destFile, err := os.Create(destPath)
+			if err != nil {
+				return err
+			}
+
+			// Copy the contents of the entry to the destination file
+			if _, err = io.Copy(destFile, r); err != nil {
+				_ = destFile.Close()
+				return err
+			}
+			if err = destFile.Close(); err != nil {
+				return err
+			}
+
+			// File successfully extracted, move to the next file
+			break
 		}
 		return nil
 	}); err != nil {
