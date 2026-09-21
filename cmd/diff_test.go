@@ -3,6 +3,9 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
@@ -441,6 +444,146 @@ func TestCompareProcessTreesCmdlineIgnoredByDefault(t *testing.T) {
 	if len(result.Unchanged) != 1 {
 		t.Errorf("Expected 1 unchanged, got %d", len(result.Unchanged))
 	}
+}
+
+func TestCompareProcessTreesEnvVars(t *testing.T) {
+	prevEnv, prevCmd := internal.PsTreeEnv, internal.PsTreeCmd
+	t.Cleanup(func() {
+		internal.PsTreeEnv, internal.PsTreeCmd = prevEnv, prevCmd
+	})
+	internal.PsTreeCmd = false
+
+	tests := []struct {
+		name     string
+		before   map[string]string
+		after    map[string]string
+		modified bool
+	}{
+		{"changed", map[string]string{"VAR": "before"}, map[string]string{"VAR": "after"}, true},
+		{"added", nil, map[string]string{"VAR": "value"}, true},
+		{"removed", map[string]string{"VAR": "value"}, nil, true},
+		{"added empty value", nil, map[string]string{"VAR": ""}, true},
+		{"removed empty value", map[string]string{"VAR": ""}, nil, true},
+		{"unchanged", map[string]string{"A": "", "B": "value"}, map[string]string{"B": "value", "A": ""}, false},
+		{"nil and empty", nil, map[string]string{}, false},
+	}
+	for _, tt := range tests {
+		for _, enabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/env=%t", tt.name, enabled), func(t *testing.T) {
+				internal.PsTreeEnv = enabled
+				before := &internal.PsNode{PID: 1, Comm: "server", EnvVars: tt.before}
+				after := &internal.PsNode{PID: 1, Comm: "server", EnvVars: tt.after}
+				result := compareProcessTrees(before, after)
+
+				wantModified := 0
+				if enabled && tt.modified {
+					wantModified = 1
+				}
+				if len(result.Modified) != wantModified || len(result.Unchanged) != 1-wantModified {
+					t.Errorf("Expected %d modified and %d unchanged, got %+v", wantModified, 1-wantModified, result)
+				}
+				if len(result.Added) != 0 || len(result.Removed) != 0 {
+					t.Errorf("Expected no added or removed processes, got %+v", result)
+				}
+			})
+		}
+	}
+}
+
+func TestRenderDiffEnvVars(t *testing.T) {
+	prevEnv, prevCmd, prevUnchanged := internal.PsTreeEnv, internal.PsTreeCmd, internal.ShowUnchanged
+	t.Cleanup(func() {
+		internal.PsTreeEnv, internal.PsTreeCmd, internal.ShowUnchanged = prevEnv, prevCmd, prevUnchanged
+	})
+	internal.PsTreeCmd = false
+
+	before := CheckpointMetadata{ProcessTree: &internal.PsNode{
+		PID: 1, Comm: "init", EnvVars: map[string]string{"TEST_UNCHANGED": "kept"},
+		Children: []internal.PsNode{
+			{PID: 2, Comm: "server", EnvVars: map[string]string{"TEST_CHANGED": "before", "TEST_EMPTY": ""}},
+			{PID: 3, Comm: "removed", EnvVars: map[string]string{"TEST_REMOVED": "before"}},
+		},
+	}}
+	after := CheckpointMetadata{ProcessTree: &internal.PsNode{
+		PID: 1, Comm: "init", EnvVars: map[string]string{"TEST_UNCHANGED": "kept"},
+		Children: []internal.PsNode{
+			{PID: 2, Comm: "server", EnvVars: map[string]string{"TEST_EMPTY": "", "TEST_CHANGED": "after"}},
+			{PID: 4, Comm: "added", EnvVars: map[string]string{"TEST_ADDED": "after"}},
+		},
+	}}
+
+	for _, tt := range []struct {
+		name          string
+		showUnchanged bool
+		json          bool
+	}{
+		{"tree", false, false},
+		{"tree with unchanged", true, false},
+		{"json", false, true},
+	} {
+		for _, enabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/env=%t", tt.name, enabled), func(t *testing.T) {
+				internal.PsTreeEnv, internal.ShowUnchanged = enabled, tt.showUnchanged
+				result := computeDiff(before, after)
+				out := captureDiffOutput(t, func() {
+					if tt.json {
+						if err := renderJSONDiff(result); err != nil {
+							t.Fatal(err)
+						}
+					} else {
+						renderTreeDiff(result)
+					}
+				})
+
+				for key, value := range map[string]string{
+					"TEST_ADDED":     "after",
+					"TEST_CHANGED":   "after",
+					"TEST_EMPTY":     "",
+					"TEST_REMOVED":   "before",
+					"TEST_UNCHANGED": "kept",
+				} {
+					want := enabled && (key != "TEST_UNCHANGED" || tt.showUnchanged || tt.json)
+					entry := key + "=" + value
+					if tt.json {
+						entry = fmt.Sprintf("%q: %q", key, value)
+					}
+					if want && !strings.Contains(out, entry) {
+						t.Errorf("Expected output to contain %q, got:\n%s", entry, out)
+					} else if !want && strings.Contains(out, key) {
+						t.Errorf("Unexpected environment variable %s in output:\n%s", key, out)
+					}
+				}
+				if tt.json && strings.Contains(out, `"environment_variables"`) != enabled {
+					t.Errorf("Environment field presence does not match --ps-tree-env=%t:\n%s", enabled, out)
+				}
+				if enabled && !tt.json && strings.Index(out, "TEST_CHANGED=") > strings.Index(out, "TEST_EMPTY=") {
+					t.Errorf("Environment variables are not sorted:\n%s", out)
+				}
+			})
+		}
+	}
+}
+
+func captureDiffOutput(t *testing.T, render func()) string {
+	t.Helper()
+	file, err := os.CreateTemp(t.TempDir(), "diff-output")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = file
+	defer func() {
+		os.Stdout = stdout
+		if err := file.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	render()
+	data, err := os.ReadFile(file.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
 
 // flattening a nested tree visits every node
