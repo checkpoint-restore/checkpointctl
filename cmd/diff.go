@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -284,9 +285,10 @@ type ProcessDiff struct {
 }
 
 type ProcessInfo struct {
-	PID     int    `json:"pid"`
-	Command string `json:"command"`
-	Cmdline string `json:"cmdline,omitempty"`
+	PID     int               `json:"pid"`
+	Command string            `json:"command"`
+	Cmdline string            `json:"cmdline,omitempty"`
+	EnvVars map[string]string `json:"environment_variables,omitempty"`
 }
 
 type FileDiff struct {
@@ -389,7 +391,8 @@ func compareProcessTrees(treeA, treeB *internal.PsNode) *ProcessDiff {
 	for pid, procB := range mapB {
 		if procA, exists := mapA[pid]; !exists {
 			diff.Added = append(diff.Added, procB)
-		} else if *psTreeCmd && procA.Cmdline != procB.Cmdline {
+		} else if (*psTreeCmd && procA.Cmdline != procB.Cmdline) ||
+			(*psTreeEnv && !maps.Equal(procA.EnvVars, procB.EnvVars)) {
 			diff.Modified = append(diff.Modified, procB)
 		} else {
 			diff.Unchanged = append(diff.Unchanged, procB)
@@ -424,6 +427,9 @@ func flattenProcessTree(tree *internal.PsNode) []ProcessInfo {
 		}
 		if *psTreeCmd {
 			proc.Cmdline = node.Cmdline
+		}
+		if *psTreeEnv {
+			proc.EnvVars = node.EnvVars
 		}
 		processes = append(processes, proc)
 
@@ -650,6 +656,9 @@ func renderTreeDiff(result *DiffResult) {
 				fmt.Println("│ Removed:")
 				for _, proc := range result.ProcessChanges.Removed {
 					fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
+					for _, envVar := range formatEnvVars(proc.EnvVars) {
+						fmt.Printf("│             %s\n", envVar)
+					}
 				}
 			}
 		case !hasChanges:
@@ -662,18 +671,27 @@ func renderTreeDiff(result *DiffResult) {
 					if *psTreeCmd && proc.Cmdline != "" {
 						fmt.Printf("│             %s\n", truncate(proc.Cmdline, 55))
 					}
+					for _, envVar := range formatEnvVars(proc.EnvVars) {
+						fmt.Printf("│             %s\n", envVar)
+					}
 				}
 			}
 			if removed > 0 {
 				fmt.Println("│ Removed:")
 				for _, proc := range result.ProcessChanges.Removed {
 					fmt.Printf("│   - PID %-5d %s\n", proc.PID, proc.Command)
+					for _, envVar := range formatEnvVars(proc.EnvVars) {
+						fmt.Printf("│             %s\n", envVar)
+					}
 				}
 			}
 			if modified > 0 {
 				fmt.Println("│ Modified:")
 				for _, proc := range result.ProcessChanges.Modified {
 					fmt.Printf("│   ~ PID %-5d %s\n", proc.PID, proc.Command)
+					for _, envVar := range formatEnvVars(proc.EnvVars) {
+						fmt.Printf("│             %s\n", envVar)
+					}
 				}
 			}
 		}
@@ -784,6 +802,15 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
+func formatEnvVars(envVars map[string]string) []string {
+	entries := make([]string, 0, len(envVars))
+	for key, value := range envVars {
+		entries = append(entries, key+"="+value)
+	}
+	sort.Strings(entries)
+	return entries
+}
+
 // buildProcessStatusMap indexes each PID in a ProcessDiff by its marker
 // character: "+" added, "~" modified, "=" unchanged. Removed processes are not
 // included because they do not appear in tree B.
@@ -822,6 +849,12 @@ func addAnnotatedBranch(parent treeprint.Tree, ps *internal.PsNode, status map[u
 		displayName = ps.Cmdline
 	}
 	branch := parent.AddMetaBranch(fmt.Sprintf("%s PID %d", marker, ps.PID), displayName)
+	if *psTreeEnv && len(ps.EnvVars) > 0 {
+		envBranch := branch.AddBranch("Environment variables")
+		for _, envVar := range formatEnvVars(ps.EnvVars) {
+			envBranch.AddBranch(envVar)
+		}
+	}
 
 	children := make([]internal.PsNode, len(ps.Children))
 	copy(children, ps.Children)
