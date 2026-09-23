@@ -1,6 +1,6 @@
 module github.com/checkpoint-restore/checkpointctl
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/checkpoint-restore/go-criu/v8 v8.4.0
@@ -9,7 +9,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/spf13/cobra v1.10.2
 	github.com/xlab/treeprint v1.2.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
