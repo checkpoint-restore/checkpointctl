@@ -41,45 +41,47 @@ type Task struct {
 
 func CreateTasks(args []string, requiredFiles []string) ([]Task, error) {
 	tasks := make([]Task, 0, len(args))
+	success := false
+	defer func() {
+		if !success {
+			CleanupTasks(tasks)
+		}
+	}()
 
 	for _, input := range args {
 		tar, err := os.Stat(input)
 		if err != nil {
-			CleanupTasks(tasks)
 			return nil, err
 		}
 		if !tar.Mode().IsRegular() {
-			CleanupTasks(tasks)
 			return nil, fmt.Errorf("input %s not a regular file", input)
 		}
 
 		// Check if there is a checkpoint directory in the archive file
 		checkpointDirExists, err := isFileInArchive(input, metadata.CheckpointDirectory, true)
 		if err != nil {
-			CleanupTasks(tasks)
 			return nil, err
 		}
 
 		if !checkpointDirExists {
-			CleanupTasks(tasks)
 			return nil, fmt.Errorf("checkpoint directory is missing in the archive file: %s", input)
 		}
 
 		dir, err := os.MkdirTemp("", "checkpointctl")
 		if err != nil {
-			CleanupTasks(tasks)
 			return nil, err
 		}
+
+		// Append before extraction so the deferred cleanup also removes a
+		// partially extracted directory if UntarFiles fails.
+		tasks = append(tasks, Task{CheckpointFilePath: input, OutputDir: dir})
 
 		if err := UntarFiles(input, dir, requiredFiles); err != nil {
-			_ = os.RemoveAll(dir)
-			CleanupTasks(tasks)
 			return nil, err
 		}
-
-		tasks = append(tasks, Task{CheckpointFilePath: input, OutputDir: dir})
 	}
 
+	success = true
 	return tasks, nil
 }
 
