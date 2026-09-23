@@ -41,6 +41,12 @@ type Task struct {
 
 func CreateTasks(args []string, requiredFiles []string) ([]Task, error) {
 	tasks := make([]Task, 0, len(args))
+	success := false
+	defer func() {
+		if !success {
+			CleanupTasks(tasks)
+		}
+	}()
 
 	for _, input := range args {
 		tar, err := os.Stat(input)
@@ -66,13 +72,16 @@ func CreateTasks(args []string, requiredFiles []string) ([]Task, error) {
 			return nil, err
 		}
 
+		// Append before extraction so the deferred cleanup also removes a
+		// partially extracted directory if UntarFiles fails.
+		tasks = append(tasks, Task{CheckpointFilePath: input, OutputDir: dir})
+
 		if err := UntarFiles(input, dir, requiredFiles); err != nil {
 			return nil, err
 		}
-
-		tasks = append(tasks, Task{CheckpointFilePath: input, OutputDir: dir})
 	}
 
+	success = true
 	return tasks, nil
 }
 
