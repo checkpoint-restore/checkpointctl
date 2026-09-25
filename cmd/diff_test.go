@@ -3,12 +3,17 @@
 package cmd
 
 import (
+	"archive/tar"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
+	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 )
 
 // compareSockets [empty inputs]
@@ -683,5 +688,171 @@ func TestRenderAnnotatedProcessTreeUnknownPID(t *testing.T) {
 
 	if !contains(out, "  PID 99") {
 		t.Errorf("Expected blank marker for unknown PID, got:\n%s", out)
+	}
+}
+
+func createTestCheckpointArchive(t *testing.T, dir, filename string, containerID, containerName, runtime, imageName string, created time.Time) string {
+	t.Helper()
+	archivePath := filepath.Join(dir, filename)
+	f, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatalf("creating test archive: %v", err)
+	}
+	defer f.Close()
+
+	tw := tar.NewWriter(f)
+	defer tw.Close()
+
+	// 1. checkpoint/ directory
+	dirHdr := &tar.Header{
+		Name:     "checkpoint/",
+		Typeflag: tar.TypeDir,
+		Mode:     0o700,
+	}
+	if err := tw.WriteHeader(dirHdr); err != nil {
+		t.Fatalf("writing dir header: %v", err)
+	}
+
+	// 2. spec.dump
+	specContent := `{"annotations":{"io.container.manager":"libpod"}}`
+	specHdr := &tar.Header{
+		Name: "spec.dump",
+		Mode: 0o600,
+		Size: int64(len(specContent)),
+	}
+	if err := tw.WriteHeader(specHdr); err != nil {
+		t.Fatalf("writing spec header: %v", err)
+	}
+	if _, err := tw.Write([]byte(specContent)); err != nil {
+		t.Fatalf("writing spec content: %v", err)
+	}
+
+	// 3. config.dump
+	configObj := metadata.ContainerConfig{
+		ID:              containerID,
+		Name:            containerName,
+		OCIRuntime:      runtime,
+		CreatedTime:     created,
+		RootfsImageName: imageName,
+	}
+	configBytes, err := json.Marshal(configObj)
+	if err != nil {
+		t.Fatalf("marshaling config: %v", err)
+	}
+	configHdr := &tar.Header{
+		Name: "config.dump",
+		Mode: 0o600,
+		Size: int64(len(configBytes)),
+	}
+	if err := tw.WriteHeader(configHdr); err != nil {
+		t.Fatalf("writing config header: %v", err)
+	}
+	if _, err := tw.Write(configBytes); err != nil {
+		t.Fatalf("writing config content: %v", err)
+	}
+
+	return archivePath
+}
+
+func TestGetTaskJSON_LargeOutput(t *testing.T) {
+	testCreated := time.Date(2026, 3, 15, 10, 30, 0, 0, time.UTC)
+	testCases := []struct {
+		name      string
+		imageSize int
+	}{
+		{
+			name:      "serialized output exceeding effective host pipe capacity (~75 KiB)",
+			imageSize: 75 * 1024,
+		},
+		{
+			name:      "serialized output well above 1 MiB (~1.5 MiB)",
+			imageSize: 1500 * 1024,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			expectedImage := strings.Repeat("x", tc.imageSize)
+			archive := createTestCheckpointArchive(
+				t, tmpDir, "test.tar",
+				"container-id-123456789", "custom-container-name", "crun",
+				expectedImage, testCreated,
+			)
+
+			tasks, err := internal.CreateTasks([]string{archive}, []string{metadata.SpecDumpFile, metadata.ConfigDumpFile})
+			if err != nil {
+				t.Fatalf("CreateTasks failed: %v", err)
+			}
+			defer internal.CleanupTasks(tasks)
+
+			type result struct {
+				meta []CheckpointMetadata
+				err  error
+			}
+			ch := make(chan result, 1)
+
+			go func() {
+				m, e := getTaskJSON(tasks)
+				ch <- result{meta: m, err: e}
+			}()
+
+			select {
+			case <-time.After(10 * time.Second):
+				t.Fatal("getTaskJSON deadlocked/timed out while processing large output")
+			case res := <-ch:
+				if res.err != nil {
+					t.Fatalf("getTaskJSON returned error: %v", res.err)
+				}
+				if len(res.meta) != 1 {
+					t.Fatalf("expected 1 metadata entry, got %d", len(res.meta))
+				}
+				m := res.meta[0]
+				if m.ID != "container-id-123456789" {
+					t.Errorf("ID mismatch: got %q, want %q", m.ID, "container-id-123456789")
+				}
+				if m.ContainerName != "custom-container-name" {
+					t.Errorf("ContainerName mismatch: got %q, want %q", m.ContainerName, "custom-container-name")
+				}
+				if m.Runtime != "crun" {
+					t.Errorf("Runtime mismatch: got %q, want %q", m.Runtime, "crun")
+				}
+				if m.Engine != "Podman" {
+					t.Errorf("Engine mismatch: got %q, want %q", m.Engine, "Podman")
+				}
+				if m.Created != testCreated.Format(time.RFC3339) {
+					t.Errorf("Created mismatch: got %q, want %q", m.Created, testCreated.Format(time.RFC3339))
+				}
+				if m.Image != expectedImage {
+					t.Fatalf("image name truncated or corrupted: got %d bytes, want %d bytes",
+						len(m.Image), len(expectedImage))
+				}
+			}
+		})
+	}
+}
+
+func TestDiff_LargeOutputNoDeadlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	largeImage := strings.Repeat("y", 80*1024) // Exceeds default host pipe capacity
+	testCreated := time.Date(2026, 3, 15, 10, 30, 0, 0, time.UTC)
+	archiveA := createTestCheckpointArchive(t, tmpDir, "cpA.tar", "c123456789012", "c-test", "crun", largeImage, testCreated)
+	archiveB := createTestCheckpointArchive(t, tmpDir, "cpB.tar", "c123456789012", "c-test", "crun", largeImage, testCreated)
+
+	cmd := Diff()
+	cmd.SetArgs([]string{archiveA, archiveB})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Execute()
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		t.Fatal("checkpointctl diff deadlocked on output exceeding pipe capacity")
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("checkpointctl diff failed: %v", err)
+		}
 	}
 }
