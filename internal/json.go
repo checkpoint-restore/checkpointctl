@@ -3,6 +3,8 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -256,20 +258,21 @@ func CollectCheckpointData(tasks []Task) ([]DisplayNode, error) {
 	return result, nil
 }
 
+// RenderJSONView renders the JSON representation of checkpoint tasks to stdout.
 func RenderJSONView(tasks []Task) error {
+	return RenderJSONViewTo(os.Stdout, tasks)
+}
+
+// RenderJSONViewTo renders the JSON representation of checkpoint tasks to the given writer.
+func RenderJSONViewTo(w io.Writer, tasks []Task) error {
 	result, err := CollectCheckpointData(tasks)
 	if err != nil {
 		return err
 	}
 
-	jsonData, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%s\n", jsonData)
-
-	return nil
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(result)
 }
 
 func buildJSONMounts(specDump *spec.Spec) []MountNode {
