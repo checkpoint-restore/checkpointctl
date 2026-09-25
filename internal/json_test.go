@@ -1,7 +1,10 @@
 package internal
 
 import (
+	"bytes"
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/checkpoint-restore/go-criu/v8/crit"
@@ -269,5 +272,34 @@ func TestBuildJSONSks(t *testing.T) {
 
 	if !reflect.DeepEqual(result, expectedResult) {
 		t.Errorf("BuildJSONSks did not produce the expected result.\nExpected:\n%v\nGot:\n%v", expectedResult, result)
+	}
+}
+
+func TestRenderJSONViewTo(t *testing.T) {
+	var buf bytes.Buffer
+	err := RenderJSONViewTo(&buf, nil)
+	if err != nil {
+		t.Fatalf("expected nil error on empty tasks, got: %v", err)
+	}
+	trimmed := strings.TrimSpace(buf.String())
+	if trimmed != "null" {
+		t.Fatalf("expected 'null' JSON output on nil tasks, got: %q", trimmed)
+	}
+}
+
+type failingWriter struct{}
+
+func (f *failingWriter) Write(p []byte) (n int, err error) {
+	return 0, errors.New("simulated writer failure")
+}
+
+func TestRenderJSONViewTo_WriterError(t *testing.T) {
+	w := &failingWriter{}
+	err := RenderJSONViewTo(w, nil)
+	if err == nil {
+		t.Fatal("expected error from RenderJSONViewTo with failing writer, got nil")
+	}
+	if !strings.Contains(err.Error(), "simulated writer failure") {
+		t.Fatalf("unexpected error message: %v", err)
 	}
 }
