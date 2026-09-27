@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -289,34 +290,74 @@ func getArchiveSizes(archiveInput string) (*archiveSizes, error) {
 	return result, err
 }
 
-// UntarFiles unpack only specified files from an archive to the destination directory.
-func UntarFiles(src, dest string, files []string) error {
-	if err := iterateTarArchive(src, func(r *tar.Reader, header *tar.Header) error {
-		// Check if the current entry is one of the target files
-		for _, file := range files {
-			if strings.Contains(header.Name, file) {
-				// Create the destination folder
-				if err := os.MkdirAll(filepath.Join(dest, filepath.Dir(header.Name)), 0o700); err != nil {
-					return err
-				}
-				// Create the destination file
-				destFile, err := os.Create(filepath.Join(dest, header.Name))
-				if err != nil {
-					return err
-				}
-				defer destFile.Close()
+// archiveFileName returns the cleaned name of a tar entry if it is a file
+// that checkpointctl reads: either at the top level of the archive or
+// directly inside the checkpoint directory.
+func archiveFileName(name string) (string, bool) {
+	name = path.Clean(name)
+	dir, base := path.Split(name)
+	if (dir != "" && dir != metadata.CheckpointDirectory+"/") || base == "." || base == ".." {
+		return "", false
+	}
+	return name, true
+}
 
-				// Copy the contents of the entry to the destination file
-				_, err = io.Copy(destFile, r)
-				if err != nil {
-					return err
-				}
-
-				// File successfully extracted, move to the next file
-				break
-			}
+// matchArchiveFile reports whether name is one of the requested files.
+// A requested name ending in "-" matches all files with that prefix.
+func matchArchiveFile(name string, files []string) bool {
+	for _, file := range files {
+		if name == file || (strings.HasSuffix(file, "-") && strings.HasPrefix(name, file)) {
+			return true
 		}
-		return nil
+	}
+	return false
+}
+
+// extractFile writes the contents of r to name inside root.
+func extractFile(root *os.Root, name string, r io.Reader) error {
+	if err := root.MkdirAll(path.Dir(name), 0o700); err != nil {
+		return fmt.Errorf("extracting %s: %w", name, err)
+	}
+
+	// The root keeps all file operations, including symlink
+	// resolution, inside the destination directory.
+	destFile, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return fmt.Errorf("extracting %s: %w", name, err)
+	}
+	_, err = io.Copy(destFile, r)
+	if closeErr := destFile.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return fmt.Errorf("extracting %s: %w", name, err)
+	}
+	return nil
+}
+
+// UntarFiles unpacks the requested files from an archive to the destination
+// directory. Only regular files at the top level of the archive or directly
+// inside the checkpoint directory are extracted. A requested name ending in
+// "-" matches all files with that prefix, such as "checkpoint/core-". Other
+// entries, including absolute and nested paths, are ignored. A requested
+// entry that is not a regular file or a directory is an error.
+func UntarFiles(src, dest string, files []string) error {
+	root, err := os.OpenRoot(dest)
+	if err != nil {
+		return fmt.Errorf("unpacking of checkpoint archive failed: %w", err)
+	}
+	defer root.Close()
+
+	if err := iterateTarArchive(src, func(r *tar.Reader, header *tar.Header) error {
+		name, ok := archiveFileName(header.Name)
+		if !ok || header.Typeflag == tar.TypeDir || !matchArchiveFile(name, files) {
+			return nil
+		}
+		// The tar reader expands old GNU sparse files, but keeps their type.
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeGNUSparse {
+			return fmt.Errorf("%s is not a regular file", name)
+		}
+		return extractFile(root, name, r)
 	}); err != nil {
 		return fmt.Errorf("unpacking of checkpoint archive failed: %w", err)
 	}
