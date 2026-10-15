@@ -127,9 +127,12 @@ github.com/ulikunitz/xz/lzma
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# go.podman.io/storage v1.64.1
+# go.podman.io/storage v1.64.2
 ## explicit; go 1.25.0
 go.podman.io/storage/internal/createpath
+go.podman.io/storage/internal/rootlookupcache
+go.podman.io/storage/internal/stat
+go.podman.io/storage/internal/xattrs
 go.podman.io/storage/pkg/archive
 go.podman.io/storage/pkg/fileutils
 go.podman.io/storage/pkg/idtools
@@ -142,8 +145,8 @@ go.podman.io/storage/pkg/reexec
 go.podman.io/storage/pkg/regexp
 go.podman.io/storage/pkg/system
 go.podman.io/storage/pkg/unshare
-# golang.org/x/sys v0.47.0
-## explicit; go 1.25.0
+# golang.org/x/sys v0.49.0
+## explicit; go 1.26.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # google.golang.org/protobuf v1.36.11
