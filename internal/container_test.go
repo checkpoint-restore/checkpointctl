@@ -360,6 +360,9 @@ func TestUntarFiles_GNUSparseArchive(t *testing.T) {
 	if _, err := f.Write([]byte("sparse-data")); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := f.WriteAt([]byte("tail-data"), 512*1024); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.Truncate(1024 * 1024); err != nil {
 		t.Fatal(err)
 	}
@@ -371,6 +374,23 @@ func TestUntarFiles_GNUSparseArchive(t *testing.T) {
 		t.Fatalf("creating sparse tar archive: %v, output: %s", err, string(out))
 	}
 
+	// Verify the fixture itself has a GNU sparse header before asserting extraction.
+	af, err := os.Open(archivePath)
+	if err != nil {
+		t.Fatalf("opening sparse tar archive: %v", err)
+	}
+	tr := tar.NewReader(af)
+	hdr, err := tr.Next()
+	if err != nil {
+		af.Close()
+		t.Fatalf("reading sparse tar archive header: %v", err)
+	}
+	if hdr.Typeflag != tar.TypeGNUSparse {
+		af.Close()
+		t.Fatalf("expected header Typeflag tar.TypeGNUSparse (%d), got %d (%c)", tar.TypeGNUSparse, hdr.Typeflag, hdr.Typeflag)
+	}
+	af.Close()
+
 	dest := filepath.Join(base, "dest")
 	if err := UntarFiles(archivePath, dest, []string{"checkpoint/core-"}); err != nil {
 		t.Fatalf("extracting sparse archive failed: %v", err)
@@ -380,7 +400,7 @@ func TestUntarFiles_GNUSparseArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading extracted sparse file: %v", err)
 	}
-	if len(data) != 1024*1024 || !strings.HasPrefix(string(data), "sparse-data") {
+	if len(data) != 1024*1024 || !strings.HasPrefix(string(data), "sparse-data") || string(data[512*1024:512*1024+len("tail-data")]) != "tail-data" {
 		t.Fatalf("unexpected sparse file contents length: %d", len(data))
 	}
 }
