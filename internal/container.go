@@ -18,8 +18,8 @@ import (
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/checkpoint-restore/go-criu/v8/crit"
-	"github.com/containers/storage/pkg/archive"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
+	"go.podman.io/storage/pkg/archive"
 )
 
 var pageSize = os.Getpagesize()
