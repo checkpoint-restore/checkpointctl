@@ -17,6 +17,7 @@ type testTarEntry struct {
 	typeflag byte
 	linkname string
 	body     string
+	pax      map[string]string
 }
 
 func regular(name, body string) testTarEntry {
@@ -46,11 +47,15 @@ func writeOrderedTestArchive(t *testing.T, archivePath string, entries []testTar
 	tw := tar.NewWriter(f)
 	for _, entry := range entries {
 		hdr := &tar.Header{
-			Name:     entry.name,
-			Typeflag: entry.typeflag,
-			Linkname: entry.linkname,
-			Mode:     0o644,
-			Size:     int64(len(entry.body)),
+			Name:       entry.name,
+			Typeflag:   entry.typeflag,
+			Linkname:   entry.linkname,
+			Mode:       0o644,
+			Size:       int64(len(entry.body)),
+			PAXRecords: entry.pax,
+		}
+		if entry.typeflag == tar.TypeXGlobalHeader {
+			hdr.Mode = 0
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			t.Fatalf("writing header for %q: %v", entry.name, err)
@@ -61,6 +66,48 @@ func writeOrderedTestArchive(t *testing.T, archivePath string, entries []testTar
 	}
 	if err := tw.Close(); err != nil {
 		t.Fatalf("closing archive: %v", err)
+	}
+}
+
+func TestUntarFilesCompatibility(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries []testTarEntry
+	}{
+		{
+			name: "contiguous file",
+			entries: []testTarEntry{
+				{name: "config.dump", typeflag: tar.TypeCont, body: "config"},
+			},
+		},
+		{
+			name: "global PAX header matching requested file",
+			entries: []testTarEntry{
+				{name: "config.dump", typeflag: tar.TypeXGlobalHeader, pax: map[string]string{"comment": "global metadata"}},
+				regular("config.dump", "config"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := t.TempDir()
+			dest := filepath.Join(base, "dest")
+			if err := os.Mkdir(dest, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			archivePath := filepath.Join(base, "archive.tar")
+			writeOrderedTestArchive(t, archivePath, tt.entries)
+			if err := UntarFiles(archivePath, dest, []string{"config.dump"}); err != nil {
+				t.Fatalf("UntarFiles failed: %v", err)
+			}
+			content, err := os.ReadFile(filepath.Join(dest, "config.dump"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(content) != "config" {
+				t.Errorf("extracted content = %q, want %q", content, "config")
+			}
+		})
 	}
 }
 

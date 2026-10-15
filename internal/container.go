@@ -339,8 +339,9 @@ func extractFile(root *os.Root, name string, r io.Reader) error {
 // directory. Only regular files at the top level of the archive or directly
 // inside the checkpoint directory are extracted. A requested name ending in
 // "-" matches all files with that prefix, such as "checkpoint/core-". Other
-// entries, including absolute and nested paths, are ignored. A requested
-// entry that is not a regular file or a directory is an error.
+// entries, including absolute and nested paths and global PAX headers, are
+// ignored. A requested entry that is not a regular file or a directory is an
+// error. The destination directory must already exist.
 func UntarFiles(src, dest string, files []string) error {
 	root, err := os.OpenRoot(dest)
 	if err != nil {
@@ -349,12 +350,15 @@ func UntarFiles(src, dest string, files []string) error {
 	defer root.Close()
 
 	if err := iterateTarArchive(src, func(r *tar.Reader, header *tar.Header) error {
+		if header.Typeflag == tar.TypeXGlobalHeader {
+			return nil
+		}
 		name, ok := archiveFileName(header.Name)
 		if !ok || header.Typeflag == tar.TypeDir || !matchArchiveFile(name, files) {
 			return nil
 		}
 		// The tar reader expands old GNU sparse files, but keeps their type.
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeGNUSparse {
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeCont && header.Typeflag != tar.TypeGNUSparse {
 			return fmt.Errorf("%s is not a regular file", name)
 		}
 		return extractFile(root, name, r)
