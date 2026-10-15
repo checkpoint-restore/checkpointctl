@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -80,10 +81,10 @@ func TestUntarFiles(t *testing.T) {
 		entries     []tarEntry
 		plantLink   string // create dest/<plantLink> as a symlink to a dir outside dest
 		expectErr   bool
-		extracted   []string // paths relative to dest that must exist with content
-		notInDest   []string // paths relative to dest that must NOT exist
-		outsideName string   // path relative to base that must NOT appear outside dest
-		errContains string   // substring the error must contain, if any
+		extracted   map[string]string // paths relative to dest -> expected content
+		notInDest   []string          // paths relative to dest that must NOT exist
+		outsideName string            // path relative to base that must NOT appear outside dest
+		errContains string            // substring the error must contain, if any
 	}{
 		{
 			name: "valid archive",
@@ -97,12 +98,12 @@ func TestUntarFiles(t *testing.T) {
 				{"checkpoint/pages-1.img", tar.TypeReg, "pages"},
 				{"rootfs-diff.tar", tar.TypeReg, "rootfs"},
 			},
-			extracted: []string{
-				"config.dump",
-				"spec.dump",
-				"checkpoint/pstree.img",
-				"checkpoint/core-1.img",
-				"checkpoint/core-25.img",
+			extracted: map[string]string{
+				"config.dump":            "config",
+				"spec.dump":              "spec",
+				"checkpoint/pstree.img":  "pstree",
+				"checkpoint/core-1.img":  "core1",
+				"checkpoint/core-25.img": "core25",
 			},
 			notInDest: []string{"checkpoint/pages-1.img", "rootfs-diff.tar"},
 		},
@@ -113,7 +114,10 @@ func TestUntarFiles(t *testing.T) {
 				{"./checkpoint/", tar.TypeDir, ""},
 				{"./checkpoint/core-1.img", tar.TypeReg, "core1"},
 			},
-			extracted: []string{"config.dump", "checkpoint/core-1.img"},
+			extracted: map[string]string{
+				"config.dump":           "config",
+				"checkpoint/core-1.img": "core1",
+			},
 		},
 		{
 			name: "valid gzip archive",
@@ -122,44 +126,60 @@ func TestUntarFiles(t *testing.T) {
 				{"config.dump", tar.TypeReg, "config"},
 				{"checkpoint/core-1.img", tar.TypeReg, "core1"},
 			},
-			extracted: []string{"config.dump", "checkpoint/core-1.img"},
+			extracted: map[string]string{
+				"config.dump":           "config",
+				"checkpoint/core-1.img": "core1",
+			},
+		},
+
+		{
+			name: "contiguous file is extracted",
+			entries: []tarEntry{
+				{"checkpoint/core-1.img", tar.TypeCont, "contiguous-core"},
+			},
+			extracted: map[string]string{
+				"checkpoint/core-1.img": "contiguous-core",
+			},
 		},
 		{
-			name: "traversal through matching prefix",
+			name: "unmatched entries with traversal or absolute paths are skipped",
 			entries: []tarEntry{
 				{"config.dump/../../escape", tar.TypeReg, "escape"},
-			},
-			expectErr:   true,
-			outsideName: "escape",
-		},
-		{
-			name: "traversal through image prefix",
-			entries: []tarEntry{
 				{"checkpoint/core-../../../../escape", tar.TypeReg, "escape"},
-			},
-			expectErr:   true,
-			outsideName: "escape",
-		},
-		{
-			name: "internal traversal is rejected",
-			entries: []tarEntry{
 				{"checkpoint/core-../../../escape", tar.TypeReg, "escape"},
+				{"../config.dump", tar.TypeReg, "escape"},
+				{"/tmp/config.dump", tar.TypeReg, "escape"},
+				{`checkpoint\core-..\..\escape`, tar.TypeReg, "escape"},
+				{"config.dump", tar.TypeReg, "config"},
 			},
-			expectErr: true,
+			extracted: map[string]string{
+				"config.dump": "config",
+			},
+			outsideName: "escape",
 		},
 		{
 			name: "in-bound traversal attempting overwrite is rejected",
 			entries: []tarEntry{
 				{"checkpoint/core-x/../../spec.dump", tar.TypeReg, "evil-spec"},
 			},
-			expectErr: true,
+			expectErr:   true,
+			errContains: "contains relative traversal element",
 		},
 		{
-			name: "leading dot-dot is rejected",
+			name: "relative traversal matching target file is rejected",
 			entries: []tarEntry{
-				{"../config.dump", tar.TypeReg, "escape"},
+				{"checkpoint/../config.dump", tar.TypeReg, "evil"},
 			},
-			expectErr: true,
+			expectErr:   true,
+			errContains: "contains relative traversal element",
+		},
+		{
+			name: "prefix match with traversal element is rejected",
+			entries: []tarEntry{
+				{"checkpoint/sub/../core-1.img", tar.TypeReg, "evil"},
+			},
+			expectErr:   true,
+			errContains: "contains relative traversal element",
 		},
 		{
 			name: "directory entry with traversal name",
@@ -168,13 +188,6 @@ func TestUntarFiles(t *testing.T) {
 			},
 			// Not a regular file: skipped before any matching.
 			outsideName: "escapedir",
-		},
-		{
-			name: "absolute path is rejected",
-			entries: []tarEntry{
-				{"/tmp/config.dump", tar.TypeReg, "escape"},
-			},
-			expectErr: true,
 		},
 		{
 			name: "misleading substring name",
@@ -206,21 +219,15 @@ func TestUntarFiles(t *testing.T) {
 			notInDest: []string{"checkpoint/core-1.img/subfile", "checkpoint/core-1.img"},
 		},
 		{
-			name: "child of extracted regular file is rejected",
+			name: "unmatched child of extracted regular file is skipped",
 			entries: []tarEntry{
 				{"config.dump", tar.TypeReg, "config"},
 				{"config.dump/child.dump", tar.TypeReg, "child"},
 			},
-			expectErr:   true,
-			errContains: "conflicts with regular file",
-		},
-		{
-			name: "backslash traversal is rejected",
-			entries: []tarEntry{
-				{`checkpoint\core-..\..\escape`, tar.TypeReg, "escape"},
+			extracted: map[string]string{
+				"config.dump": "config",
 			},
-			expectErr:   true,
-			outsideName: "escape",
+			notInDest: []string{"config.dump/child.dump"},
 		},
 		{
 			name: "nested decoy",
@@ -255,6 +262,7 @@ func TestUntarFiles(t *testing.T) {
 				{"checkpoint/pstree.img", tar.TypeReg, "pwned"},
 			},
 			expectErr:   true,
+			errContains: "path escapes from parent",
 			outsideName: "outside/pstree.img",
 		},
 		{
@@ -263,7 +271,9 @@ func TestUntarFiles(t *testing.T) {
 				{"config.dump", tar.TypeReg, "first"},
 				{"config.dump", tar.TypeReg, "second"},
 			},
-			extracted: []string{"config.dump"},
+			extracted: map[string]string{
+				"config.dump": "second",
+			},
 		},
 	}
 
@@ -271,8 +281,10 @@ func TestUntarFiles(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			base := t.TempDir()
 			dest := filepath.Join(base, "dest")
-			if err := os.MkdirAll(dest, 0o700); err != nil {
-				t.Fatal(err)
+			if test.plantLink != "" {
+				if err := os.MkdirAll(dest, 0o700); err != nil {
+					t.Fatal(err)
+				}
 			}
 			archiveName := "checkpoint.tar"
 			if test.gzip {
@@ -304,14 +316,14 @@ func TestUntarFiles(t *testing.T) {
 				t.Errorf("expected error containing %q, got %v", test.errContains, err)
 			}
 
-			for _, rel := range test.extracted {
+			for rel, want := range test.extracted {
 				content, statErr := os.ReadFile(filepath.Join(dest, rel))
 				if statErr != nil {
 					t.Errorf("expected %q to be extracted: %v", rel, statErr)
 					continue
 				}
-				if len(content) == 0 {
-					t.Errorf("expected %q to have content", rel)
+				if string(content) != want {
+					t.Errorf("expected %q content %q, got %q", rel, want, string(content))
 				}
 			}
 			for _, rel := range test.notInDest {
@@ -325,5 +337,71 @@ func TestUntarFiles(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUntarFiles_GNUSparseArchive(t *testing.T) {
+	tarPath, err := exec.LookPath("tar")
+	if err != nil {
+		t.Skip("tar executable not found")
+	}
+
+	base := t.TempDir()
+	srcDir := filepath.Join(base, "src")
+	if err := os.MkdirAll(filepath.Join(srcDir, "checkpoint"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	sparseFile := filepath.Join(srcDir, "checkpoint", "core-1.img")
+	f, err := os.Create(sparseFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("sparse-data")); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(1024 * 1024); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	archivePath := filepath.Join(base, "checkpoint.tar")
+	cmd := exec.Command(tarPath, "-Scf", archivePath, "-C", srcDir, "checkpoint/core-1.img")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("creating sparse tar archive: %v, output: %s", err, string(out))
+	}
+
+	dest := filepath.Join(base, "dest")
+	if err := UntarFiles(archivePath, dest, []string{"checkpoint/core-"}); err != nil {
+		t.Fatalf("extracting sparse archive failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dest, "checkpoint", "core-1.img"))
+	if err != nil {
+		t.Fatalf("reading extracted sparse file: %v", err)
+	}
+	if len(data) != 1024*1024 || !strings.HasPrefix(string(data), "sparse-data") {
+		t.Fatalf("unexpected sparse file contents length: %d", len(data))
+	}
+}
+
+func TestUntarFiles_NonExistentDest(t *testing.T) {
+	base := t.TempDir()
+	archivePath := filepath.Join(base, "archive.tar")
+	writeArchive(t, archivePath, false, []tarEntry{
+		{"config.dump", tar.TypeReg, "config"},
+	})
+
+	dest := filepath.Join(base, "nested", "dest", "dir")
+	if err := UntarFiles(archivePath, dest, []string{"config.dump"}); err != nil {
+		t.Fatalf("UntarFiles failed with non-existent dest: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dest, "config.dump"))
+	if err != nil {
+		t.Fatalf("reading extracted file: %v", err)
+	}
+	if string(content) != "config" {
+		t.Fatalf("expected 'config', got %q", string(content))
 	}
 }

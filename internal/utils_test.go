@@ -105,16 +105,15 @@ func TestCreateTasks_CleanupOnUntarError(t *testing.T) {
 	base := t.TempDir()
 	t.Setenv("TMPDIR", base)
 
-	archivePath := filepath.Join(base, "conflict.tar")
+	archivePath := filepath.Join(base, "traversal.tar")
 	writeTestArchive(t, archivePath, map[string]string{
-		"checkpoint/":            "",
-		"config.dump":            "config",
-		"config.dump/child.dump": "child",
+		"checkpoint/":               "",
+		"checkpoint/../config.dump": "evil",
 	})
 
 	tasks, err := CreateTasks([]string{archivePath}, []string{"config.dump"})
 	if err == nil {
-		t.Fatal("expected UntarFiles error from file/directory path conflict, got nil")
+		t.Fatal("expected UntarFiles error from relative traversal element, got nil")
 	}
 	if tasks != nil {
 		t.Errorf("expected nil tasks on error, got %v", tasks)
