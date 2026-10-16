@@ -8,7 +8,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/spf13/cobra v1.10.2
 	github.com/xlab/treeprint v1.2.0
-	go.podman.io/storage v1.64.1
+	go.podman.io/storage v1.64.2
 	golang.org/x/sys v0.49.0
 )
 
