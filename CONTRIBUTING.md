@@ -29,9 +29,17 @@ PRs that fix issues should include a reference like `Closes #XXXX` in the
 commit message so that github will automatically close the referenced issue
 when the PR is merged.
 
-PRs are checked for binary size increases. If a PR legitimately increases
-the binary size beyond the default threshold, a maintainer can add the
-`bloat-ok` label to bypass the size check.
+Size checks compare the PR's merged result with its exact base commit using
+the same Go compiler and build settings. The binary check measures the normal,
+unstripped `make` build; the library check measures a minimal library consumer.
+The total increase across the PR must not exceed 51,200 bytes in either check.
+Intermediate commits are not measured separately.
+
+The library check uses the same consumer from the merged PR for both builds,
+so changes to `test/lib-size/main.go` must also compile against the base revision.
+
+If an increase is expected and acceptable, a maintainer can add `bloat-ok` to
+bypass the binary check or `lib-bloat-ok` to bypass the library check.
 
 Contributors must assert that they are in compliance with the [Developer
 Certificate of Origin 1.1](http://developercertificate.org/). This is achieved
