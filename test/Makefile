@@ -5,11 +5,11 @@ all: test clean
 
 test: test-imgs test-imgs-diff
 	@echo "Running BATS tests..."
-	bats checkpointctl.bats
+	bats checkpointctl.bats check-size.bats
 
 test-junit: test-imgs test-imgs-diff
 	@echo "Running BATS tests with JUnit results..."
-	bats -F junit checkpointctl.bats > junit.xml
+	bats -F junit checkpointctl.bats check-size.bats > junit.xml
 
 test-imgs: piggie/piggie
 	$(eval PID := $(shell export TEST_ENV=BAR TEST_ENV_EMPTY=; piggie/piggie --tcp-socket --zombie))

@@ -1,0 +1,100 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# The limit applies to the final merged PR, rather than individual commits.
+MAX_DIFF=51200
+result=error
+temp_dir=
+source_dir=
+repo_dir=
+go_version=
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+cleanup() {
+	if [[ -n "$source_dir" ]]; then
+		git -C "$repo_dir" worktree remove --force "$source_dir" >/dev/null 2>&1 || true
+	fi
+	if [[ -n "$temp_dir" ]]; then
+		rm -rf -- "$temp_dir"
+	fi
+	if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+		printf 'result=%s\nmax_diff=%s\ngo_version=%s\n' \
+			"$result" "$MAX_DIFF" "$go_version" >> "$GITHUB_OUTPUT"
+	fi
+}
+trap cleanup EXIT
+
+fail() {
+	echo "ERROR: $*" >&2
+	exit 1
+}
+
+if [[ $# -ne 3 ]]; then
+	fail "Usage: $0 binary|library MERGE_SHA HEAD_SHA"
+fi
+mode=$1
+case "$mode" in
+	binary) binary_path=checkpointctl ;;
+	library) binary_path=test/lib-size/lib-size-test ;;
+	*) fail "Unknown size check: $mode" ;;
+esac
+
+repo_dir=$(git rev-parse --show-toplevel)
+merge_sha=$(git rev-parse --verify --end-of-options "$2^{commit}") || fail "Invalid merge commit: $2"
+head_sha=$(git rev-parse --verify --end-of-options "$3^{commit}") || fail "Invalid PR head commit: $3"
+
+# Derive the baseline from the pinned merge; the event's base SHA can be stale.
+read -r base_sha head_parent extra_parents <<< "$(git show -s --format=%P "$merge_sha")"
+if [[ "$head_parent" != "$head_sha" || -n "$extra_parents" ]]; then
+	fail "Merge commit $merge_sha must have exactly two parents, with PR head $head_sha second"
+fi
+
+# Prevent go.mod or toolchain directives from selecting a different compiler.
+export GOTOOLCHAIN=local
+go_version=$(go version)
+echo "$go_version"
+echo "BASE COMMIT: $base_sha"
+echo "MERGED PR COMMIT: $merge_sha"
+
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/checkpointctl-size.XXXXXX")
+source_dir=$temp_dir/source
+
+measure() {
+	local sha=$1
+	local label=$2
+	git -C "$repo_dir" worktree add --detach --quiet "$source_dir" "$sha"
+	# Use the same path and a fresh source tree for each build.
+	if [[ "$mode" == binary ]]; then
+		make -C "$source_dir" || fail "Build failed for $label commit $sha"
+	else
+		# Keep the consumer identical, including when the base predates it.
+		rm -rf -- "$source_dir/test/lib-size"
+		mkdir -p "$source_dir/test/lib-size"
+		cp "$script_dir/lib-size/main.go" "$source_dir/test/lib-size/main.go"
+		(cd "$source_dir" && go build -o "$binary_path" ./test/lib-size) || fail "Build failed for $label commit $sha"
+	fi
+	local size
+	size=$(stat -c%s "$source_dir/$binary_path")
+	echo "$label SIZE ($sha): $size"
+	printf '%s\n' "$size" > "$temp_dir/$label.size"
+	git -C "$repo_dir" worktree remove --force "$source_dir"
+}
+
+measure "$base_sha" BASE
+measure "$merge_sha" MERGED_PR
+base_size=$(cat "$temp_dir/BASE.size")
+candidate_size=$(cat "$temp_dir/MERGED_PR.size")
+difference=$((candidate_size - base_size))
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+	printf 'base_sha=%s\nbase_size=%s\ncandidate_size=%s\ndifference=%s\n' \
+		"$base_sha" "$base_size" "$candidate_size" "$difference" >> "$GITHUB_OUTPUT"
+fi
+
+if (( difference > MAX_DIFF )); then
+	result=over_limit
+	echo "FAIL: size difference of $difference B exceeds limit $MAX_DIFF B"
+	exit 1
+fi
+result=pass
+echo "PASS: size difference of $difference B within limit $MAX_DIFF B"
