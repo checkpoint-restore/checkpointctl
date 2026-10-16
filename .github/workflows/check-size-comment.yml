@@ -15,95 +15,190 @@ jobs:
   comment:
     name: Post Size Check Results
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'failure'
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    concurrency:
+      group: size-comment-${{ github.event.workflow_run.name }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: false
 
     steps:
-    - name: Download artifacts
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        mkdir -p artifacts && cd artifacts
-
-        artifacts_url="${{ github.event.workflow_run.artifacts_url }}"
-
-        gh api --paginate "$artifacts_url" -q '.artifacts[] | [.name, .archive_download_url] | @tsv' | while read artifact
-        do
-          IFS=$'\t' read name url <<< "$artifact"
-          if [ "$name" != "size-check-results" ] && [ "$name" != "lib-size-check-results" ]; then
-            continue
-          fi
-          gh api $url > "$name.zip"
-          unzip -d "$name" "$name.zip"
-        done
-
-    - name: Check for artifacts
-      id: artifact_check
-      run: |
-        # Check for binary size check artifacts
-        if [ -e artifacts/size-check-results/event.json ] && [ -e artifacts/size-check-results/comment.md ]; then
-          echo "artifacts_found=true" >> $GITHUB_OUTPUT
-          echo "artifact_dir=size-check-results" >> $GITHUB_OUTPUT
-          echo "comment_marker=Binary Size Check Failed" >> $GITHUB_OUTPUT
-        # Check for library size check artifacts
-        elif [ -e artifacts/lib-size-check-results/event.json ] && [ -e artifacts/lib-size-check-results/comment.md ]; then
-          echo "artifacts_found=true" >> $GITHUB_OUTPUT
-          echo "artifact_dir=lib-size-check-results" >> $GITHUB_OUTPUT
-          echo "comment_marker=Library Size Check Failed" >> $GITHUB_OUTPUT
-        else
-          echo "artifacts_found=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Post comment to PR
-      if: steps.artifact_check.outputs.artifacts_found == 'true'
-      env:
-        ARTIFACT_DIR: ${{ steps.artifact_check.outputs.artifact_dir }}
-        COMMENT_MARKER: ${{ steps.artifact_check.outputs.comment_marker }}
+    # This job has write permission: read the artifacts as data and never check
+    # out or execute code from the pull request.
+    - name: Download size check artifact
+      id: artifact
       uses: actions/github-script@v9
       with:
         script: |
           const fs = require('fs');
+          const { owner, repo } = context.repo;
+          const run = context.payload.workflow_run;
+          const names = {
+            'Check binary size': 'size-check-results',
+            'Check library size': 'lib-size-check-results',
+          };
+          const name = names[run.name];
+          if (!name) {
+            throw new Error(`Unexpected source workflow: ${run.name}`);
+          }
 
-          const artifactDir = process.env.ARTIFACT_DIR;
-          const commentMarker = process.env.COMMENT_MARKER;
-
-          const event = JSON.parse(fs.readFileSync(`artifacts/${artifactDir}/event.json`, 'utf8'));
-          const commentBody = fs.readFileSync(`artifacts/${artifactDir}/comment.md`, 'utf8');
-
-          if (!event.pull_request) {
-            console.log('Not a pull request event, skipping comment');
+          const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+            owner, repo, run_id: run.id, per_page: 100,
+          });
+          // Reruns share a run ID; ignore artifacts from earlier attempts.
+          const artifact = artifacts.find(artifact =>
+            artifact.name === name && !artifact.expired &&
+            Date.parse(artifact.created_at) >= Date.parse(run.run_started_at)
+          );
+          if (!artifact) {
+            console.log('No completed size comparison artifact, skipping comment');
             return;
           }
 
-          const { owner, repo } = context.repo;
-          const prNumber = event.pull_request.number;
-
-          console.log(`Posting comment to PR #${prNumber}`);
-
-          const comments = await github.rest.issues.listComments({
-            owner,
-            repo,
-            issue_number: prNumber,
+          const archive = await github.rest.actions.downloadArtifact({
+            owner, repo, artifact_id: artifact.id, archive_format: 'zip',
           });
+          fs.writeFileSync('size-check.zip', Buffer.from(archive.data));
+          core.setOutput('found', 'true');
 
-          const existingComment = comments.data.find(comment =>
-            comment.body.includes(`## ${commentMarker}`) &&
-            comment.user.type === 'Bot'
+    - name: Read size check result
+      id: result
+      if: steps.artifact.outputs.found == 'true'
+      run: |
+        mkdir -p artifacts
+        # Extract only the two data files, without accepting archive paths.
+        if unzip -p size-check.zip event.json > artifacts/event.json &&
+           unzip -p size-check.zip comment.md > artifacts/comment.md; then
+          echo 'found=true' >> "$GITHUB_OUTPUT"
+        else
+          echo 'No complete size result in the artifact, skipping comment'
+        fi
+
+    - name: Update size check comment
+      if: steps.result.outputs.found == 'true'
+      uses: actions/github-script@v9
+      with:
+        script: |
+          const fs = require('fs');
+          const { owner, repo } = context.repo;
+          const eventRun = context.payload.workflow_run;
+          const settings = {
+            'Check binary size': {
+              marker: '<!-- checkpointctl-size:binary -->',
+              oldHeading: '## Binary Size Check Failed',
+              label: 'bloat-ok',
+            },
+            'Check library size': {
+              marker: '<!-- checkpointctl-size:library -->',
+              oldHeading: '## Library Size Check Failed',
+              label: 'lib-bloat-ok',
+            },
+          };
+          const config = settings[eventRun.name];
+          if (!config) {
+            throw new Error(`Unexpected source workflow: ${eventRun.name}`);
+          }
+
+          // A rerun can finish before an earlier completion event is processed.
+          const { data: run } = await github.rest.actions.getWorkflowRun({
+            owner, repo, run_id: eventRun.id,
+          });
+          if (run.status !== 'completed' || run.run_attempt !== eventRun.run_attempt ||
+              !['success', 'failure'].includes(run.conclusion)) {
+            console.log('Source run has been rerun or is no longer complete, skipping comment');
+            return;
+          }
+          if (run.event !== 'pull_request' || run.name !== eventRun.name ||
+              run.head_sha !== eventRun.head_sha ||
+              run.repository.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) {
+            throw new Error('Source run does not match the expected pull request workflow');
+          }
+
+          const event = JSON.parse(fs.readFileSync('artifacts/event.json', 'utf8'));
+          const prNumber = event.pull_request?.number;
+          if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+            throw new Error('Artifact does not identify a pull request');
+          }
+          // Fork workflow runs may omit pull_requests. In that case, verify the
+          // artifact's PR number against the trusted run and the current PR.
+          if (run.pull_requests.length && !run.pull_requests.some(pr => pr.number === prNumber)) {
+            throw new Error('Artifact pull request is not associated with the source run');
+          }
+          const { data: pr } = await github.rest.pulls.get({
+            owner, repo, pull_number: prNumber,
+          });
+          if (pr.state !== 'open' || pr.head.sha !== run.head_sha) {
+            console.log('Pull request has closed or changed since this run, skipping comment');
+            return;
+          }
+          if (pr.base.repo.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase() ||
+              pr.head.repo?.id !== run.head_repository.id ||
+              pr.head.ref !== run.head_branch ||
+              event.pull_request.head?.sha !== run.head_sha ||
+              event.pull_request.head?.repo?.id !== run.head_repository.id) {
+            throw new Error('Artifact pull request does not match the source repository and head');
+          }
+
+          // Match the producer workflows' case-insensitive label checks.
+          const isBypassed = labels => labels.some(label => label.name.toLowerCase() === config.label);
+          if (isBypassed(pr.labels) !== isBypassed(event.pull_request.labels)) {
+            console.log('The bypass label has changed since this run, skipping comment');
+            return;
+          }
+
+          const commentBody = fs.readFileSync('artifacts/comment.md', 'utf8');
+          if (!commentBody.startsWith(`${config.marker}\n`) || commentBody.length > 60000) {
+            throw new Error('Invalid size check comment');
+          }
+          const source = {
+            run_id: run.id,
+            run_attempt: run.run_attempt,
+            started_at: run.run_started_at,
+          };
+          const sourceStartedAt = Date.parse(source.started_at);
+          if (!Number.isFinite(sourceStartedAt)) {
+            throw new Error('Source run has no valid start time');
+          }
+          const sourcePattern = /<!-- checkpointctl-size-source:(\{[^\n]*\}) -->\s*$/;
+          const isNewerThanSource = previous => {
+            const previousStartedAt = Date.parse(previous.started_at);
+            if (!Number.isFinite(previousStartedAt)) {
+              return false;
+            }
+            if (previousStartedAt !== sourceStartedAt) {
+              return previousStartedAt > sourceStartedAt;
+            }
+            if (previous.run_id !== source.run_id) {
+              return previous.run_id > source.run_id;
+            }
+            return previous.run_attempt > source.run_attempt;
+          };
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner, repo, issue_number: prNumber, per_page: 100,
+          });
+          const existing = comments.filter(comment =>
+            comment.user.type === 'Bot' && comment.user.login === 'github-actions[bot]' &&
+            (comment.body.startsWith(`${config.marker}\n`) || comment.body.startsWith(config.oldHeading))
           );
-
-          if (existingComment) {
+          for (const comment of existing) {
+            const match = comment.body.match(sourcePattern);
+            if (match && isNewerThanSource(JSON.parse(match[1]))) {
+              console.log('A newer size result has already been posted, skipping comment');
+              return;
+            }
+          }
+          const body = `${commentBody.trimEnd()}\n` +
+            `<!-- checkpointctl-size-source:${JSON.stringify(source)} -->`;
+          // Reuse the marked comment on success as well, replacing stale failures.
+          const previous = existing.find(comment => comment.body.startsWith(`${config.marker}\n`)) || existing[0];
+          if (previous) {
             await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: existingComment.id,
-              body: commentBody
+              owner, repo, comment_id: previous.id, body,
             });
-            console.log(`Updated existing comment ${existingComment.id}`);
+            console.log(`Updated size check comment ${previous.id}`);
           } else {
             await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: prNumber,
-              body: commentBody
+              owner, repo, issue_number: prNumber, body,
             });
-            console.log('Created new comment');
+            console.log('Created size check comment');
           }

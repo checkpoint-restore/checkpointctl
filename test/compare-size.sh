@@ -8,6 +8,7 @@ result=error
 temp_dir=
 source_dir=
 repo_dir=
+go_version=
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 cleanup() {
@@ -18,7 +19,8 @@ cleanup() {
 		rm -rf -- "$temp_dir"
 	fi
 	if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-		printf 'result=%s\n' "$result" >> "$GITHUB_OUTPUT"
+		printf 'result=%s\nmax_diff=%s\ngo_version=%s\n' \
+			"$result" "$MAX_DIFF" "$go_version" >> "$GITHUB_OUTPUT"
 	fi
 }
 trap cleanup EXIT
@@ -50,7 +52,8 @@ fi
 
 # Prevent go.mod or toolchain directives from selecting a different compiler.
 export GOTOOLCHAIN=local
-go version
+go_version=$(go version)
+echo "$go_version"
 echo "BASE COMMIT: $base_sha"
 echo "MERGED PR COMMIT: $merge_sha"
 

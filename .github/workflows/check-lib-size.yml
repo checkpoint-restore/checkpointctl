@@ -13,10 +13,9 @@ jobs:
     env:
       # Use the same compiler for the base and merged PR builds.
       GOTOOLCHAIN: local
+      BYPASS_SIZE_CHECK: ${{ contains(github.event.pull_request.labels.*.name, 'lib-bloat-ok') }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       MERGE_SHA: ${{ github.sha }}
-    # Check if pull request does not have label "lib-bloat-ok".
-    if: "!contains(github.event.pull_request.labels.*.name, 'lib-bloat-ok')"
     steps:
     - uses: actions/checkout@v7
       with:
@@ -29,61 +28,34 @@ jobs:
         mkdir -p artifacts
         printenv EVENT_JSON > artifacts/event.json
     - uses: actions/setup-go@v7
+      if: env.BYPASS_SIZE_CHECK != 'true'
       with:
         go-version: stable
     - name: Compare base and merged PR library sizes
       id: size-check
+      if: env.BYPASS_SIZE_CHECK != 'true'
       shell: bash
       run: |
         test/check-lib-size.sh "$MERGE_SHA" "$HEAD_SHA" 2>&1 | tee artifacts/output.txt
     - name: Generate size check comment
-      if: ${{ failure() && steps.size-check.outcome == 'failure' }}
+      if: >-
+        ${{ !cancelled() &&
+            (env.BYPASS_SIZE_CHECK == 'true' ||
+             steps.size-check.outcome == 'success' ||
+             steps.size-check.outcome == 'failure') }}
       env:
-        SIZE_RESULT: ${{ steps.size-check.outputs.result }}
-      run: |
-        {
-        cat << 'EOF'
-        ## Library Size Check Failed
-
-        EOF
-        if [ "$SIZE_RESULT" = over_limit ]; then
-          cat << 'EOF'
-        The library size increase exceeds the allowed threshold.
-        EOF
-        else
-          cat << 'EOF'
-        The library size comparison could not be completed. Inspect the output
-        below for the build or revision error.
-        EOF
-        fi
-        cat << 'EOF'
-
-        ### Size Check Output
-        ```
-        EOF
-        cat artifacts/output.txt
-        cat << 'EOF'
-        ```
-        EOF
-        if [ "$SIZE_RESULT" = over_limit ]; then
-          cat << 'EOF'
-
-        ### How to resolve
-
-        If this size increase is expected and acceptable, a maintainer can add
-        the `lib-bloat-ok` label to this PR to bypass the size check.
-        EOF
-        fi
-        cat << 'EOF'
-
-        ---
-        *Library size check performed by CI*
-        EOF
-        } > artifacts/comment.md
+        SIZE_RESULT: ${{ env.BYPASS_SIZE_CHECK == 'true' && 'bypassed' || steps.size-check.outputs.result }}
+        BASE_SHA: ${{ steps.size-check.outputs.base_sha }}
+        BASE_SIZE: ${{ steps.size-check.outputs.base_size }}
+        CANDIDATE_SIZE: ${{ steps.size-check.outputs.candidate_size }}
+        MAX_DIFF: ${{ steps.size-check.outputs.max_diff }}
+        GO_VERSION: ${{ steps.size-check.outputs.go_version }}
+      run: bash test/size-comment.sh library > artifacts/comment.md
     - name: Upload size check results
       if: always()
       uses: actions/upload-artifact@v7
       with:
         name: lib-size-check-results
+        overwrite: true
         retention-days: 5
         path: artifacts/
