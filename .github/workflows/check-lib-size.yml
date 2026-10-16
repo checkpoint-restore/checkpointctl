@@ -10,6 +10,9 @@ permissions:
 jobs:
   check_lib_size:
     runs-on: ubuntu-latest
+    env:
+      # Use the same compiler when rebuilding older commits.
+      GOTOOLCHAIN: local
     # Check if pull request does not have label "lib-bloat-ok".
     if: "!contains(github.event.pull_request.labels.*.name, 'lib-bloat-ok')"
     steps:

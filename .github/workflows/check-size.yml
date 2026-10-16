@@ -10,6 +10,9 @@ permissions:
 jobs:
   check_size:
     runs-on: ubuntu-latest
+    env:
+      # Use the same compiler when rebuilding older commits.
+      GOTOOLCHAIN: local
     # Check if pull request does not have label "bloat-ok".
     if: "!contains(github.event.pull_request.labels.*.name, 'bloat-ok')"
     steps:
@@ -19,6 +22,9 @@ jobs:
         fetch-depth: 0
         # Checkout pull request HEAD commit instead of merge commit
         ref: ${{ github.event.pull_request.head.sha }}
+    - uses: actions/setup-go@v7
+      with:
+        go-version: stable
     - name: Configure git user details
       run: |
         git config --global user.email "checkpoint-restore@users.noreply.github.com"
