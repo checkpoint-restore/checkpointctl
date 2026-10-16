@@ -4,8 +4,8 @@ cyphar.com/go-pathrs
 cyphar.com/go-pathrs/internal/fdutils
 cyphar.com/go-pathrs/internal/libpathrs
 cyphar.com/go-pathrs/procfs
-# github.com/checkpoint-restore/go-criu/v8 v8.4.0
-## explicit; go 1.25.0
+# github.com/checkpoint-restore/go-criu/v8 v8.5.0
+## explicit; go 1.26.0
 github.com/checkpoint-restore/go-criu/v8/crit
 github.com/checkpoint-restore/go-criu/v8/crit/images/bpfmap-data
 github.com/checkpoint-restore/go-criu/v8/crit/images/bpfmap-file
@@ -30,6 +30,7 @@ github.com/checkpoint-restore/go-criu/v8/crit/images/fown
 github.com/checkpoint-restore/go-criu/v8/crit/images/fs
 github.com/checkpoint-restore/go-criu/v8/crit/images/fsnotify
 github.com/checkpoint-restore/go-criu/v8/crit/images/ghost-file
+github.com/checkpoint-restore/go-criu/v8/crit/images/inventory
 github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-desc
 github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-msg
 github.com/checkpoint-restore/go-criu/v8/crit/images/ipc-sem
@@ -109,6 +110,13 @@ github.com/moby/sys/user
 # github.com/opencontainers/runtime-spec v1.3.0
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
+# github.com/pierrec/lz4/v4 v4.1.33
+## explicit; go 1.22
+github.com/pierrec/lz4/v4
+github.com/pierrec/lz4/v4/internal/lz4block
+github.com/pierrec/lz4/v4/internal/lz4errors
+github.com/pierrec/lz4/v4/internal/lz4stream
+github.com/pierrec/lz4/v4/internal/xxh32
 # github.com/sirupsen/logrus v1.9.4
 ## explicit; go 1.17
 github.com/sirupsen/logrus
@@ -142,11 +150,11 @@ go.podman.io/storage/pkg/reexec
 go.podman.io/storage/pkg/regexp
 go.podman.io/storage/pkg/system
 go.podman.io/storage/pkg/unshare
-# golang.org/x/sys v0.47.0
-## explicit; go 1.25.0
+# golang.org/x/sys v0.49.0
+## explicit; go 1.26.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# google.golang.org/protobuf v1.36.11
+# google.golang.org/protobuf v1.36.12
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
