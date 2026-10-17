@@ -34,9 +34,17 @@ if [[ $# -ne 3 ]]; then
 	fail "Usage: $0 binary|library MERGE_SHA HEAD_SHA"
 fi
 mode=$1
+# Files that affect the measured size, or the size check itself.
+build_inputs=('*.go' go.mod go.sum vendor test/compare-size.sh test/size-comment.sh)
 case "$mode" in
-	binary) binary_path=checkpointctl ;;
-	library) binary_path=test/lib-size/lib-size-test ;;
+	binary)
+		binary_path=checkpointctl
+		build_inputs+=('Makefile*' test/check-size.sh .github/workflows/check-size.yml)
+		;;
+	library)
+		binary_path=test/lib-size/lib-size-test
+		build_inputs+=(test/lib-size test/check-lib-size.sh .github/workflows/check-lib-size.yml)
+		;;
 	*) fail "Unknown size check: $mode" ;;
 esac
 
@@ -48,6 +56,16 @@ head_sha=$(git rev-parse --verify --end-of-options "$3^{commit}") || fail "Inval
 read -r base_sha head_parent extra_parents <<< "$(git show -s --format=%P "$merge_sha")"
 if [[ "$head_parent" != "$head_sha" || -n "$extra_parents" ]]; then
 	fail "Merge commit $merge_sha must have exactly two parents, with PR head $head_sha second"
+fi
+
+# A git error counts as a change, so that the sizes are still compared.
+if git diff --quiet "$base_sha" "$merge_sha" -- "${build_inputs[@]}"; then
+	result=skipped
+	echo "SKIPPED: the PR does not change the build inputs"
+	if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+		echo "::notice::No build inputs changed; skipping the $mode size check"
+	fi
+	exit 0
 fi
 
 # Prevent go.mod or toolchain directives from selecting a different compiler.

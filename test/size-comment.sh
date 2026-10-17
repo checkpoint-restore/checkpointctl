@@ -21,12 +21,18 @@ fi
 
 repo_url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:?}
 run_url=$repo_url/actions/runs/${GITHUB_RUN_ID:?}/attempts/${GITHUB_RUN_ATTEMPT:-1}
-printf '<!-- checkpointctl-size:%s -->\n## %s\n\n' "$1" "$title"
+printf '<!-- checkpointctl-size:%s -->\n' "$1"
+# The comment workflow only uses a skipped result to update an earlier comment.
+if [[ "$result" == skipped ]]; then
+	echo '<!-- checkpointctl-size-result:skipped -->'
+fi
+printf '## %s\n\n' "$title"
 
 case "$result" in
 	pass) echo '**Passed** — the size increase is within the limit.' ;;
 	over_limit) echo '**Failed** — the size increase exceeds the limit.' ;;
 	bypassed) printf '**Bypassed** — the `%s` label disables this size check.\n' "$label" ;;
+	skipped) echo '**Skipped** — this PR does not change the build inputs.' ;;
 	*)
 		echo '**Unable to complete the comparison.** See the CI logs for the build or revision error.'
 		result=error

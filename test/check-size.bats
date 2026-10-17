@@ -13,7 +13,7 @@ setup() {
 set -eu
 case "$1" in
 version) echo 'go version go1.26.0 linux/amd64' ;;
-build) truncate -s "$(cat size)" "$3" ;;
+build) truncate -s "$(cat size.go)" "$3" ;;
 *) exit 1 ;;
 esac
 EOF
@@ -25,8 +25,9 @@ EOF
 	git config user.email 'size-check@example.invalid'
 	git config commit.gpgsign false
 	# shellcheck disable=SC2016
-	printf 'all:\n\ttruncate -s $$(cat size) checkpointctl\n' > Makefile
-	printf '100000\n' > size
+	printf 'all:\n\ttruncate -s $$(cat size.go) checkpointctl\n' > Makefile
+	# The fake build reads the size from a .go file, so it is a build input.
+	printf '100000\n' > size.go
 	commit 'Initial size'
 }
 
@@ -67,7 +68,7 @@ check_sizes() {
 	BASE_SHA=$(git rev-parse HEAD)
 	export BASE_SHA
 	git switch -qc feature
-	printf '800000\n' > size
+	printf '800000\n' > size.go
 	commit 'Grow binary'
 	git switch -q main
 	touch README.md
@@ -79,18 +80,44 @@ check_sizes() {
 
 @test "Size checks preserve resolved merges in the base branch" {
 	git switch -qc topic
-	printf '110000\n' > size
+	printf '110000\n' > size.go
 	commit 'Change topic size'
 	git switch -q main
-	printf '160000\n' > size
+	printf '160000\n' > size.go
 	commit 'Change base size'
 	run git merge --no-ff topic -m 'Merge topic'
 	[ "$status" -eq 1 ]
-	printf '165000\n' > size
+	printf '165000\n' > size.go
 	commit 'Resolve size conflict'
+	git switch -qc feature
+	touch helper.go
+	commit 'Add an empty Go file'
+	merge_pr
+	check_sizes pass 165000 165000 0
+}
+
+@test "Size checks skip PRs that do not change the build inputs" {
 	git switch -qc feature
 	touch README.md
 	commit 'Docs only'
 	merge_pr
-	check_sizes pass 165000 165000 0
+	local script
+	for script in check-size.sh check-lib-size.sh; do
+		: > "$GITHUB_OUTPUT"
+		run "$SCRIPTS_DIR/$script" "$MERGE_SHA" "$HEAD_SHA"
+		echo "$output"
+		[ "$status" -eq 0 ]
+		[ "$(sed -n 's/^result=//p' "$GITHUB_OUTPUT")" = skipped ]
+		[ -z "$(sed -n 's/^base_size=//p' "$GITHUB_OUTPUT")" ]
+	done
+}
+
+@test "Skipped size check comment is marked for update only" {
+	run env GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1 SIZE_RESULT=skipped \
+		bash "$SCRIPTS_DIR/size-comment.sh" binary
+	echo "$output"
+	[ "$status" -eq 0 ]
+	[ "${lines[0]}" = '<!-- checkpointctl-size:binary -->' ]
+	[ "${lines[1]}" = '<!-- checkpointctl-size-result:skipped -->' ]
+	[[ "$output" == *'**Skipped**'* ]]
 }

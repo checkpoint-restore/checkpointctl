@@ -33,7 +33,8 @@ Size checks compare the PR's merged result with its exact base commit using
 the same Go compiler and build settings. The binary check measures the normal,
 unstripped `make` build; the library check measures a minimal library consumer.
 The total increase across the PR must not exceed 524,288 bytes (512 KiB) in
-either check. Intermediate commits are not measured separately.
+either check. Intermediate commits are not measured separately, and PRs that
+don't change Go code, modules, the build or the size checks are skipped.
 
 The library check uses the same consumer from the merged PR for both builds,
 so changes to `test/lib-size/main.go` must also compile against the base revision.
