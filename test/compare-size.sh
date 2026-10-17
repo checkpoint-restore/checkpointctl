@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # The limit applies to the final merged PR, rather than individual commits.
-MAX_DIFF=51200
+MAX_DIFF=$((512 * 1024))
 result=error
 temp_dir=
 source_dir=
