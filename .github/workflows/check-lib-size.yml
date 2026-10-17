@@ -36,7 +36,7 @@ jobs:
       if: env.BYPASS_SIZE_CHECK != 'true'
       shell: bash
       run: |
-        test/check-lib-size.sh "$MERGE_SHA" "$HEAD_SHA" 2>&1 | tee artifacts/output.txt
+        test/compare-size.sh library "$MERGE_SHA" "$HEAD_SHA" 2>&1 | tee artifacts/output.txt
     - name: Generate size check comment
       if: >-
         ${{ !cancelled() &&

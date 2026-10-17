@@ -51,10 +51,10 @@ merge_pr() {
 
 check_sizes() {
 	local expected_result=$1 expected_base=$2 expected_candidate=$3 expected_status=$4
-	local script
-	for script in check-size.sh check-lib-size.sh; do
+	local mode
+	for mode in binary library; do
 		: > "$GITHUB_OUTPUT"
-		run "$SCRIPTS_DIR/$script" "$MERGE_SHA" "$HEAD_SHA"
+		run "$SCRIPTS_DIR/compare-size.sh" "$mode" "$MERGE_SHA" "$HEAD_SHA"
 		echo "$output"
 		[ "$status" -eq "$expected_status" ]
 		[ "$(sed -n 's/^result=//p' "$GITHUB_OUTPUT")" = "$expected_result" ]
@@ -101,10 +101,10 @@ check_sizes() {
 	touch README.md
 	commit 'Docs only'
 	merge_pr
-	local script
-	for script in check-size.sh check-lib-size.sh; do
+	local mode
+	for mode in binary library; do
 		: > "$GITHUB_OUTPUT"
-		run "$SCRIPTS_DIR/$script" "$MERGE_SHA" "$HEAD_SHA"
+		run "$SCRIPTS_DIR/compare-size.sh" "$mode" "$MERGE_SHA" "$HEAD_SHA"
 		echo "$output"
 		[ "$status" -eq 0 ]
 		[ "$(sed -n 's/^result=//p' "$GITHUB_OUTPUT")" = skipped ]

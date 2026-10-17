@@ -45,11 +45,11 @@ build_inputs=('*.go' go.mod go.sum vendor test/compare-size.sh test/size-comment
 case "$mode" in
 	binary)
 		binary_path=checkpointctl
-		build_inputs+=('Makefile*' test/check-size.sh .github/workflows/check-size.yml)
+		build_inputs+=('Makefile*' .github/workflows/check-size.yml)
 		;;
 	library)
 		binary_path=test/lib-size/lib-size-test
-		build_inputs+=(test/lib-size test/check-lib-size.sh .github/workflows/check-lib-size.yml)
+		build_inputs+=(test/lib-size .github/workflows/check-lib-size.yml)
 		;;
 	*) fail "Unknown size check: $mode" ;;
 esac
