@@ -130,3 +130,16 @@ check_sizes() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *'Unable to complete the comparison'* ]]
 }
+
+@test "Size check comment shows the change in bytes and percent" {
+	local sizes base candidate expected
+	for sizes in '10748232 10800648 +52416 B (+0.49%)' '200 100 -100 B (-50.00%)' '100 100 +0 B (0.00%)'; do
+		read -r base candidate expected <<< "$sizes"
+		run env GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1 SIZE_RESULT=pass \
+			BASE_SIZE="$base" CANDIDATE_SIZE="$candidate" MAX_DIFF=524288 \
+			BASE_SHA=base MERGE_SHA=merge bash "$SCRIPTS_DIR/size-comment.sh" binary
+		echo "$output"
+		[ "$status" -eq 0 ]
+		[[ "$output" == *"| Change | **$expected** |"* ]]
+	done
+}

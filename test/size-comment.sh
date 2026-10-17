@@ -49,21 +49,13 @@ case "$result" in
 esac
 
 if [[ "$result" == pass || "$result" == over_limit ]]; then
-	base=$((10#$base))
-	candidate=$((10#$candidate))
-	limit=$((10#$limit))
 	difference=$((candidate - base))
 	printf -v change '%+d B' "$difference"
 	if (( base > 0 )); then
-		absolute=${difference#-}
-		# Round the percentage to two decimal places using integer arithmetic.
-		percent_hundredths=$(((absolute * 10000 + base / 2) / base))
-		sign=
-		if (( difference > 0 )); then sign=+; fi
-		if (( difference < 0 )); then sign=-; fi
-		printf -v percentage '%s%d.%02d%%' \
-			"$sign" "$((percent_hundredths / 100))" "$((percent_hundredths % 100))"
-		change+=" ($percentage)"
+		change+=$(awk -v diff="$difference" -v base="$base" 'BEGIN {
+			percent = diff * 100 / base
+			printf " (%s%.2f%%)", (percent > 0 ? "+" : ""), percent
+		}')
 	fi
 	printf '\n| | Size |\n|---|---:|\n'
 	printf '| Base ([`%.12s`](%s/commit/%s)) | %s B |\n' "${BASE_SHA:?}" "$repo_url" "$BASE_SHA" "$base"
