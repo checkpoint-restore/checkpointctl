@@ -11,6 +11,13 @@ repo_dir=
 go_version=
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
+# Record a result for the GitHub Actions workflow, if there is one.
+output() {
+	if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+		printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
+	fi
+}
+
 cleanup() {
 	if [[ -n "$source_dir" ]]; then
 		git -C "$repo_dir" worktree remove --force "$source_dir" >/dev/null 2>&1 || true
@@ -18,10 +25,9 @@ cleanup() {
 	if [[ -n "$temp_dir" ]]; then
 		rm -rf -- "$temp_dir"
 	fi
-	if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-		printf 'result=%s\nmax_diff=%s\ngo_version=%s\n' \
-			"$result" "$MAX_DIFF" "$go_version" >> "$GITHUB_OUTPUT"
-	fi
+	output result "$result"
+	output max_diff "$MAX_DIFF"
+	output go_version "$go_version"
 }
 trap cleanup EXIT
 
@@ -92,22 +98,19 @@ measure() {
 		cp "$script_dir/lib-size/main.go" "$source_dir/test/lib-size/main.go"
 		(cd "$source_dir" && go build -o "$binary_path" ./test/lib-size) || fail "Build failed for $label commit $sha"
 	fi
-	local size
-	size=$(stat -c%s "$source_dir/$binary_path")
-	echo "$label SIZE ($sha): $size"
-	printf '%s\n' "$size" > "$temp_dir/$label.size"
+	measured_size=$(stat -c%s "$source_dir/$binary_path")
+	echo "$label SIZE ($sha): $measured_size"
 	git -C "$repo_dir" worktree remove --force "$source_dir"
 }
 
 measure "$base_sha" BASE
+base_size=$measured_size
 measure "$merge_sha" MERGED_PR
-base_size=$(cat "$temp_dir/BASE.size")
-candidate_size=$(cat "$temp_dir/MERGED_PR.size")
+candidate_size=$measured_size
 difference=$((candidate_size - base_size))
-if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-	printf 'base_sha=%s\nbase_size=%s\ncandidate_size=%s\ndifference=%s\n' \
-		"$base_sha" "$base_size" "$candidate_size" "$difference" >> "$GITHUB_OUTPUT"
-fi
+output base_sha "$base_sha"
+output base_size "$base_size"
+output candidate_size "$candidate_size"
 
 if (( difference > MAX_DIFF )); then
 	result=over_limit
