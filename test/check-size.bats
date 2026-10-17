@@ -67,14 +67,14 @@ check_sizes() {
 	BASE_SHA=$(git rev-parse HEAD)
 	export BASE_SHA
 	git switch -qc feature
-	printf '160000\n' > size
+	printf '800000\n' > size
 	commit 'Grow binary'
 	git switch -q main
 	touch README.md
 	commit 'Advance base branch'
 	merge_pr
 	[ "$BASE_SHA" != "$BASE_PARENT_SHA" ]
-	check_sizes over_limit 100000 160000 1
+	check_sizes over_limit 100000 800000 1
 }
 
 @test "Size checks preserve resolved merges in the base branch" {

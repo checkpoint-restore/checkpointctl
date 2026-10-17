@@ -13,7 +13,7 @@ esac
 result=${SIZE_RESULT:-error}
 base=${BASE_SIZE:-}
 candidate=${CANDIDATE_SIZE:-}
-limit=${MAX_DIFF:-51200}
+limit=${MAX_DIFF:-$((512 * 1024))}
 if [[ "$result" == pass || "$result" == over_limit ]] &&
 	[[ ! "$base" =~ ^[0-9]+$ || ! "$candidate" =~ ^[0-9]+$ || ! "$limit" =~ ^[0-9]+$ ]]; then
 	result=error
