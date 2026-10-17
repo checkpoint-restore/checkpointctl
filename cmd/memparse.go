@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -72,10 +73,38 @@ func MemParse() *cobra.Command {
 		"Print the specified number of bytes surrounding each match",
 	)
 
+	flags.StringVar(
+		addressRange,
+		"address-range",
+		"",
+		"Filter memory by virtual address range, e.g. \"0x7f0000000000-0x7f0000010000\"",
+	)
+
 	return cmd
 }
 
 func memparse(cmd *cobra.Command, args []string) error {
+	var (
+		rangeStart uint64
+		rangeEnd   uint64
+		hasRange   bool
+	)
+
+	if cmd.Flags().Changed("address-range") {
+		if *addressRange == "" {
+			return fmt.Errorf("invalid address range: cannot be empty")
+		}
+		if *pID == 0 {
+			return fmt.Errorf("--address-range requires --pid")
+		}
+		var err error
+		rangeStart, rangeEnd, err = parseAddrRange(*addressRange)
+		if err != nil {
+			return err
+		}
+		hasRange = true
+	}
+
 	requiredFiles := []string{
 		metadata.SpecDumpFile, metadata.ConfigDumpFile,
 		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
@@ -103,11 +132,11 @@ func memparse(cmd *cobra.Command, args []string) error {
 	defer internal.CleanupTasks(tasks)
 
 	if *searchPattern != "" || *searchRegexPattern != "" {
-		return printMemorySearchResultForPID(tasks[0])
+		return printMemorySearchResultForPID(tasks[0], hasRange, rangeStart, rangeEnd)
 	}
 
 	if *pID != 0 {
-		return printProcessMemoryPages(tasks[0])
+		return printProcessMemoryPages(tasks[0], hasRange, rangeStart, rangeEnd)
 	}
 
 	return showProcessMemorySizeTables(tasks)
@@ -195,7 +224,7 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 	return nil
 }
 
-func printProcessMemoryPages(task internal.Task) error {
+func printProcessMemoryPages(task internal.Task, hasRange bool, rangeStart, rangeEnd uint64) error {
 	c := crit.New(nil, nil, filepath.Join(task.OutputDir, metadata.CheckpointDirectory), false, false)
 	psTree, err := c.ExplorePs()
 	if err != nil {
@@ -260,12 +289,23 @@ func printProcessMemoryPages(task internal.Task) error {
 	for _, entry := range pagemapEntries {
 		start := entry.GetVaddr()
 		end := start + (uint64(pageSize) * entry.GetNrPages())
-		buf, err := memReader.GetMemPages(start, end)
+
+		clipStart := start
+		clipEnd := end
+		if hasRange {
+			clipStart = max(start, rangeStart)
+			clipEnd = min(end, rangeEnd)
+			if clipStart >= clipEnd {
+				continue
+			}
+		}
+
+		buf, err := memReader.GetMemPages(clipStart, clipEnd)
 		if err != nil {
 			return err
 		}
 
-		hexdump(output, buf, start, compact)
+		hexdump(output, buf, clipStart, compact)
 	}
 	return nil
 }
@@ -316,7 +356,7 @@ func generateHexAndAscii(data []byte) (string, string) {
 }
 
 // Searches for a pattern in the memory of a given PID and prints the results.
-func printMemorySearchResultForPID(task internal.Task) error {
+func printMemorySearchResultForPID(task internal.Task, hasRange bool, rangeStart, rangeEnd uint64) error {
 	c := crit.New(nil, nil, filepath.Join(task.OutputDir, metadata.CheckpointDirectory), false, false)
 	psTree, err := c.ExplorePs()
 	if err != nil {
@@ -357,9 +397,80 @@ func printMemorySearchResultForPID(task internal.Task) error {
 		escapeRegExpCharacters = false
 	}
 
-	results, err := memReader.SearchPattern(pattern, escapeRegExpCharacters, *searchContext, 0)
-	if err != nil {
-		return fmt.Errorf("failed to search pattern in memory: %w", err)
+	var results []crit.PatternMatch
+
+	if hasRange {
+		if *searchContext < 0 {
+			return fmt.Errorf("context size cannot be negative")
+		}
+
+		// Search only intersecting bytes so out-of-range memory is not read and matches cannot cross the range edge.
+		var re *regexp.Regexp
+		if escapeRegExpCharacters {
+			re = regexp.MustCompile(regexp.QuoteMeta(pattern))
+		} else {
+			var err error
+			re, err = regexp.Compile(pattern)
+			if err != nil {
+				return fmt.Errorf("failed to compile regex pattern: %w", err)
+			}
+		}
+
+		pagemapEntries := memReader.GetPagemapEntries()
+		for _, entry := range pagemapEntries {
+			start := entry.GetVaddr()
+			end := start + (uint64(pageSize) * entry.GetNrPages())
+
+			clipStart := max(start, rangeStart)
+			clipEnd := min(end, rangeEnd)
+			if clipStart >= clipEnd {
+				continue
+			}
+
+			buf, err := memReader.GetMemPages(clipStart, clipEnd)
+			if err != nil {
+				return err
+			}
+
+			data := buf.Bytes()
+			indices := re.FindAllIndex(data, -1)
+			for _, idx := range indices {
+				matchStart := idx[0]
+				matchEnd := idx[1]
+				matchLen := matchEnd - matchStart
+
+				contextSize := *searchContext
+				cStart := matchStart - contextSize
+				if cStart < 0 {
+					cStart = 0
+				}
+				cEnd := matchEnd + contextSize
+				if cEnd > len(data) {
+					cEnd = len(data)
+				}
+
+				contextBuf := make([]byte, cEnd-cStart)
+				copy(contextBuf, data[cStart:cEnd])
+				for i := range contextBuf {
+					if contextBuf[i] < 32 || contextBuf[i] >= 127 {
+						contextBuf[i] = '?'
+					}
+				}
+
+				results = append(results, crit.PatternMatch{
+					Vaddr:   clipStart + uint64(matchStart),
+					Length:  matchLen,
+					Context: contextSize,
+					Match:   string(contextBuf),
+				})
+			}
+		}
+	} else {
+		var err error
+		results, err = memReader.SearchPattern(pattern, escapeRegExpCharacters, *searchContext, 0)
+		if err != nil {
+			return fmt.Errorf("failed to search pattern in memory: %w", err)
+		}
 	}
 
 	if len(results) == 0 {
