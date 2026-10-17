@@ -121,3 +121,12 @@ check_sizes() {
 	[ "${lines[1]}" = '<!-- checkpointctl-size-result:skipped -->' ]
 	[[ "$output" == *'**Skipped**'* ]]
 }
+
+@test "Size check comment does not assume a size limit" {
+	run env GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1 SIZE_RESULT=pass \
+		BASE_SIZE=100 CANDIDATE_SIZE=200 BASE_SHA=base MERGE_SHA=merge \
+		bash "$SCRIPTS_DIR/size-comment.sh" binary
+	echo "$output"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *'Unable to complete the comparison'* ]]
+}

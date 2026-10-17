@@ -21,7 +21,8 @@ esac
 result=${SIZE_RESULT:-error}
 base=${BASE_SIZE:-}
 candidate=${CANDIDATE_SIZE:-}
-limit=${MAX_DIFF:-$((512 * 1024))}
+# compare-size.sh reports the limit, so that it is defined in one place.
+limit=${MAX_DIFF:-}
 if [[ "$result" == pass || "$result" == over_limit ]] &&
 	[[ ! "$base" =~ ^[0-9]+$ || ! "$candidate" =~ ^[0-9]+$ || ! "$limit" =~ ^[0-9]+$ ]]; then
 	result=error
