@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -175,7 +176,7 @@ func diff(cmd *cobra.Command, args []string) error {
 	}
 }
 
-// getTaskJSON converts tasks to JSON format (same as internal.RenderJSONView)
+// getTaskJSON renders tasks as JSON and decodes their checkpoint metadata.
 func getTaskJSON(tasks []internal.Task) ([]CheckpointMetadata, error) {
 	var result []CheckpointMetadata
 
@@ -189,32 +190,14 @@ func getTaskJSON(tasks []internal.Task) ([]CheckpointMetadata, error) {
 		_, statErr := os.Stat(pstreePath)
 		internal.PsTree = statErr == nil
 
-		// Use the same rendering logic as inspect
-		var buf []byte
-		var err error
-
-		// Create a pipe to capture RenderJSONView output
-		oldStdout := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		// Call the existing RenderJSONView
-		err = internal.RenderJSONView([]internal.Task{task})
-
-		w.Close()
-		os.Stdout = oldStdout
-
-		if err != nil {
+		var buf bytes.Buffer
+		if err := internal.RenderJSONViewTo(&buf, []internal.Task{task}); err != nil {
 			return nil, err
 		}
 
-		// Read captured output
-		buf = make([]byte, 1024*1024) // 1MB buffer
-		n, _ := r.Read(buf)
-
 		// Parse JSON
 		var metadata []CheckpointMetadata
-		if err := json.Unmarshal(buf[:n], &metadata); err != nil {
+		if err := json.Unmarshal(buf.Bytes(), &metadata); err != nil {
 			return nil, err
 		}
 

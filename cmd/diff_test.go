@@ -3,12 +3,20 @@
 package cmd
 
 import (
+	"archive/tar"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/checkpoint-restore/checkpointctl/internal"
+	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 )
 
 // compareSockets [empty inputs]
@@ -683,5 +691,206 @@ func TestRenderAnnotatedProcessTreeUnknownPID(t *testing.T) {
 
 	if !contains(out, "  PID 99") {
 		t.Errorf("Expected blank marker for unknown PID, got:\n%s", out)
+	}
+}
+
+func createTestCheckpointArchive(t *testing.T, dir, filename string, containerID, containerName, runtime, imageName string, created time.Time) string {
+	t.Helper()
+	archivePath := filepath.Join(dir, filename)
+	f, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatalf("creating test archive: %v", err)
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Errorf("closing test archive: %v", err)
+		}
+	}()
+
+	tw := tar.NewWriter(f)
+	defer func() {
+		if err := tw.Close(); err != nil {
+			t.Errorf("finishing test archive: %v", err)
+		}
+	}()
+
+	// 1. checkpoint/ directory
+	dirHdr := &tar.Header{
+		Name:     "checkpoint/",
+		Typeflag: tar.TypeDir,
+		Mode:     0o700,
+	}
+	if err := tw.WriteHeader(dirHdr); err != nil {
+		t.Fatalf("writing dir header: %v", err)
+	}
+
+	// 2. spec.dump
+	specContent := `{"annotations":{"io.container.manager":"libpod"}}`
+	specHdr := &tar.Header{
+		Name: "spec.dump",
+		Mode: 0o600,
+		Size: int64(len(specContent)),
+	}
+	if err := tw.WriteHeader(specHdr); err != nil {
+		t.Fatalf("writing spec header: %v", err)
+	}
+	if _, err := tw.Write([]byte(specContent)); err != nil {
+		t.Fatalf("writing spec content: %v", err)
+	}
+
+	// 3. config.dump
+	configObj := metadata.ContainerConfig{
+		ID:              containerID,
+		Name:            containerName,
+		OCIRuntime:      runtime,
+		CreatedTime:     created,
+		RootfsImageName: imageName,
+	}
+	configBytes, err := json.Marshal(configObj)
+	if err != nil {
+		t.Fatalf("marshaling config: %v", err)
+	}
+	configHdr := &tar.Header{
+		Name: "config.dump",
+		Mode: 0o600,
+		Size: int64(len(configBytes)),
+	}
+	if err := tw.WriteHeader(configHdr); err != nil {
+		t.Fatalf("writing config header: %v", err)
+	}
+	if _, err := tw.Write(configBytes); err != nil {
+		t.Fatalf("writing config content: %v", err)
+	}
+
+	return archivePath
+}
+
+// runDiffTestSubprocess isolates tests that could hang with stdout redirected.
+// The parent can kill a blocked child without leaving its own stdout or globals
+// changed. Return true in the parent so the caller skips the child-only work.
+func runDiffTestSubprocess(t *testing.T) bool {
+	t.Helper()
+	const childEnv = "CHECKPOINTCTL_DIFF_TEST_CHILD"
+	if os.Getenv(childEnv) == t.Name() {
+		return false
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(t.Name(), "/")
+	for i, part := range parts {
+		parts[i] = "^" + regexp.QuoteMeta(part) + "$"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, "-test.run="+strings.Join(parts, "/"))
+	// Keep files from a killed child under the parent's cleanup directory.
+	cmd.Env = append(os.Environ(), childEnv+"="+t.Name(), "TMPDIR="+t.TempDir())
+	cmd.WaitDelay = time.Second
+	output, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Fatalf("%s timed out: %v\n%s", t.Name(), ctx.Err(), output)
+	}
+	if err != nil {
+		t.Fatalf("%s failed in subprocess: %v\n%s", t.Name(), err, output)
+	}
+	return true
+}
+
+func TestGetTaskJSON_LargeOutput(t *testing.T) {
+	testCreated := time.Date(2026, 3, 15, 10, 30, 0, 0, time.UTC)
+	testCases := []struct {
+		name      string
+		imageSize int
+	}{
+		{
+			name:      "75_KiB",
+			imageSize: 75 * 1024,
+		},
+		{
+			name:      "1500_KiB",
+			imageSize: 1500 * 1024,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if runDiffTestSubprocess(t) {
+				return
+			}
+			tmpDir := t.TempDir()
+			expectedImage := strings.Repeat("x", tc.imageSize)
+			archive := createTestCheckpointArchive(
+				t, tmpDir, "test.tar",
+				"container-id-123456789", "custom-container-name", "crun",
+				expectedImage, testCreated,
+			)
+
+			tasks, err := internal.CreateTasks([]string{archive}, []string{metadata.SpecDumpFile, metadata.ConfigDumpFile})
+			if err != nil {
+				t.Fatalf("CreateTasks failed: %v", err)
+			}
+			defer internal.CleanupTasks(tasks)
+
+			meta, err := getTaskJSON(tasks)
+			if err != nil {
+				t.Fatalf("getTaskJSON returned error: %v", err)
+			}
+			if len(meta) != 1 {
+				t.Fatalf("expected 1 metadata entry, got %d", len(meta))
+			}
+			m := meta[0]
+			if m.ID != "container-id-123456789" {
+				t.Errorf("ID mismatch: got %q, want %q", m.ID, "container-id-123456789")
+			}
+			if m.ContainerName != "custom-container-name" {
+				t.Errorf("ContainerName mismatch: got %q, want %q", m.ContainerName, "custom-container-name")
+			}
+			if m.Runtime != "crun" {
+				t.Errorf("Runtime mismatch: got %q, want %q", m.Runtime, "crun")
+			}
+			if m.Engine != "Podman" {
+				t.Errorf("Engine mismatch: got %q, want %q", m.Engine, "Podman")
+			}
+			if m.Created != testCreated.Format(time.RFC3339) {
+				t.Errorf("Created mismatch: got %q, want %q", m.Created, testCreated.Format(time.RFC3339))
+			}
+			if m.Image != expectedImage {
+				t.Fatalf("image name truncated or corrupted: got %d bytes, want %d bytes",
+					len(m.Image), len(expectedImage))
+			}
+		})
+	}
+}
+
+func TestDiff_LargeOutputNoDeadlock(t *testing.T) {
+	if runDiffTestSubprocess(t) {
+		return
+	}
+	tmpDir := t.TempDir()
+	largeImage := strings.Repeat("y", 80*1024)
+	testCreated := time.Date(2026, 3, 15, 10, 30, 0, 0, time.UTC)
+	archiveA := createTestCheckpointArchive(t, tmpDir, "cpA.tar", "c123456789012", "c-test", "crun", largeImage, testCreated)
+	archiveB := createTestCheckpointArchive(t, tmpDir, "cpB.tar", "c123456789012", "c-test", "crun", largeImage, testCreated)
+
+	cmd := Diff()
+	cmd.SetArgs([]string{archiveA, archiveB})
+
+	output := captureDiffOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("checkpointctl diff failed: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "Container: c-test") {
+		t.Errorf("expected rendered output to contain container name, got:\n%s", output)
+	}
+	if !strings.Contains(output, "ID:        c123456789012") {
+		t.Errorf("expected rendered output to contain container ID, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Checkpoint comparison for container c-test") {
+		t.Errorf("expected rendered output to contain summary, got:\n%s", output)
 	}
 }
