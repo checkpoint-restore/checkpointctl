@@ -18,8 +18,19 @@ Compare two container checkpoints and show differences in:
 * Sockets (new/removed network sockets)
 * Stored memory page-image sizes
 
+Command lines and environment variables are read from memory pages in each
+archive. CRIU LZ4-compressed pages are decoded automatically and require
+`checkpoint/inventory.img`.
+
 Compression can change stored page-image sizes without changing process
 memory. The `size_change_mb` field in JSON output is measured in MiB.
+
+Each checkpoint's details show `CRIU compression: Enabled` or
+`CRIU compression: Disabled`. JSON output includes the boolean field
+`criu_compression` in both `checkpoint_a` and `checkpoint_b`. This setting
+describes CRIU memory page compression, independently of archive compression.
+Archives without `checkpoint/inventory.img` are reported as compression
+disabled for compatibility with older checkpoints.
 
 == Options
 

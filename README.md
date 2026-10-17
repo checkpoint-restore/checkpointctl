@@ -68,6 +68,7 @@ awesome_booth
 │       ├── IP: 10.88.0.4/16
 │       ├── MAC: 2e:e1:db:6b:68:93
 │       └── Gateway: 10.88.0.1
+├── CRIU compression: Disabled
 ├── Checkpoint size: 1018.3 KiB
 │   └── Memory pages size: 952.0 KiB
 ├── Root FS diff size: 2.0 KiB
@@ -95,12 +96,14 @@ $ checkpointctl diff --show-unchanged --ps-tree-cmd --sockets ./cp1.tar cp2.tar
 ╚════════════════════════════════════════════════════════════════╝
 
 Checkpoint A:
-  Created: 2026-04-18T10:15:41+01:00
-  Size:    15186908 bytes
+  Created:          2026-04-18T10:15:41+01:00
+  Size:             15186908 bytes
+  CRIU compression: Disabled
 
 Checkpoint B:
-  Created: 2026-04-18T10:15:41+01:00
-  Size:    15212641 bytes
+  Created:          2026-04-18T10:15:41+01:00
+  Size:             15212641 bytes
+  CRIU compression: Disabled
 
 ┌─ Stored Page-Image Changes ──────────────────────────────────┐
 │ ↑ Increased by 0.02 MiB

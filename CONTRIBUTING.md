@@ -15,6 +15,15 @@ Regardless of the type of PR, all PRs should include:
 * additional testcases: ideally, they should fail w/o your code change applied;
 * documentation changes.
 
+Run `go test ./...` to test checkpointctl without CRIU or root privileges.
+
+The CRIU compression tests require root, a C compiler, and an LZ4-enabled
+CRIU supporting `--compress-block`:
+
+```sh
+sudo env "PATH=$PATH" make -C test test-compression CRIU_TEST_BINARY=/absolute/path/to/criu
+```
+
 Squash your commits into logical pieces of work that might want to be reviewed
 separate from the rest of the PRs. Ideally, each commit should implement a
 single idea, and the PR branch should pass the tests at every commit. GitHub
