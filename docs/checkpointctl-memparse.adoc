@@ -29,6 +29,10 @@ include::footer.adoc[]
 *-c, --context*=_CONTEXT_::
   Print the specified number of bytes surrounding each match
 
+*--address-range*=_START_-_END_::
+  Filter memory by virtual address range, e.g. "0x7f0000000000-0x7f0000010000".
+  Requires *--pid*.
+
 == See also
 
 checkpointctl(1)
