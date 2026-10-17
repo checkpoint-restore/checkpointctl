@@ -5,8 +5,16 @@
 set -euo pipefail
 
 case "${1:-}" in
-	binary) title='Binary size check'; label=bloat-ok ;;
-	library) title='Library size check'; label=lib-bloat-ok ;;
+	binary)
+		title='Binary size check'
+		description='Compares the size of the `checkpointctl` binary, built with `make`, before and after this PR.'
+		label=bloat-ok
+		;;
+	library)
+		title='Library size check'
+		description='Compares the size of a small program that imports the `lib` package, to show how this PR affects projects that use checkpointctl as a library.'
+		label=lib-bloat-ok
+		;;
 	*) echo "Usage: $0 binary|library" >&2; exit 1 ;;
 esac
 
@@ -26,7 +34,7 @@ printf '<!-- checkpointctl-size:%s -->\n' "$1"
 if [[ "$result" == skipped ]]; then
 	echo '<!-- checkpointctl-size-result:skipped -->'
 fi
-printf '## %s\n\n' "$title"
+printf '## %s\n\n%s\n\n' "$title" "$description"
 
 case "$result" in
 	pass) echo '**Passed** — the size increase is within the limit.' ;;
