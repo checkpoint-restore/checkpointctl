@@ -814,6 +814,37 @@ function teardown() {
 	[[ ${lines[0]} == *"no process with PID 9999"* ]]
 }
 
+@test "Run checkpointctl memparse with tar file created by CRIU 4.1" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp data/criu-4.1/pstree.img \
+		data/criu-4.1/core-*.img \
+		data/criu-4.1/pagemap-*.img \
+		data/criu-4.1/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
+	[ "$status" -eq 0 ]
+	# CRIU < 4.2 only stores compat_nr_pages: PID 1 has 30 pages
+	[[ ${lines[3]} == *"piggie"*"120.0 KiB"* ]]
+}
+
+@test "Run checkpointctl memparse with tar file created by CRIU 4.1 and valid PID" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp data/criu-4.1/pstree.img \
+		data/criu-4.1/core-*.img \
+		data/criu-4.1/pagemap-*.img \
+		data/criu-4.1/pages-1.img \
+		data/criu-4.1/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	# The first pagemap entry of PID 1 in these images starts at 0x401000
+	[[ ${lines[3]} == "0000000000401000 "* ]]
+}
+
 @test "Run checkpointctl inspect with json format" {
 	cp data/config.dump data/spec.dump test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
