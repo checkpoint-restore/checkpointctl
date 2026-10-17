@@ -11,7 +11,7 @@ setup() {
 set -eu
 case "$1" in
 version) echo 'go version go1.26.0 linux/amd64' ;;
-build) truncate -s "$(cat size.go)" "$3" ;;
+build) truncate -s "$(cat lib/size.go)" "$3" ;;
 *) exit 1 ;;
 esac
 EOF
@@ -22,9 +22,10 @@ EOF
 	git config user.name 'Size check test'
 	git config user.email 'size-check@example.invalid'
 	# shellcheck disable=SC2016
-	printf 'all:\n\ttruncate -s $$(cat size.go) checkpointctl\n' > Makefile
+	printf 'all:\n\ttruncate -s $$(cat lib/size.go) checkpointctl\n' > Makefile
 	# The fake build reads the size from a .go file, so it is a build input.
-	printf '100000\n' > size.go
+	mkdir lib
+	printf '100000\n' > lib/size.go
 	commit 'Initial size'
 }
 
@@ -65,7 +66,7 @@ check_sizes() {
 
 @test "Size checks compare the merge with its first parent" {
 	git switch -qc feature
-	printf '800000\n' > size.go
+	printf '800000\n' > lib/size.go
 	commit 'Grow binary'
 	git switch -q main
 	touch README.md
@@ -76,17 +77,17 @@ check_sizes() {
 
 @test "Size checks preserve resolved merges in the base branch" {
 	git switch -qc topic
-	printf '110000\n' > size.go
+	printf '110000\n' > lib/size.go
 	commit 'Change topic size'
 	git switch -q main
-	printf '160000\n' > size.go
+	printf '160000\n' > lib/size.go
 	commit 'Change base size'
 	run git merge --no-ff topic -m 'Merge topic'
 	[ "$status" -eq 1 ]
-	printf '165000\n' > size.go
+	printf '165000\n' > lib/size.go
 	commit 'Resolve size conflict'
 	git switch -qc feature
-	touch helper.go
+	touch lib/helper.go
 	commit 'Add an empty Go file'
 	merge_pr
 	check_sizes pass 0 165000 165000
@@ -107,6 +108,37 @@ check_sizes() {
 	[ "${lines[0]}" = '<!-- checkpointctl-size:binary -->' ]
 	[ "${lines[1]}" = '<!-- checkpointctl-size-result:skipped -->' ]
 	[[ "$output" == *'**Skipped**'* ]]
+}
+
+@test "Library size check skips CLI-only changes" {
+	git switch -qc feature
+	mkdir cmd
+	touch cmd/inspect.go
+	commit 'Change CLI code'
+	merge_pr
+	run "$BATS_TEST_DIRNAME/compare-size.sh" library "$MERGE_SHA" "$HEAD_SHA"
+	[ "$status" -eq 0 ]
+	[ "$(output_value result)" = skipped ]
+	: > "$GITHUB_OUTPUT"
+	run "$BATS_TEST_DIRNAME/compare-size.sh" binary "$MERGE_SHA" "$HEAD_SHA"
+	[ "$status" -eq 0 ]
+	[ "$(output_value result)" = pass ]
+}
+
+@test "Size checks skip changes confined to Go tests" {
+	git switch -qc feature
+	touch lib/metadata_test.go
+	commit 'Change a Go test'
+	merge_pr
+	check_sizes skipped 0
+}
+
+@test "Library size check still measures dependency changes" {
+	git switch -qc feature
+	touch go.mod
+	commit 'Change dependencies'
+	merge_pr
+	check_sizes pass 0 100000 100000
 }
 
 @test "Size check comment does not assume a size limit" {

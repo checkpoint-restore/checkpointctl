@@ -41,19 +41,22 @@ if [[ $# -ne 3 ]]; then
 fi
 mode=$1
 # Files that affect the measured size, or the size check itself.
-build_inputs=('*.go' go.mod go.sum vendor test/compare-size.sh test/size-comment.sh
+build_inputs=(go.mod go.sum vendor test/compare-size.sh test/size-comment.sh
 	.github/workflows/check-size-reusable.yml)
 case "$mode" in
 	binary)
 		binary_path=checkpointctl
-		build_inputs+=('Makefile*' .github/workflows/check-size.yml)
+		build_inputs+=('*.go' 'Makefile*' .github/workflows/check-size.yml)
 		;;
 	library)
 		binary_path=test/lib-size/lib-size-test
-		build_inputs+=(test/lib-size .github/workflows/check-lib-size.yml)
+		# lib imports no other packages from this repository. Update these
+		# inputs if that changes.
+		build_inputs+=(lib test/lib-size .github/workflows/check-lib-size.yml)
 		;;
 	*) fail "Unknown size check: $mode" ;;
 esac
+build_inputs+=(':(exclude)*_test.go')
 
 repo_dir=$(git rev-parse --show-toplevel)
 merge_sha=$(git rev-parse --verify --end-of-options "$2^{commit}") || fail "Invalid merge commit: $2"
