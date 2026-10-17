@@ -274,14 +274,14 @@ func printProcessMemoryPages(task internal.Task) error {
 // and writes the output to 'out'. If compact is true, consecutive duplicate rows will be represented
 // with an asterisk (*).
 func hexdump(out io.Writer, buf *bytes.Buffer, vaddr uint64, compact bool) {
-	var prevAscii string
+	var prevRow []byte
 	var isDuplicate bool
 	for buf.Len() > 0 {
 		row := buf.Next(chunkSize)
 		hex, ascii := generateHexAndAscii(row)
 
 		if compact {
-			if prevAscii == ascii {
+			if bytes.Equal(prevRow, row) {
 				if !isDuplicate {
 					fmt.Fprint(out, "*\n")
 				}
@@ -295,7 +295,7 @@ func hexdump(out io.Writer, buf *bytes.Buffer, vaddr uint64, compact bool) {
 		}
 
 		vaddr += chunkSize
-		prevAscii = ascii
+		prevRow = append(prevRow[:0], row...)
 	}
 }
 
