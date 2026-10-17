@@ -79,6 +79,7 @@ func MemParse() *cobra.Command {
 func memparse(cmd *cobra.Command, args []string) error {
 	requiredFiles := []string{
 		metadata.SpecDumpFile, metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
 		filepath.Join(metadata.CheckpointDirectory, "core-"),
 	}

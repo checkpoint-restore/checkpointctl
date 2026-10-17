@@ -145,7 +145,8 @@ func inspect(cmd *cobra.Command, args []string) error {
 		*psTree = true
 		requiredFiles = append(
 			requiredFiles,
-			// Unpack pagemap-*.img, pages-*.img, and mm-*.img
+			// Unpack inventory.img, pagemap-*.img, pages-*.img, and mm-*.img
+			filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
 			filepath.Join(metadata.CheckpointDirectory, "pages-"),
 			filepath.Join(metadata.CheckpointDirectory, "mm-"),

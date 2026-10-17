@@ -96,6 +96,7 @@ func diff(cmd *cobra.Command, args []string) error {
 	if *psTreeCmd || *psTreeEnv {
 		requiredFiles = append(
 			requiredFiles,
+			filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
 			filepath.Join(metadata.CheckpointDirectory, "pages-"),
 			filepath.Join(metadata.CheckpointDirectory, "mm-"),
