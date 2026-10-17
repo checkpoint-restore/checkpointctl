@@ -101,15 +101,6 @@ check_sizes() {
 	check_sizes skipped 0
 }
 
-@test "Skipped size check comment is marked for update only" {
-	run env SIZE_RESULT=skipped bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
-	echo "$output"
-	[ "$status" -eq 0 ]
-	[ "${lines[0]}" = '<!-- checkpointctl-size:binary -->' ]
-	[ "${lines[1]}" = '<!-- checkpointctl-size-result:skipped -->' ]
-	[[ "$output" == *'**Skipped**'* ]]
-}
-
 @test "Library size check skips CLI-only changes" {
 	git switch -qc feature
 	mkdir cmd

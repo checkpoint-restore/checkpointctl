@@ -43,10 +43,6 @@ format_size() {
 repo_url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:?}
 run_url=$repo_url/actions/runs/${GITHUB_RUN_ID:?}/attempts/${GITHUB_RUN_ATTEMPT:-1}
 printf '<!-- checkpointctl-size:%s -->\n' "$1"
-# The comment workflow only uses a skipped result to update an earlier comment.
-if [[ "$result" == skipped ]]; then
-	echo '<!-- checkpointctl-size-result:skipped -->'
-fi
 printf '## %s\n\n%s\n\n' "$title" "$description"
 
 case "$result" in

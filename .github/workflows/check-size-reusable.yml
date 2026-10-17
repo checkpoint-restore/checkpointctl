@@ -61,7 +61,9 @@ jobs:
         CANDIDATE_SIZE: ${{ steps.size-check.outputs.candidate_size }}
         MAX_DIFF: ${{ steps.size-check.outputs.max_diff }}
         GO_VERSION: ${{ steps.size-check.outputs.go_version }}
-      run: bash test/size-comment.sh "$MODE" > artifacts/comment.md
+      run: |
+        bash test/size-comment.sh "$MODE" > artifacts/comment.md
+        cat artifacts/comment.md >> "$GITHUB_STEP_SUMMARY"
     - name: Upload size check results
       if: always()
       uses: actions/upload-artifact@v7
