@@ -191,6 +191,11 @@ jobs:
             `<!-- checkpointctl-size-source:${JSON.stringify(source)} -->`;
           // Reuse the marked comment on success as well, replacing stale failures.
           const previous = existing.find(comment => comment.body.startsWith(`${config.marker}\n`)) || existing[0];
+          // A skipped check replaces an earlier result, but doesn't start a new comment.
+          if (!previous && commentBody.includes('\n<!-- checkpointctl-size-result:skipped -->\n')) {
+            console.log('Size check skipped and there is no earlier comment, skipping comment');
+            return;
+          }
           if (previous) {
             await github.rest.issues.updateComment({
               owner, repo, comment_id: previous.id, body,

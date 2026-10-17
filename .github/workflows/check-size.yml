@@ -9,53 +9,8 @@ permissions:
 
 jobs:
   check_size:
-    runs-on: ubuntu-latest
-    env:
-      # Use the same compiler for the base and merged PR builds.
-      GOTOOLCHAIN: local
-      BYPASS_SIZE_CHECK: ${{ contains(github.event.pull_request.labels.*.name, 'bloat-ok') }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      MERGE_SHA: ${{ github.sha }}
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        fetch-depth: 0
-        ref: ${{ github.sha }}
-    - name: Save PR context
-      env:
-        EVENT_JSON: ${{ toJSON(github.event) }}
-      run: |
-        mkdir -p artifacts
-        printenv EVENT_JSON > artifacts/event.json
-    - uses: actions/setup-go@v7
-      if: env.BYPASS_SIZE_CHECK != 'true'
-      with:
-        go-version: stable
-    - name: Compare base and merged PR binary sizes
-      id: size-check
-      if: env.BYPASS_SIZE_CHECK != 'true'
-      shell: bash
-      run: |
-        test/check-size.sh "$MERGE_SHA" "$HEAD_SHA" 2>&1 | tee artifacts/output.txt
-    - name: Generate size check comment
-      if: >-
-        ${{ !cancelled() &&
-            (env.BYPASS_SIZE_CHECK == 'true' ||
-             steps.size-check.outcome == 'success' ||
-             steps.size-check.outcome == 'failure') }}
-      env:
-        SIZE_RESULT: ${{ env.BYPASS_SIZE_CHECK == 'true' && 'bypassed' || steps.size-check.outputs.result }}
-        BASE_SHA: ${{ steps.size-check.outputs.base_sha }}
-        BASE_SIZE: ${{ steps.size-check.outputs.base_size }}
-        CANDIDATE_SIZE: ${{ steps.size-check.outputs.candidate_size }}
-        MAX_DIFF: ${{ steps.size-check.outputs.max_diff }}
-        GO_VERSION: ${{ steps.size-check.outputs.go_version }}
-      run: bash test/size-comment.sh binary > artifacts/comment.md
-    - name: Upload size check results
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: size-check-results
-        overwrite: true
-        retention-days: 5
-        path: artifacts/
+    uses: ./.github/workflows/check-size-reusable.yml
+    with:
+      mode: binary
+      bypass_label: bloat-ok
+      artifact_name: size-check-results
