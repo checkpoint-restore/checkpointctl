@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,6 +18,7 @@ type testTarEntry struct {
 	typeflag byte
 	linkname string
 	body     string
+	pax      map[string]string
 }
 
 func regular(name, body string) testTarEntry {
@@ -46,11 +48,15 @@ func writeOrderedTestArchive(t *testing.T, archivePath string, entries []testTar
 	tw := tar.NewWriter(f)
 	for _, entry := range entries {
 		hdr := &tar.Header{
-			Name:     entry.name,
-			Typeflag: entry.typeflag,
-			Linkname: entry.linkname,
-			Mode:     0o644,
-			Size:     int64(len(entry.body)),
+			Name:       entry.name,
+			Typeflag:   entry.typeflag,
+			Linkname:   entry.linkname,
+			Mode:       0o644,
+			Size:       int64(len(entry.body)),
+			PAXRecords: entry.pax,
+		}
+		if entry.typeflag == tar.TypeXGlobalHeader {
+			hdr.Mode = 0
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			t.Fatalf("writing header for %q: %v", entry.name, err)
@@ -61,6 +67,48 @@ func writeOrderedTestArchive(t *testing.T, archivePath string, entries []testTar
 	}
 	if err := tw.Close(); err != nil {
 		t.Fatalf("closing archive: %v", err)
+	}
+}
+
+func TestUntarFilesCompatibility(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries []testTarEntry
+	}{
+		{
+			name: "contiguous file",
+			entries: []testTarEntry{
+				{name: "config.dump", typeflag: tar.TypeCont, body: "config"},
+			},
+		},
+		{
+			name: "global PAX header matching requested file",
+			entries: []testTarEntry{
+				{name: "config.dump", typeflag: tar.TypeXGlobalHeader, pax: map[string]string{"comment": "global metadata"}},
+				regular("config.dump", "config"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := t.TempDir()
+			dest := filepath.Join(base, "dest")
+			if err := os.Mkdir(dest, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			archivePath := filepath.Join(base, "archive.tar")
+			writeOrderedTestArchive(t, archivePath, tt.entries)
+			if err := UntarFiles(archivePath, dest, []string{"config.dump"}); err != nil {
+				t.Fatalf("UntarFiles failed: %v", err)
+			}
+			content, err := os.ReadFile(filepath.Join(dest, "config.dump"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(content) != "config" {
+				t.Errorf("extracted content = %q, want %q", content, "config")
+			}
+		})
 	}
 }
 
@@ -100,6 +148,7 @@ func TestUntarFiles(t *testing.T) {
 		entries []testTarEntry
 		files   []string
 		want    []string
+		content map[string]string
 		wantErr string
 	}{
 		{
@@ -114,6 +163,10 @@ func TestUntarFiles(t *testing.T) {
 			},
 			files: []string{"spec.dump", "checkpoint/core-"},
 			want:  []string{"checkpoint/core-1.img", "spec.dump"},
+			content: map[string]string{
+				"checkpoint/core-1.img": "core",
+				"spec.dump":             "spec",
+			},
 		},
 		{
 			name: "names are cleaned",
@@ -123,6 +176,10 @@ func TestUntarFiles(t *testing.T) {
 			},
 			files: []string{"spec.dump", "checkpoint/core-"},
 			want:  []string{"checkpoint/core-1.img", "spec.dump"},
+			content: map[string]string{
+				"checkpoint/core-1.img": "core",
+				"spec.dump":             "spec",
+			},
 		},
 		{
 			name: "names containing dots",
@@ -130,8 +187,9 @@ func TestUntarFiles(t *testing.T) {
 				regular("notes..txt", "notes"),
 				regular("checkpoint/core-1..img", "core"),
 			},
-			files: []string{"checkpoint/core-"},
-			want:  []string{"checkpoint/core-1..img"},
+			files:   []string{"checkpoint/core-"},
+			want:    []string{"checkpoint/core-1..img"},
+			content: map[string]string{"checkpoint/core-1..img": "core"},
 		},
 		{
 			name: "prefix boundaries",
@@ -141,8 +199,9 @@ func TestUntarFiles(t *testing.T) {
 				regular("checkpoint/amdgpu-pages-1.img", "amdgpu"),
 				regular("checkpoint/pages-1.img", "pages"),
 			},
-			files: []string{"config.dump", "checkpoint/core-", "checkpoint/pages-"},
-			want:  []string{"checkpoint/pages-1.img"},
+			files:   []string{"config.dump", "checkpoint/core-", "checkpoint/pages-"},
+			want:    []string{"checkpoint/pages-1.img"},
+			content: map[string]string{"checkpoint/pages-1.img": "pages"},
 		},
 		{
 			name: "nested files are ignored",
@@ -182,8 +241,9 @@ func TestUntarFiles(t *testing.T) {
 				symlink("checkpoint", "../outside"),
 				regular("checkpoint/core-1.img", "core"),
 			},
-			files: []string{"checkpoint/core-"},
-			want:  []string{"checkpoint/core-1.img"},
+			files:   []string{"checkpoint/core-"},
+			want:    []string{"checkpoint/core-1.img"},
+			content: map[string]string{"checkpoint/core-1.img": "core"},
 		},
 		{
 			name: "unrequested links and special files are ignored",
@@ -193,8 +253,19 @@ func TestUntarFiles(t *testing.T) {
 				special("checkpoint/fifo", tar.TypeFifo),
 				regular("spec.dump", "spec"),
 			},
-			files: []string{"spec.dump"},
-			want:  []string{"spec.dump"},
+			files:   []string{"spec.dump"},
+			want:    []string{"spec.dump"},
+			content: map[string]string{"spec.dump": "spec"},
+		},
+		{
+			name: "duplicate entries last wins",
+			entries: []testTarEntry{
+				regular("config.dump", "first-longer-content"),
+				regular("config.dump", "second"),
+			},
+			files:   []string{"config.dump"},
+			want:    []string{"config.dump"},
+			content: map[string]string{"config.dump": "second"},
 		},
 		{
 			name:    "requested symlink",
@@ -255,6 +326,95 @@ func TestUntarFiles(t *testing.T) {
 
 			if got := listFiles(t, dest); !slices.Equal(got, tt.want) {
 				t.Errorf("extracted files = %v, want %v", got, tt.want)
+			}
+			for name, want := range tt.content {
+				got, err := os.ReadFile(filepath.Join(dest, name))
+				if err != nil {
+					t.Fatalf("reading extracted file %s: %v", name, err)
+				}
+				if string(got) != want {
+					t.Errorf("content of %s = %q, want %q", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestUntarFilesGzip(t *testing.T) {
+	base := t.TempDir()
+	archivePath := filepath.Join(base, "archive.tar")
+	writeOrderedTestArchive(t, archivePath, []testTarEntry{
+		regular("config.dump", "config"),
+		regular("checkpoint/core-1.img", "core"),
+	})
+	archive, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var compressed bytes.Buffer
+	gw := gzip.NewWriter(&compressed)
+	if _, err := gw.Write(archive); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	gzipPath := filepath.Join(base, "archive.tar.gz")
+	if err := os.WriteFile(gzipPath, compressed.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(base, "dest")
+	if err := os.Mkdir(dest, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := UntarFiles(gzipPath, dest, []string{"config.dump", "checkpoint/core-"}); err != nil {
+		t.Fatalf("UntarFiles failed: %v", err)
+	}
+	for name, want := range map[string]string{"config.dump": "config", "checkpoint/core-1.img": "core"} {
+		got, err := os.ReadFile(filepath.Join(dest, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != want {
+			t.Errorf("content of %s = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestUntarFilesDestinationSymlink(t *testing.T) {
+	for _, name := range []string{"checkpoint", "checkpoint/core-1.img"} {
+		t.Run(name, func(t *testing.T) {
+			base := t.TempDir()
+			dest := filepath.Join(base, "dest")
+			outside := filepath.Join(base, "outside")
+			if err := os.Mkdir(dest, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(outside, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			link := filepath.Join(dest, name)
+			target := filepath.Join(outside, "core-1.img")
+			if name == "checkpoint" {
+				target = outside
+			} else if err := os.Mkdir(filepath.Dir(link), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, link); err != nil {
+				t.Fatal(err)
+			}
+			archivePath := filepath.Join(base, "archive.tar")
+			writeOrderedTestArchive(t, archivePath, []testTarEntry{regular("checkpoint/core-1.img", "escape")})
+			err := UntarFiles(archivePath, dest, []string{"checkpoint/core-"})
+			if err == nil || !strings.Contains(err.Error(), "path escapes from parent") {
+				t.Errorf("UntarFiles error = %v, want path escape error", err)
+			}
+			entries, err := os.ReadDir(outside)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 0 {
+				t.Errorf("entries created outside destination: %v", entries)
 			}
 		})
 	}
