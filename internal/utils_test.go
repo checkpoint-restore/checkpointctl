@@ -105,14 +105,16 @@ func TestCreateTasks_CleanupOnUntarError(t *testing.T) {
 	base := t.TempDir()
 	t.Setenv("TMPDIR", base)
 
+	// A regular file named checkpoint conflicts with the checkpoint directory
+	// needed to extract checkpoint/core-1.img, in either order.
 	archivePath := filepath.Join(base, "conflict.tar")
 	writeTestArchive(t, archivePath, map[string]string{
-		"checkpoint/":            "",
-		"config.dump":            "config",
-		"config.dump/child.dump": "child",
+		"checkpoint/":           "",
+		"checkpoint":            "file",
+		"checkpoint/core-1.img": "core",
 	})
 
-	tasks, err := CreateTasks([]string{archivePath}, []string{"config.dump"})
+	tasks, err := CreateTasks([]string{archivePath}, []string{"checkpoint", "checkpoint/core-"})
 	if err == nil {
 		t.Fatal("expected UntarFiles error from file/directory path conflict, got nil")
 	}
