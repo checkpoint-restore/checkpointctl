@@ -12,7 +12,7 @@ case "${1:-}" in
 		;;
 	library)
 		title='Library size check'
-		description='Compares the size of a small program that imports the `lib` package, to show how this PR affects projects that use checkpointctl as a library.'
+		description='Compares the executable size of a small program that reads container configuration and OCI specs through `lib`.'
 		label=lib-bloat-ok
 		;;
 	*) echo "Usage: $0 binary|library" >&2; exit 1 ;;
