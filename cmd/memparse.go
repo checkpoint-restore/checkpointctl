@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -145,7 +146,19 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 		var memSize int64
 
 		for _, entry := range pagemapEntries {
-			memSize += int64(entry.GetNrPages()) * int64(pageSize)
+			// Get the page count from the current format or the field used by
+			// older checkpoints. This counts memory pages before compression.
+			pages := crit.PagemapPageCount(entry)
+
+			// Each page adds pageSize bytes to memSize. MaxInt64 is the largest
+			// byte total we can store. Subtract the bytes already counted, then
+			// divide by pageSize to find how many more pages fit. Check this limit
+			// before multiplying or adding to avoid an incorrect total from overflow.
+			if pages > uint64((math.MaxInt64-memSize)/int64(pageSize)) {
+				return fmt.Errorf("memory size for PID %d exceeds supported size", root.PID)
+			}
+
+			memSize += int64(pages) * int64(pageSize)
 		}
 
 		shmemSize, err := memReader.GetShmemSize()
@@ -259,7 +272,17 @@ func printProcessMemoryPages(task internal.Task) error {
 	pagemapEntries := memReader.GetPagemapEntries()
 	for _, entry := range pagemapEntries {
 		start := entry.GetVaddr()
-		end := start + (uint64(pageSize) * entry.GetNrPages())
+		pages := crit.PagemapPageCount(entry)
+
+		// The end address is the start address plus the number of bytes.
+		// Subtract start from the largest uint64 address, then divide by
+		// pageSize to find how many pages fit. Check before multiplying or
+		// adding so an overflow cannot wrap the end address back to a low value.
+		if pages > (math.MaxUint64-start)/uint64(pageSize) {
+			return fmt.Errorf("memory range at %#x overflows", start)
+		}
+
+		end := start + uint64(pageSize)*pages
 		buf, err := memReader.GetMemPages(start, end)
 		if err != nil {
 			return err
