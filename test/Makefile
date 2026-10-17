@@ -22,8 +22,12 @@ test-imgs-diff: piggie/piggie
 piggie/piggie: piggie/piggie.c
 	$(CC) $^ -o $@
 
+test-compression:
+	@test -n "$(CRIU_TEST_BINARY)" || { echo 'Set CRIU_TEST_BINARY to an LZ4-enabled CRIU executable'; exit 1; }
+	cd .. && CRIU_TEST_BINARY="$(CRIU_TEST_BINARY)" go test ./cmd -run '^TestCRIUCompressedCheckpoints$$' -v -count=1 -timeout=5m
+
 clean:
 	@echo "Cleaning up test files..."
 	@rm -rf test-imgs test-imgs-diff piggie/piggie
 
-.PHONY: all test test-junit test-imgs-diff clean
+.PHONY: all test test-junit test-imgs-diff test-compression clean
