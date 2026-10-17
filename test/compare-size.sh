@@ -41,7 +41,8 @@ if [[ $# -ne 3 ]]; then
 fi
 mode=$1
 # Files that affect the measured size, or the size check itself.
-build_inputs=('*.go' go.mod go.sum vendor test/compare-size.sh test/size-comment.sh)
+build_inputs=('*.go' go.mod go.sum vendor test/compare-size.sh test/size-comment.sh
+	.github/workflows/check-size-reusable.yml)
 case "$mode" in
 	binary)
 		binary_path=checkpointctl
