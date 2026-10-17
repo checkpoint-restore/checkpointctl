@@ -27,6 +27,18 @@ if [[ "$result" == pass || "$result" == over_limit ]] &&
 	[[ ! "$base" =~ ^[0-9]+$ || ! "$candidate" =~ ^[0-9]+$ || ! "$limit" =~ ^[0-9]+$ ]]; then
 	result=error
 fi
+format_size() {
+	awk -v bytes="$1" 'BEGIN {
+		if (bytes >= 1048576 || sprintf("%.2f", bytes / 1024) + 0 >= 1024) {
+			printf "%.2f MiB", bytes / 1048576
+		} else if (bytes >= 1024) {
+			if (bytes % 1024 == 0) printf "%d KiB", bytes / 1024
+			else printf "%.2f KiB", bytes / 1024
+		} else {
+			printf "%d B", bytes
+		}
+	}'
+}
 
 repo_url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:?}
 run_url=$repo_url/actions/runs/${GITHUB_RUN_ID:?}/attempts/${GITHUB_RUN_ATTEMPT:-1}
@@ -50,17 +62,30 @@ esac
 
 if [[ "$result" == pass || "$result" == over_limit ]]; then
 	difference=$((candidate - base))
-	printf -v change '%+d B' "$difference"
-	if (( base > 0 )); then
+	if (( difference == 0 )); then
+		change='No change'
+	elif (( difference > -1024 && difference < 1024 )); then
+		if (( difference > 0 )); then
+			change='Less than 1 KiB increase'
+		else
+			change='Less than 1 KiB decrease'
+		fi
+	elif (( difference > 0 )); then
+		change="+$(format_size "$difference")"
+	else
+		change="-$(format_size "$((-difference))")"
+	fi
+	if (( base > 0 && (difference <= -1024 || difference >= 1024) )); then
 		change+=$(awk -v diff="$difference" -v base="$base" 'BEGIN {
 			percent = diff * 100 / base
-			printf " (%s%.2f%%)", (percent > 0 ? "+" : ""), percent
+			rounded = sprintf("%.2f", percent)
+			if (rounded + 0 != 0) printf " (%s%s%%)", (percent > 0 ? "+" : ""), rounded
 		}')
 	fi
 	printf '\n| | Size |\n|---|---:|\n'
-	printf '| Base ([`%.12s`](%s/commit/%s)) | %s B |\n' "${BASE_SHA:?}" "$repo_url" "$BASE_SHA" "$base"
-	printf '| Merged PR ([`%.12s`](%s/commit/%s)) | %s B |\n' "${MERGE_SHA:?}" "$repo_url" "$MERGE_SHA" "$candidate"
-	printf '| Change | **%s** |\n| Allowed increase | %s B |\n' "$change" "$limit"
+	printf '| Base ([`%.12s`](%s/commit/%s)) | %s |\n' "${BASE_SHA:?}" "$repo_url" "$BASE_SHA" "$(format_size "$base")"
+	printf '| Merged PR ([`%.12s`](%s/commit/%s)) | %s |\n' "${MERGE_SHA:?}" "$repo_url" "$MERGE_SHA" "$(format_size "$candidate")"
+	printf '| Change | **%s** |\n| Allowed increase | %s |\n' "$change" "$(format_size "$limit")"
 fi
 
 if [[ -n "${GO_VERSION:-}" ]]; then

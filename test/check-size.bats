@@ -149,9 +149,9 @@ check_sizes() {
 	[[ "$output" == *'Unable to complete the comparison'* ]]
 }
 
-@test "Size check comment shows the change in bytes and percent" {
+@test "Size check comment uses readable units and suppresses tiny percentages" {
 	local sizes base candidate expected
-	for sizes in '10748232 10800648 +52416 B (+0.49%)' '200 100 -100 B (-50.00%)' '100 100 +0 B (0.00%)'; do
+	for sizes in '10485760 10616832 +128 KiB (+1.25%)' '10616832 10485760 -128 KiB (-1.23%)' '100 100 No change' '10801280 10800952 Less than 1 KiB decrease' '10800952 10801280 Less than 1 KiB increase' '0 1048576 +1.00 MiB' '52428800 52429824 +1 KiB' '52428800 52427776 -1 KiB' '52428800 52431872 +3 KiB (+0.01%)'; do
 		read -r base candidate expected <<< "$sizes"
 		run env SIZE_RESULT=pass BASE_SIZE="$base" CANDIDATE_SIZE="$candidate" MAX_DIFF=524288 \
 			BASE_SHA=base MERGE_SHA=merge bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
@@ -159,4 +159,24 @@ check_sizes() {
 		[ "$status" -eq 0 ]
 		[[ "$output" == *"| Change | **$expected** |"* ]]
 	done
+}
+
+@test "Size check report formats totals and the limit in binary units" {
+	run env SIZE_RESULT=over_limit BASE_SIZE=10485760 CANDIDATE_SIZE=11534336 MAX_DIFF=524288 \
+		BASE_SHA=base MERGE_SHA=merge bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
+	[ "$status" -eq 0 ]
+	[[ "$output" == *'| 10.00 MiB |'* ]]
+	[[ "$output" == *'| 11.00 MiB |'* ]]
+	[[ "$output" == *'| Change | **+1.00 MiB (+10.00%)** |'* ]]
+	[[ "$output" == *'| Allowed increase | 512 KiB |'* ]]
+}
+
+@test "Size check report promotes KiB rounded to the next MiB" {
+	run env SIZE_RESULT=pass BASE_SIZE=1048570 CANDIDATE_SIZE=1048575 MAX_DIFF=1048575 \
+		BASE_SHA=base MERGE_SHA=merge bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
+	[ "$status" -eq 0 ]
+	[[ "$output" == *'| 1023.99 KiB |'* ]]
+	[[ "$output" == *'| 1.00 MiB |'* ]]
+	[[ "$output" == *'| Allowed increase | 1.00 MiB |'* ]]
+	[[ "$output" != *'1024.00 KiB'* ]]
 }
