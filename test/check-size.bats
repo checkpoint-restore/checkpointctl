@@ -1,14 +1,12 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC2030,SC2031
 # Each test builds synthetic Git snapshots without a compiler or network access.
 
 setup() {
-	SCRIPTS_DIR=$(cd "$BATS_TEST_DIRNAME" && pwd)
-	TEST_ROOT=$(mktemp -d)
-	export TMPDIR="$TEST_ROOT/tmp" GITHUB_OUTPUT="$TEST_ROOT/output"
+	export GITHUB_OUTPUT="$BATS_TEST_TMPDIR/output" TMPDIR="$BATS_TEST_TMPDIR"
+	export GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1
 	export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-	mkdir -p "$TMPDIR" "$TEST_ROOT/bin" "$TEST_ROOT/repo"
-	cat > "$TEST_ROOT/bin/go" <<'EOF'
+	mkdir "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/repo"
+	cat > "$BATS_TEST_TMPDIR/bin/go" <<'EOF'
 #!/bin/bash
 set -eu
 case "$1" in
@@ -17,23 +15,17 @@ build) truncate -s "$(cat size.go)" "$3" ;;
 *) exit 1 ;;
 esac
 EOF
-	chmod +x "$TEST_ROOT/bin/go"
-	export PATH="$TEST_ROOT/bin:$PATH"
-	cd "$TEST_ROOT/repo" || return
+	chmod +x "$BATS_TEST_TMPDIR/bin/go"
+	export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+	cd "$BATS_TEST_TMPDIR/repo" || return
 	git init -q -b main
 	git config user.name 'Size check test'
 	git config user.email 'size-check@example.invalid'
-	git config commit.gpgsign false
 	# shellcheck disable=SC2016
 	printf 'all:\n\ttruncate -s $$(cat size.go) checkpointctl\n' > Makefile
 	# The fake build reads the size from a .go file, so it is a build input.
 	printf '100000\n' > size.go
 	commit 'Initial size'
-}
-
-teardown() {
-	cd "$BATS_TEST_DIRNAME" || return
-	rm -rf "$TEST_ROOT"
 }
 
 commit() {
@@ -49,24 +41,29 @@ merge_pr() {
 	MERGE_SHA=$(git rev-parse HEAD)
 }
 
+output_value() {
+	sed -n "s/^$1=//p" "$GITHUB_OUTPUT"
+}
+
+# Run both size checks on the merged PR. Sizes are empty when not measured.
 check_sizes() {
-	local expected_result=$1 expected_base=$2 expected_candidate=$3 expected_status=$4
+	local expected_result=$1 expected_status=$2 expected_base=${3:-} expected_candidate=${4:-}
 	local mode
 	for mode in binary library; do
 		: > "$GITHUB_OUTPUT"
-		run "$SCRIPTS_DIR/compare-size.sh" "$mode" "$MERGE_SHA" "$HEAD_SHA"
+		run "$BATS_TEST_DIRNAME/compare-size.sh" "$mode" "$MERGE_SHA" "$HEAD_SHA"
 		echo "$output"
 		[ "$status" -eq "$expected_status" ]
-		[ "$(sed -n 's/^result=//p' "$GITHUB_OUTPUT")" = "$expected_result" ]
-		[ "$(sed -n 's/^base_sha=//p' "$GITHUB_OUTPUT")" = "$BASE_PARENT_SHA" ]
-		[ "$(sed -n 's/^base_size=//p' "$GITHUB_OUTPUT")" -eq "$expected_base" ]
-		[ "$(sed -n 's/^candidate_size=//p' "$GITHUB_OUTPUT")" -eq "$expected_candidate" ]
+		[ "$(output_value result)" = "$expected_result" ]
+		[ "$(output_value base_size)" = "$expected_base" ]
+		[ "$(output_value candidate_size)" = "$expected_candidate" ]
+		if [ -n "$expected_base" ]; then
+			[ "$(output_value base_sha)" = "$BASE_PARENT_SHA" ]
+		fi
 	done
 }
 
-@test "Size checks use the merge's first parent when the payload base is stale" {
-	BASE_SHA=$(git rev-parse HEAD)
-	export BASE_SHA
+@test "Size checks compare the merge with its first parent" {
 	git switch -qc feature
 	printf '800000\n' > size.go
 	commit 'Grow binary'
@@ -74,8 +71,7 @@ check_sizes() {
 	touch README.md
 	commit 'Advance base branch'
 	merge_pr
-	[ "$BASE_SHA" != "$BASE_PARENT_SHA" ]
-	check_sizes over_limit 100000 800000 1
+	check_sizes over_limit 1 100000 800000
 }
 
 @test "Size checks preserve resolved merges in the base branch" {
@@ -93,7 +89,7 @@ check_sizes() {
 	touch helper.go
 	commit 'Add an empty Go file'
 	merge_pr
-	check_sizes pass 165000 165000 0
+	check_sizes pass 0 165000 165000
 }
 
 @test "Size checks skip PRs that do not change the build inputs" {
@@ -101,20 +97,11 @@ check_sizes() {
 	touch README.md
 	commit 'Docs only'
 	merge_pr
-	local mode
-	for mode in binary library; do
-		: > "$GITHUB_OUTPUT"
-		run "$SCRIPTS_DIR/compare-size.sh" "$mode" "$MERGE_SHA" "$HEAD_SHA"
-		echo "$output"
-		[ "$status" -eq 0 ]
-		[ "$(sed -n 's/^result=//p' "$GITHUB_OUTPUT")" = skipped ]
-		[ -z "$(sed -n 's/^base_size=//p' "$GITHUB_OUTPUT")" ]
-	done
+	check_sizes skipped 0
 }
 
 @test "Skipped size check comment is marked for update only" {
-	run env GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1 SIZE_RESULT=skipped \
-		bash "$SCRIPTS_DIR/size-comment.sh" binary
+	run env SIZE_RESULT=skipped bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
 	echo "$output"
 	[ "$status" -eq 0 ]
 	[ "${lines[0]}" = '<!-- checkpointctl-size:binary -->' ]
@@ -123,9 +110,8 @@ check_sizes() {
 }
 
 @test "Size check comment does not assume a size limit" {
-	run env GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1 SIZE_RESULT=pass \
-		BASE_SIZE=100 CANDIDATE_SIZE=200 BASE_SHA=base MERGE_SHA=merge \
-		bash "$SCRIPTS_DIR/size-comment.sh" binary
+	run env SIZE_RESULT=pass BASE_SIZE=100 CANDIDATE_SIZE=200 BASE_SHA=base MERGE_SHA=merge \
+		bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
 	echo "$output"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *'Unable to complete the comparison'* ]]
@@ -135,9 +121,8 @@ check_sizes() {
 	local sizes base candidate expected
 	for sizes in '10748232 10800648 +52416 B (+0.49%)' '200 100 -100 B (-50.00%)' '100 100 +0 B (0.00%)'; do
 		read -r base candidate expected <<< "$sizes"
-		run env GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=1 SIZE_RESULT=pass \
-			BASE_SIZE="$base" CANDIDATE_SIZE="$candidate" MAX_DIFF=524288 \
-			BASE_SHA=base MERGE_SHA=merge bash "$SCRIPTS_DIR/size-comment.sh" binary
+		run env SIZE_RESULT=pass BASE_SIZE="$base" CANDIDATE_SIZE="$candidate" MAX_DIFF=524288 \
+			BASE_SHA=base MERGE_SHA=merge bash "$BATS_TEST_DIRNAME/size-comment.sh" binary
 		echo "$output"
 		[ "$status" -eq 0 ]
 		[[ "$output" == *"| Change | **$expected** |"* ]]
