@@ -30,14 +30,24 @@ commit message so that github will automatically close the referenced issue
 when the PR is merged.
 
 Size checks compare the PR's merged result with its exact base commit using
-the same Go compiler and build settings. The binary check measures the normal,
-unstripped `make` build; the library check measures a minimal library consumer.
-The total increase across the PR must not exceed 524,288 bytes (512 KiB) in
-either check. Intermediate commits are not measured separately, and PRs that
-don't change Go code, modules, the build or the size checks are skipped.
+the same Go compiler and build settings. The binary check measures the
+normal, unstripped `make` build. The library check builds a small program
+that reads container configuration and OCI specs through `lib`.
+This measures the functions used by the test program, not every function
+in the library.
 
-The library check uses the same consumer from the merged PR for both builds,
-so changes to `test/lib-size/main.go` must also compile against the base revision.
+Each check allows up to 512 KiB of growth across the merged PR. Intermediate
+commits are not measured separately. Checks are skipped when their build
+inputs have not changed. CLI-only changes skip the library check, and
+changes limited to Go tests skip both checks.
+
+Both library builds use the same test program from the merged PR. Changes
+to `test/lib-size/main.go` must also compile against the base revision.
+
+Size results appear in the Actions job summaries. Only failed size-check
+runs create PR comments; later results update an existing comment to clear
+a stale failure. Reports use KiB and MiB, while the logs retain exact byte
+counts.
 
 If an increase is expected and acceptable, a maintainer can add `bloat-ok` to
 bypass the binary check or `lib-bloat-ok` to bypass the library check.
