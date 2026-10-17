@@ -102,8 +102,8 @@ Checkpoint B:
   Created: 2026-04-18T10:15:41+01:00
   Size:    15212641 bytes
 
-┌─ Memory Changes ─────────────────────────────────────────────┐
-│ ↑ Increased by 0.02 MB
+┌─ Stored Page-Image Changes ──────────────────────────────────┐
+│ ↑ Increased by 0.02 MiB
 └──────────────────────────────────────────────────────────────┘
 ┌─ Process Tree ───────────────────────────────────────────────┐
 │ Process tree
@@ -118,7 +118,7 @@ Checkpoint B:
 Summary:
 Checkpoint comparison for container optimistic_mclean
 Sockets: +1 -0
-Memory: +0.02 MB
+Stored page images: +0.02 MiB
 
 ```
 

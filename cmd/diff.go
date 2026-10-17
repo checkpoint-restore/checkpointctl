@@ -24,7 +24,7 @@ func Diff() *cobra.Command {
   - Process tree (new/removed/modified processes)
   - File descriptors (opened/closed files)
   - Sockets (new/removed network sockets)
-  - Memory usage (size changes)
+  - Stored memory page-image sizes
 
 Example:
   checkpointctl diff checkpoint1.tar checkpoint2.tar
@@ -583,7 +583,7 @@ func generateSummary(result *DiffResult) string {
 	}
 
 	if result.MemoryChanges != nil && result.MemoryChanges.SizeChangeBytes != 0 {
-		summary += fmt.Sprintf("\nMemory: %+.2f MB", result.MemoryChanges.SizeChangeMB)
+		summary += fmt.Sprintf("\nStored page images: %+.2f MiB", result.MemoryChanges.SizeChangeMB)
 	}
 
 	return summary
@@ -609,11 +609,11 @@ func renderTreeDiff(result *DiffResult) {
 
 	// Memory changes
 	if result.MemoryChanges != nil {
-		fmt.Println("┌─ Memory Changes ─────────────────────────────────────────────┐")
+		fmt.Println("┌─ Stored Page-Image Changes ──────────────────────────────────┐")
 		if result.MemoryChanges.SizeChangeBytes > 0 {
-			fmt.Printf("│ ↑ Increased by %.2f MB\n", result.MemoryChanges.SizeChangeMB)
+			fmt.Printf("│ ↑ Increased by %.2f MiB\n", result.MemoryChanges.SizeChangeMB)
 		} else if result.MemoryChanges.SizeChangeBytes < 0 {
-			fmt.Printf("│ ↓ Decreased by %.2f MB\n", -result.MemoryChanges.SizeChangeMB)
+			fmt.Printf("│ ↓ Decreased by %.2f MiB\n", -result.MemoryChanges.SizeChangeMB)
 		} else {
 			fmt.Println("│ = No change")
 		}

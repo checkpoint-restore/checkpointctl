@@ -16,7 +16,10 @@ Compare two container checkpoints and show differences in:
 * Process tree (new/removed/modified processes)
 * File descriptors (opened/closed files)
 * Sockets (new/removed network sockets)
-* Memory usage (size changes)
+* Stored memory page-image sizes
+
+Compression can change stored page-image sizes without changing process
+memory. The `size_change_mb` field in JSON output is measured in MiB.
 
 == Options
 

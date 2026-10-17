@@ -969,9 +969,9 @@ function teardown() {
 	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"Checkpoint Diff"* ]]
-	[[ "$output" == *"Memory Changes"* ]]
+	[[ "$output" == *"Stored Page-Image Changes"* ]]
 	[[ "$output" == *"Process Tree"* ]]
-	# Both Memory Changes and Process Tree sections emit "No change".
+	# Both Stored Page-Image Changes and Process Tree sections emit "No change".
 	[ "$(echo "$output" | grep -c "No change")" -ge 2 ]
 }
 
@@ -1206,7 +1206,7 @@ function build_sk_diff_tars() {
 		"Image:"
 		"Checkpoint A:"
 		"Checkpoint B:"
-		"Memory Changes"
+		"Stored Page-Image Changes"
 		"Process Tree"
 		"Summary"
 	)
