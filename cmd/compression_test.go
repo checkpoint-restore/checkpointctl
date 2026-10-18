@@ -414,6 +414,13 @@ func TestCompressedCheckpointErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "block granularity exceeds limit",
+			want: "block size exceeds maximum",
+			mutate: func(f *compressionFixture) {
+				f.entries[0].Blocks.PagesPerBlock = proto.Uint32(uint32(4*1024*1024/pageSize + 1))
+			},
+		},
+		{
 			name: "zero block granularity",
 			want: "pages_per_block is zero",
 			mutate: func(f *compressionFixture) {
