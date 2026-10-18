@@ -388,7 +388,16 @@ func compareProcessTrees(treeA, treeB *internal.PsNode) *ProcessDiff {
 		}
 	}
 
+	sortProcesses(diff.Added)
+	sortProcesses(diff.Removed)
+	sortProcesses(diff.Modified)
+	sortProcesses(diff.Unchanged)
+
 	return diff
+}
+
+func sortProcesses(procs []ProcessInfo) {
+	sort.Slice(procs, func(i, j int) bool { return procs[i].PID < procs[j].PID })
 }
 
 func flattenProcessTree(tree *internal.PsNode) []ProcessInfo {
@@ -471,7 +480,23 @@ func compareFileDescriptors(fdsA, fdsB []FileDescriptorEntry) *FileDiff {
 		}
 	}
 
+	sortFiles(diff.Added)
+	sortFiles(diff.Removed)
+	sortFiles(diff.Unchanged)
+
 	return diff
+}
+
+func sortFiles(files []FileInfo) {
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].PID != files[j].PID {
+			return files[i].PID < files[j].PID
+		}
+		if files[i].Path != files[j].Path {
+			return files[i].Path < files[j].Path
+		}
+		return files[i].FD < files[j].FD
+	})
 }
 
 func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
@@ -547,7 +572,40 @@ func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
 		}
 	}
 
+	sortSockets(diff.Added)
+	sortSockets(diff.Removed)
+	sortSockets(diff.Unchanged)
+
 	return diff
+}
+
+// sortSockets compares every field of the comparison key, so sockets that
+// differ only in Type, Address, Dest or DstPort still get a fixed order.
+func sortSockets(sockets []SocketInfo) {
+	sort.Slice(sockets, func(i, j int) bool {
+		if sockets[i].PID != sockets[j].PID {
+			return sockets[i].PID < sockets[j].PID
+		}
+		if sockets[i].Protocol != sockets[j].Protocol {
+			return sockets[i].Protocol < sockets[j].Protocol
+		}
+		if sockets[i].Source != sockets[j].Source {
+			return sockets[i].Source < sockets[j].Source
+		}
+		if sockets[i].SrcPort != sockets[j].SrcPort {
+			return sockets[i].SrcPort < sockets[j].SrcPort
+		}
+		if sockets[i].Type != sockets[j].Type {
+			return sockets[i].Type < sockets[j].Type
+		}
+		if sockets[i].Address != sockets[j].Address {
+			return sockets[i].Address < sockets[j].Address
+		}
+		if sockets[i].Dest != sockets[j].Dest {
+			return sockets[i].Dest < sockets[j].Dest
+		}
+		return sockets[i].DstPort < sockets[j].DstPort
+	})
 }
 
 func generateSummary(result *DiffResult) string {

@@ -894,3 +894,204 @@ func TestDiff_LargeOutputNoDeadlock(t *testing.T) {
 		t.Errorf("expected rendered output to contain summary, got:\n%s", output)
 	}
 }
+
+// added and removed processes keep a stable PID order
+func TestCompareProcessTreesDeterministicOrder(t *testing.T) {
+	treeA := &internal.PsNode{PID: 1, Comm: "init"}
+	treeB := &internal.PsNode{PID: 1, Comm: "init"}
+	const n = 50
+	for i := 0; i < n; i++ {
+		treeB.Children = append(treeB.Children, internal.PsNode{PID: uint32(100 + i), Comm: "added"})
+		treeA.Children = append(treeA.Children, internal.PsNode{PID: uint32(200 + i), Comm: "removed"})
+	}
+
+	first := compareProcessTrees(treeA, treeB)
+	if len(first.Added) != n || len(first.Removed) != n {
+		t.Fatalf("Expected %d added and %d removed processes, got %d and %d", n, n, len(first.Added), len(first.Removed))
+	}
+	for run := 0; run < 10; run++ {
+		result := compareProcessTrees(treeA, treeB)
+		for i := 0; i < n; i++ {
+			if result.Added[i].PID != first.Added[i].PID {
+				t.Fatalf("Added order changed between runs at index %d: %d != %d", i, result.Added[i].PID, first.Added[i].PID)
+			}
+			if result.Removed[i].PID != first.Removed[i].PID {
+				t.Fatalf("Removed order changed between runs at index %d: %d != %d", i, result.Removed[i].PID, first.Removed[i].PID)
+			}
+		}
+	}
+	for i := 1; i < n; i++ {
+		if first.Added[i-1].PID >= first.Added[i].PID {
+			t.Errorf("Added processes not sorted by PID: %d >= %d", first.Added[i-1].PID, first.Added[i].PID)
+		}
+		if first.Removed[i-1].PID >= first.Removed[i].PID {
+			t.Errorf("Removed processes not sorted by PID: %d >= %d", first.Removed[i-1].PID, first.Removed[i].PID)
+		}
+	}
+}
+
+// added and removed files keep a stable PID order
+func TestCompareFileDescriptorsDeterministicOrder(t *testing.T) {
+	const n = 50
+	var fdsA, fdsB []FileDescriptorEntry
+	for i := 0; i < n; i++ {
+		fdsB = append(fdsB, FileDescriptorEntry{PID: 100 + i, OpenFiles: []OpenFile{{FD: "3", Path: "/added"}}})
+		fdsA = append(fdsA, FileDescriptorEntry{PID: 200 + i, OpenFiles: []OpenFile{{FD: "3", Path: "/removed"}}})
+	}
+
+	first := compareFileDescriptors(fdsA, fdsB)
+	if len(first.Added) != n || len(first.Removed) != n {
+		t.Fatalf("Expected %d added and %d removed files, got %d and %d", n, n, len(first.Added), len(first.Removed))
+	}
+	for run := 0; run < 10; run++ {
+		result := compareFileDescriptors(fdsA, fdsB)
+		for i := 0; i < n; i++ {
+			if result.Added[i] != first.Added[i] {
+				t.Fatalf("Added order changed between runs at index %d: %+v != %+v", i, result.Added[i], first.Added[i])
+			}
+			if result.Removed[i] != first.Removed[i] {
+				t.Fatalf("Removed order changed between runs at index %d: %+v != %+v", i, result.Removed[i], first.Removed[i])
+			}
+		}
+	}
+	for i := 1; i < n; i++ {
+		if first.Added[i-1].PID >= first.Added[i].PID {
+			t.Errorf("Added files not sorted by PID: %d >= %d", first.Added[i-1].PID, first.Added[i].PID)
+		}
+		if first.Removed[i-1].PID >= first.Removed[i].PID {
+			t.Errorf("Removed files not sorted by PID: %d >= %d", first.Removed[i-1].PID, first.Removed[i].PID)
+		}
+	}
+}
+
+// added and removed sockets keep a stable PID order
+func TestCompareSocketsDeterministicOrder(t *testing.T) {
+	const n = 50
+	var sksA, sksB []internal.SkNode
+	for i := 0; i < n; i++ {
+		sksB = append(sksB, internal.SkNode{PID: uint32(100 + i), OpenSockets: []internal.SocketNode{{
+			Protocol: "TCP",
+			Data:     internal.SkData{Type: "TCP", Source: "0.0.0.0", SourcePort: uint32(1000 + i)},
+		}}})
+		sksA = append(sksA, internal.SkNode{PID: uint32(200 + i), OpenSockets: []internal.SocketNode{{
+			Protocol: "TCP",
+			Data:     internal.SkData{Type: "TCP", Source: "0.0.0.0", SourcePort: uint32(2000 + i)},
+		}}})
+	}
+
+	first := compareSockets(sksA, sksB)
+	if len(first.Added) != n || len(first.Removed) != n {
+		t.Fatalf("Expected %d added and %d removed sockets, got %d and %d", n, n, len(first.Added), len(first.Removed))
+	}
+	for run := 0; run < 10; run++ {
+		result := compareSockets(sksA, sksB)
+		for i := 0; i < n; i++ {
+			if result.Added[i].PID != first.Added[i].PID || result.Added[i].SrcPort != first.Added[i].SrcPort {
+				t.Fatalf("Added order changed between runs at index %d", i)
+			}
+			if result.Removed[i].PID != first.Removed[i].PID || result.Removed[i].SrcPort != first.Removed[i].SrcPort {
+				t.Fatalf("Removed order changed between runs at index %d", i)
+			}
+		}
+	}
+	for i := 1; i < n; i++ {
+		if first.Added[i-1].PID >= first.Added[i].PID {
+			t.Errorf("Added sockets not sorted by PID: %d >= %d", first.Added[i-1].PID, first.Added[i].PID)
+		}
+		if first.Removed[i-1].PID >= first.Removed[i].PID {
+			t.Errorf("Removed sockets not sorted by PID: %d >= %d", first.Removed[i-1].PID, first.Removed[i].PID)
+		}
+	}
+}
+
+func socketOrderSignature(sockets []SocketInfo) string {
+	parts := make([]string, len(sockets))
+	for i, s := range sockets {
+		parts[i] = fmt.Sprintf("%d|%s|%s|%s|%d|%s|%s|%d", s.PID, s.Protocol, s.Type, s.Address, s.SrcPort, s.Source, s.Dest, s.DstPort)
+	}
+	return strings.Join(parts, ";")
+}
+
+// same PID, UNIX sockets differing only in address
+func TestCompareSocketsDeterministicOrderSamePIDUnix(t *testing.T) {
+	addresses := []string{"/run/f.sock", "/run/e.sock", "/run/d.sock", "/run/c.sock", "/run/b.sock", "/run/a.sock"}
+
+	unixSocket := func(addr string) internal.SocketNode {
+		return internal.SocketNode{Protocol: "UNIXSK", Data: internal.SkData{Type: "STREAM", Address: addr}}
+	}
+	sksA := []internal.SkNode{{PID: 100, OpenSockets: []internal.SocketNode{
+		unixSocket("/run/a.sock"), unixSocket("/run/b.sock"), unixSocket("/run/c.sock"), unixSocket("/run/removed.sock"),
+	}}}
+	sksB := []internal.SkNode{{PID: 100, OpenSockets: []internal.SocketNode{
+		unixSocket(addresses[0]), unixSocket(addresses[1]), unixSocket(addresses[2]),
+		unixSocket(addresses[3]), unixSocket(addresses[4]), unixSocket(addresses[5]),
+	}}}
+
+	first := compareSockets(sksA, sksB)
+	if len(first.Added) != 3 || len(first.Removed) != 1 || len(first.Unchanged) != 3 {
+		t.Fatalf("Expected 3 added, 1 removed, 3 unchanged sockets, got %d, %d, %d",
+			len(first.Added), len(first.Removed), len(first.Unchanged))
+	}
+	for run := 0; run < 20; run++ {
+		result := compareSockets(sksA, sksB)
+		if socketOrderSignature(result.Added) != socketOrderSignature(first.Added) {
+			t.Fatalf("Added order changed between runs: %q vs %q", socketOrderSignature(result.Added), socketOrderSignature(first.Added))
+		}
+		if socketOrderSignature(result.Unchanged) != socketOrderSignature(first.Unchanged) {
+			t.Fatalf("Unchanged order changed between runs: %q vs %q", socketOrderSignature(result.Unchanged), socketOrderSignature(first.Unchanged))
+		}
+	}
+	wantAdded := []string{"/run/d.sock", "/run/e.sock", "/run/f.sock"}
+	for i, want := range wantAdded {
+		if first.Added[i].Address != want {
+			t.Errorf("Added[%d].Address = %q, want %q", i, first.Added[i].Address, want)
+		}
+	}
+	for i := 1; i < len(first.Unchanged); i++ {
+		if first.Unchanged[i-1].Address >= first.Unchanged[i].Address {
+			t.Errorf("Unchanged sockets not sorted by address: %q >= %q", first.Unchanged[i-1].Address, first.Unchanged[i].Address)
+		}
+	}
+}
+
+// same local endpoint, different TCP peers
+func TestCompareSocketsDeterministicOrderSameLocalEndpoint(t *testing.T) {
+	tcpSocket := func(dest string, dstPort uint32) internal.SocketNode {
+		return internal.SocketNode{Protocol: "TCP", Data: internal.SkData{
+			Type: "TCP", Source: "127.0.0.1", SourcePort: 8080, Dest: dest, DestPort: dstPort,
+		}}
+	}
+	sksA := []internal.SkNode{{PID: 100, OpenSockets: []internal.SocketNode{
+		tcpSocket("10.0.0.1", 9000), tcpSocket("10.0.0.2", 9000), tcpSocket("10.0.0.2", 9001), tcpSocket("10.0.0.3", 9000),
+	}}}
+	sksB := []internal.SkNode{{PID: 100, OpenSockets: []internal.SocketNode{
+		tcpSocket("10.0.0.2", 9000), tcpSocket("10.0.0.2", 9001), tcpSocket("10.0.0.4", 9000),
+	}}}
+
+	first := compareSockets(sksA, sksB)
+	if len(first.Added) != 1 || len(first.Removed) != 2 || len(first.Unchanged) != 2 {
+		t.Fatalf("Expected 1 added, 2 removed, 2 unchanged sockets, got %d, %d, %d",
+			len(first.Added), len(first.Removed), len(first.Unchanged))
+	}
+	for run := 0; run < 20; run++ {
+		result := compareSockets(sksA, sksB)
+		if socketOrderSignature(result.Removed) != socketOrderSignature(first.Removed) {
+			t.Fatalf("Removed order changed between runs: %q vs %q", socketOrderSignature(result.Removed), socketOrderSignature(first.Removed))
+		}
+		if socketOrderSignature(result.Unchanged) != socketOrderSignature(first.Unchanged) {
+			t.Fatalf("Unchanged order changed between runs: %q vs %q", socketOrderSignature(result.Unchanged), socketOrderSignature(first.Unchanged))
+		}
+	}
+	wantRemoved := []struct {
+		dest string
+		port uint32
+	}{{"10.0.0.1", 9000}, {"10.0.0.3", 9000}}
+	for i, want := range wantRemoved {
+		if first.Removed[i].Dest != want.dest || first.Removed[i].DstPort != want.port {
+			t.Errorf("Removed[%d] = %s:%d, want %s:%d", i, first.Removed[i].Dest, first.Removed[i].DstPort, want.dest, want.port)
+		}
+	}
+	if first.Unchanged[0].DstPort != 9000 || first.Unchanged[1].DstPort != 9001 {
+		t.Errorf("Unchanged sockets not sorted by destination port: %d, %d", first.Unchanged[0].DstPort, first.Unchanged[1].DstPort)
+	}
+}
