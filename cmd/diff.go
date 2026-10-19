@@ -84,6 +84,7 @@ func diff(cmd *cobra.Command, args []string) error {
 	requiredFiles := []string{
 		metadata.SpecDumpFile,
 		metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 	}
 
 	// Add process tree files
@@ -96,7 +97,6 @@ func diff(cmd *cobra.Command, args []string) error {
 	if *psTreeCmd || *psTreeEnv {
 		requiredFiles = append(
 			requiredFiles,
-			filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
 			filepath.Join(metadata.CheckpointDirectory, "pages-"),
 			filepath.Join(metadata.CheckpointDirectory, "mm-"),
@@ -219,6 +219,7 @@ type CheckpointMetadata struct {
 	Created         string                `json:"created"`
 	Engine          string                `json:"engine"`
 	CheckpointSize  CheckpointSize        `json:"checkpoint_size"`
+	CriuCompression bool                  `json:"criu_compression"`
 	ProcessTree     *internal.PsNode      `json:"process_tree,omitempty"`
 	FileDescriptors []FileDescriptorEntry `json:"file_descriptors,omitempty"`
 	Sockets         []internal.SkNode     `json:"sockets,omitempty"`
@@ -257,8 +258,9 @@ type DiffResult struct {
 }
 
 type CheckpointInfo struct {
-	Created   string `json:"created"`
-	TotalSize int64  `json:"total_size"`
+	Created         string `json:"created"`
+	TotalSize       int64  `json:"total_size"`
+	CriuCompression bool   `json:"criu_compression"`
 }
 
 type ProcessDiff struct {
@@ -317,12 +319,14 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 		ContainerName: metadataA.ContainerName,
 		Image:         metadataA.Image,
 		CheckpointA: CheckpointInfo{
-			Created:   metadataA.Created,
-			TotalSize: metadataA.CheckpointSize.TotalSize,
+			Created:         metadataA.Created,
+			TotalSize:       metadataA.CheckpointSize.TotalSize,
+			CriuCompression: metadataA.CriuCompression,
 		},
 		CheckpointB: CheckpointInfo{
-			Created:   metadataB.Created,
-			TotalSize: metadataB.CheckpointSize.TotalSize,
+			Created:         metadataB.Created,
+			TotalSize:       metadataB.CheckpointSize.TotalSize,
+			CriuCompression: metadataB.CriuCompression,
 		},
 	}
 
@@ -589,6 +593,18 @@ func generateSummary(result *DiffResult) string {
 	return summary
 }
 
+func renderCheckpointInfo(label string, info CheckpointInfo) {
+	compression := "Disabled"
+	if info.CriuCompression {
+		compression = "Enabled"
+	}
+
+	fmt.Printf("Checkpoint %s:\n", label)
+	fmt.Printf("  %-17s %s\n", "Created:", info.Created)
+	fmt.Printf("  %-17s %d bytes\n", "Size:", info.TotalSize)
+	fmt.Printf("  %-17s %s\n\n", "CRIU compression:", compression)
+}
+
 func renderTreeDiff(result *DiffResult) {
 	fmt.Printf("╔════════════════════════════════════════════════════════════════╗\n")
 	fmt.Printf("║ Checkpoint Diff                                                ║\n")
@@ -599,13 +615,8 @@ func renderTreeDiff(result *DiffResult) {
 	fmt.Printf("╚════════════════════════════════════════════════════════════════╝\n\n")
 
 	// Checkpoint info
-	fmt.Printf("Checkpoint A:\n")
-	fmt.Printf("  Created: %s\n", result.CheckpointA.Created)
-	fmt.Printf("  Size:    %d bytes\n\n", result.CheckpointA.TotalSize)
-
-	fmt.Printf("Checkpoint B:\n")
-	fmt.Printf("  Created: %s\n", result.CheckpointB.Created)
-	fmt.Printf("  Size:    %d bytes\n\n", result.CheckpointB.TotalSize)
+	renderCheckpointInfo("A", result.CheckpointA)
+	renderCheckpointInfo("B", result.CheckpointB)
 
 	// Memory changes
 	if result.MemoryChanges != nil {

@@ -353,6 +353,7 @@ func TestInspectCompressionInvalidInventory(t *testing.T) {
 		for _, args := range [][]string{
 			{"inspect", archive},
 			{"inspect", archive, "--format=json"},
+			{"diff", archive, archive, "--format=json"},
 		} {
 			output, err := compressionCommand(t, args...)
 			if err == nil || !strings.Contains(output, "failed to get CRIU compression information") {

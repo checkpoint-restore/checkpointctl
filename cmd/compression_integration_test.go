@@ -136,6 +136,9 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 			if err := json.Unmarshal([]byte(output), &result); err != nil {
 				t.Fatal(err)
 			}
+			if result.CheckpointA.CriuCompression || result.CheckpointB.CriuCompression != (mode.block != 0) {
+				t.Fatalf("incorrect diff compression indicators: %s", output)
+			}
 			if mode.block != 0 && (result.MemoryChanges == nil || result.MemoryChanges.SizeChangeBytes >= 0) {
 				t.Fatalf("compressed page images should be smaller than the raw baseline: %+v", result.MemoryChanges)
 			}
