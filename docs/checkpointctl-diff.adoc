@@ -32,6 +32,14 @@ describes CRIU memory page compression, independently of archive compression.
 Archives without `checkpoint/inventory.img` are reported as compression
 disabled for compatibility with older checkpoints.
 
+`Container created` shows when the container was created, so it is the same
+for checkpoints of the same container. JSON output keeps this timestamp in
+the `created` field of `checkpoint_a` and `checkpoint_b`.
+
+`Checkpoint data size` is the combined size of files under `checkpoint/`,
+including memory images and CRIU metadata. It reflects CRIU page compression,
+but not compression of the archive. JSON output keeps this value in `total_size`.
+
 == Options
 
 *-h*, *--help*::

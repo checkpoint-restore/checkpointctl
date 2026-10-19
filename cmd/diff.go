@@ -600,9 +600,9 @@ func renderCheckpointInfo(label string, info CheckpointInfo) {
 	}
 
 	fmt.Printf("Checkpoint %s:\n", label)
-	fmt.Printf("  %-17s %s\n", "Created:", info.Created)
-	fmt.Printf("  %-17s %d bytes\n", "Size:", info.TotalSize)
-	fmt.Printf("  %-17s %s\n\n", "CRIU compression:", compression)
+	fmt.Printf("  %-21s %s\n", "Container created:", info.Created)
+	fmt.Printf("  %-21s %d bytes\n", "Checkpoint data size:", info.TotalSize)
+	fmt.Printf("  %-21s %s\n\n", "CRIU compression:", compression)
 }
 
 func renderTreeDiff(result *DiffResult) {

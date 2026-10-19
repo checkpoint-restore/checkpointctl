@@ -61,7 +61,7 @@ awesome_booth
 ├── Image: docker.io/library/ubuntu:latest
 ├── ID: 2076a99c49c959375c6ae406818a2c841744a019d30221f134db657232f133f5
 ├── Runtime: crun
-├── Created: 2026-03-16T08:00:17Z
+├── Container created: 2026-03-16T08:00:17Z
 ├── Engine: Podman
 ├── Network Interfaces
 │   └── podman (eth0)
@@ -69,7 +69,7 @@ awesome_booth
 │       ├── MAC: 2e:e1:db:6b:68:93
 │       └── Gateway: 10.88.0.1
 ├── CRIU compression: Disabled
-├── Checkpoint size: 1018.3 KiB
+├── Checkpoint data size: 1018.3 KiB
 │   └── Memory pages size: 952.0 KiB
 ├── Root FS diff size: 2.0 KiB
 └── Process tree
@@ -96,14 +96,14 @@ $ checkpointctl diff --show-unchanged --ps-tree-cmd --sockets ./cp1.tar cp2.tar
 ╚════════════════════════════════════════════════════════════════╝
 
 Checkpoint A:
-  Created:          2026-04-18T10:15:41+01:00
-  Size:             15186908 bytes
-  CRIU compression: Disabled
+  Container created:    2026-04-18T10:15:41+01:00
+  Checkpoint data size: 15186908 bytes
+  CRIU compression:     Disabled
 
 Checkpoint B:
-  Created:          2026-04-18T10:15:41+01:00
-  Size:             15212641 bytes
-  CRIU compression: Disabled
+  Container created:    2026-04-18T10:15:41+01:00
+  Checkpoint data size: 15212641 bytes
+  CRIU compression:     Disabled
 
 ┌─ Stored Page-Image Changes ──────────────────────────────────┐
 │ ↑ Increased by 0.02 MiB
