@@ -59,7 +59,9 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 	// Always create a raw baseline, including when -run selects one mode.
 	rawImages, rawArchive := h.dump(t, process.Process.Pid, "raw", 0)
 	qualifyCompressionLayout(t, rawImages, process.Process.Pid, page, 0, address)
-	baselineSize := memorySizeTable(t, h.run(t, "memparse", rawArchive))
+	baselineOutput := h.run(t, "memparse", rawArchive)
+	assertMemparseCompressionIndicator(t, baselineOutput, false)
+	baselineSize := memorySizeTable(t, baselineOutput)
 
 	for _, mode := range []struct {
 		name  string
@@ -104,7 +106,9 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 				t.Fatalf("inspect --all did not decode process memory: %s", output)
 			}
 
-			table := memorySizeTable(t, h.run(t, "memparse", archive))
+			output = h.run(t, "memparse", archive)
+			assertMemparseCompressionIndicator(t, output, mode.block != 0)
+			table := memorySizeTable(t, output)
 			if table != baselineSize {
 				t.Fatalf("logical memory size changed:\n%s\n%s", baselineSize, table)
 			}
@@ -117,6 +121,7 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 				if !strings.Contains(output, "CRIU_COMPRESSION_MARKER") {
 					t.Fatalf("search failed: %s", output)
 				}
+				assertMemparseCompressionIndicator(t, output, mode.block != 0)
 			}
 
 			outputFile := filepath.Join(h.directory, "memory-"+mode.name)
@@ -126,9 +131,11 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 			if err := os.Chmod(outputFile, 0o666); err != nil {
 				t.Fatal(err)
 			}
-			h.run(t, "memparse", archive, "--pid", strconv.Itoa(process.Process.Pid), "--output", outputFile)
+			output = h.run(t, "memparse", archive, "--pid", strconv.Itoa(process.Process.Pid), "--output", outputFile)
+			assertMemparseCompressionIndicator(t, output, mode.block != 0)
 			verifyMemoryDump(t, outputFile, address, expected)
 			compact := h.run(t, "memparse", archive, "--pid", strconv.Itoa(process.Process.Pid))
+			assertMemparseCompressionIndicator(t, compact, mode.block != 0)
 			verifyCompactMapping(t, compact, address, expected)
 
 			output = h.run(t, "diff", rawArchive, archive, "--ps-tree-cmd", "--ps-tree-env", "--format=json")
@@ -157,7 +164,7 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 func memorySizeTable(t *testing.T, output string) string {
 	t.Helper()
 
-	// Ignore the introductory line containing the archive path.
+	// Ignore the archive path and compression indicator before the table.
 	_, table, found := strings.Cut(output, "PID")
 	if !found {
 		t.Fatalf("missing memory table: %s", output)

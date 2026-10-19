@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -115,6 +116,22 @@ func memparse(cmd *cobra.Command, args []string) error {
 	return showProcessMemorySizeTables(tasks)
 }
 
+func printCRIUCompression(task internal.Task) error {
+	checkpointDirectory := filepath.Join(task.OutputDir, metadata.CheckpointDirectory)
+	compression, err := crit.ReadCompressionInfo(checkpointDirectory)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to get CRIU compression information: %w", err)
+	}
+
+	// Older archives may omit inventory.img and contain uncompressed pages.
+	state := "Disabled"
+	if compression.Compressed() {
+		state = "Enabled"
+	}
+	fmt.Printf("CRIU compression: %s\n\n", state)
+	return nil
+}
+
 // Display processes memory sizes within the given container checkpoints.
 func showProcessMemorySizeTables(tasks []internal.Task) error {
 	header := []string{
@@ -199,6 +216,9 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 		}
 
 		fmt.Printf("\nDisplaying processes memory sizes from %s\n\n", task.CheckpointFilePath)
+		if err := printCRIUCompression(task); err != nil {
+			return err
+		}
 
 		internal.WriteTableHeader(w, header)
 		internal.WriteTableRows(w, rows)
@@ -265,6 +285,9 @@ func printProcessMemoryPages(task internal.Task) error {
 	} else {
 		compact = true // Use a compact format when writing the output to stdout
 		fmt.Printf("\nDisplaying memory pages content for process ID %d from checkpoint: %s\n\n", *pID, task.CheckpointFilePath)
+	}
+	if err := printCRIUCompression(task); err != nil {
+		return err
 	}
 
 	fmt.Fprintln(output, "Address           Hexadecimal                                       ASCII            ")
@@ -384,6 +407,9 @@ func printMemorySearchResultForPID(task internal.Task) error {
 	results, err := memReader.SearchPattern(pattern, escapeRegExpCharacters, *searchContext, 0)
 	if err != nil {
 		return fmt.Errorf("failed to search pattern in memory: %w", err)
+	}
+	if err := printCRIUCompression(task); err != nil {
+		return err
 	}
 
 	if len(results) == 0 {

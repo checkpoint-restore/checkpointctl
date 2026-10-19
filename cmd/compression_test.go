@@ -339,7 +339,7 @@ func TestInspectCompressionIndicator(t *testing.T) {
 	}
 }
 
-func TestInspectCompressionInvalidInventory(t *testing.T) {
+func TestCompressionInvalidInventory(t *testing.T) {
 	for _, data := range [][]byte{
 		[]byte("invalid inventory"),
 		compressionImage(t, "INVENTORY", &inventory.InventoryEntry{
@@ -359,6 +359,46 @@ func TestInspectCompressionInvalidInventory(t *testing.T) {
 			if err == nil || !strings.Contains(output, "failed to get CRIU compression information") {
 				t.Fatalf("expected inventory error for %v: %v: %s", args, err, output)
 			}
+		}
+		output, err := compressionCommand(t, "memparse", archive)
+		if err == nil || strings.Contains(output, "CRIU compression:") {
+			t.Fatalf("expected inventory error without a compression indicator: %v: %s", err, output)
+		}
+	}
+}
+
+func assertMemparseCompressionIndicator(t *testing.T, output string, compressed bool) {
+	t.Helper()
+
+	want := "CRIU compression: Disabled"
+	if compressed {
+		want = "CRIU compression: Enabled"
+	}
+	if !strings.Contains(output, want) || strings.Count(output, "CRIU compression:") != 1 {
+		t.Fatalf("expected one %q indicator: %s", want, output)
+	}
+}
+
+func TestMemparseCompressionIndicatorPerCheckpoint(t *testing.T) {
+	compressed := newCompressionFixture(t, compressionFixtureOptions{compressed: true, blockPages: 2}).archive(t)
+	legacy := newCompressionFixture(t, compressionFixtureOptions{legacy: true, blockPages: 1}).archive(t)
+
+	output, err := compressionCommand(t, "memparse", compressed, legacy)
+	if err != nil {
+		t.Fatalf("memory sizes: %v: %s", err, output)
+	}
+	sections := strings.Split(output, "Displaying processes memory sizes from ")
+	if len(sections) != 3 {
+		t.Fatalf("expected two checkpoint tables: %s", output)
+	}
+	for i, archive := range []string{compressed, legacy} {
+		section := sections[i+1]
+		if !strings.HasPrefix(section, archive+"\n") {
+			t.Fatalf("expected checkpoint %s: %s", archive, section)
+		}
+		assertMemparseCompressionIndicator(t, section, i == 0)
+		if strings.Index(section, "PID") < strings.Index(section, "CRIU compression:") {
+			t.Fatalf("expected compression indicator before memory table: %s", section)
 		}
 	}
 }
@@ -406,12 +446,14 @@ func TestCompressedCheckpointCommands(t *testing.T) {
 			if err != nil || !strings.Contains(out, metadata.ByteToString(int64(9*pageSize))) {
 				t.Fatalf("memory size: %v\n%s", err, out)
 			}
+			assertMemparseCompressionIndicator(t, out, test.options.compressed)
 
 			destination := filepath.Join(t.TempDir(), "memory.txt")
 			out, err = compressionCommand(t, "memparse", archive, "--pid=1", "--output", destination)
 			if err != nil {
 				t.Fatalf("write memory: %v\n%s", err, out)
 			}
+			assertMemparseCompressionIndicator(t, out, test.options.compressed)
 			content, err := os.ReadFile(destination)
 			if err != nil {
 				t.Fatal(err)
@@ -419,18 +461,38 @@ func TestCompressedCheckpointCommands(t *testing.T) {
 			if !bytes.Equal(content, baselineMemory) {
 				t.Fatal("decoded memory differs from legacy raw checkpoint")
 			}
+			if bytes.Contains(content, []byte("CRIU compression:")) {
+				t.Fatal("compression indicator was written to the memory output file")
+			}
+
+			out, err = compressionCommand(t, "memparse", archive, "--pid=1")
+			if err != nil {
+				t.Fatalf("display memory: %v\n%s", err, out)
+			}
+			assertMemparseCompressionIndicator(t, out, test.options.compressed)
+			if strings.Index(out, "Address") < strings.Index(out, "CRIU compression:") {
+				t.Fatalf("expected compression indicator before memory content: %s", out)
+			}
 
 			for _, search := range []string{"--search=CROSS_BLOCK_NEEDLE", "--search-regex=CROSS_BLOCK_N[E]+DLE"} {
 				out, err = compressionCommand(t, "memparse", archive, "--pid=1", search, "--context=8")
 				if err != nil || !strings.Contains(out, "CROSS_BLOCK_NEEDLE") {
 					t.Fatalf("search: %v\n%s", err, out)
 				}
+				assertMemparseCompressionIndicator(t, out, test.options.compressed)
 
 				prefix := "CHECKPOINTCTL_TEST="
 				envStart := compressionBase + uint64(2*pageSize-compressionEnvBytesBeforeBoundary)
 				address := envStart + uint64(len(prefix))
 				context := prefix[len(prefix)-8:] + "CROSS_BLOCK_NEEDLE?EMPTY=?"
 				assertSearchRow(t, out, address, context)
+			}
+			for _, search := range []string{"--search=NON_EXISTING_PATTERN", "--search-regex=NON_EXISTING_PAT[T]+ERN"} {
+				out, err = compressionCommand(t, "memparse", archive, "--pid=1", search)
+				if err != nil || !strings.Contains(out, "No matches") {
+					t.Fatalf("search without matches: %v\n%s", err, out)
+				}
+				assertMemparseCompressionIndicator(t, out, test.options.compressed)
 			}
 
 			out, err = compressionCommand(t, "diff", raw, archive, "--ps-tree-cmd", "--ps-tree-env", "--format=json")

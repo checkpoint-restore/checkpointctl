@@ -674,7 +674,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"piggie"* ]]
+	[[ ${lines[1]} == *"CRIU compression: Disabled"* ]]
+	[[ ${lines[4]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file and missing pstree.img" {
@@ -703,9 +704,9 @@ function teardown() {
 	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
 
-	# Check if the 4th line matches the expected hex pattern
+	# Check if the 5th line matches the expected hex pattern
 	# We expect lines like: '000055eb086f6030  f3 0f 1e fa 68 00 00 00 00 f2 e9 e1 ff ff ff 90  |....h...........|'
-	line="${lines[3]}"
+	line="${lines[4]}"
 
 	hex_address_regex="^[0-9a-fA-F]{16}"
 	# Check the hex address (first 16 characters)
@@ -768,7 +769,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search=NON_EXISTING_PATTERN "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[0]} == *"No matches"* ]]
+	[[ ${lines[0]} == *"CRIU compression: Disabled"* ]]
+	[[ ${lines[1]} == *"No matches"* ]]
 }
 
 @test "Run checkpointctl memparse with --search=PATH and --context=10 flags" {
@@ -796,7 +798,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search-regex='HOME=([^?]+)' "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[2]} == *"HOME"* ]]
+	[[ ${lines[3]} == *"HOME"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file and invalid PID" {
