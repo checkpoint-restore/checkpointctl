@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/checkpoint-restore/checkpointctl/internal"
 	"github.com/checkpoint-restore/go-criu/v8/crit"
 	"github.com/checkpoint-restore/go-criu/v8/crit/images/pagemap"
 )
@@ -76,6 +77,18 @@ func TestCRIUCompressedCheckpoints(t *testing.T) {
 				images, compressedArchive := h.dump(t, process.Process.Pid, mode.name, mode.block)
 				qualifyCompressionLayout(t, images, process.Process.Pid, page, mode.block, address)
 				archive = compressedArchive
+			}
+
+			for _, flags := range [][]string{nil, {"--all"}} {
+				args := append([]string{"inspect", archive, "--format=json"}, flags...)
+				output := h.run(t, args...)
+				var nodes []internal.DisplayNode
+				if err := json.Unmarshal([]byte(output), &nodes); err != nil {
+					t.Fatal(err)
+				}
+				if len(nodes) != 1 || nodes[0].CriuCompression != (mode.block != 0) {
+					t.Fatalf("incorrect CRIU compression indicator: %s", output)
+				}
 			}
 
 			for _, format := range []string{"tree", "json"} {

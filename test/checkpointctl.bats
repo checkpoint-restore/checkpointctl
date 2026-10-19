@@ -250,9 +250,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[12]} == *"Memwrite time"* ]]
-	[[ ${lines[13]} =~ [1-9] ]]
+	[[ ${lines[9]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[13]} == *"Memwrite time"* ]]
+	[[ ${lines[14]} =~ [1-9] ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --mounts and valid spec.dump" {
@@ -262,9 +262,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --mounts
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Overview of mounts"* ]]
-	[[ ${lines[9]} == *"Destination"* ]]
-	[[ ${lines[10]} == *"proc"* ]]
+	[[ ${lines[9]} == *"Overview of mounts"* ]]
+	[[ ${lines[10]} == *"Destination"* ]]
+	[[ ${lines[11]} == *"proc"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree" {
@@ -276,8 +276,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Process tree"* ]]
-	[[ ${lines[9]} == *"piggie"* ]]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree and missing pstree.img" {
@@ -302,8 +302,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
 	[ "$status" -eq 0 ]
-	[[ ${lines[9]} == *"Process tree"* ]]
-	[[ ${lines[10]} == *"piggie/piggie"* ]]
+	[[ ${lines[10]} == *"Process tree"* ]]
+	[[ ${lines[11]} == *"piggie/piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-cmd as non-root" {
@@ -327,8 +327,8 @@ function teardown() {
 	echo "$output"
 	rm -f "$NON_ROOT_BIN"
 	[ "$status" -eq 0 ]
-	[[ ${lines[9]} == *"Process tree"* ]]
-	[[ ${lines[10]} == *"piggie/piggie"* ]]
+	[[ ${lines[10]} == *"Process tree"* ]]
+	[[ ${lines[11]} == *"piggie/piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-cmd and missing pages-*.img" {
@@ -357,9 +357,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-env
 	[ "$status" -eq 0 ]
-	[[ ${lines[9]} == *"Process tree"* ]]
-	[[ ${lines[10]} == *"piggie"* ]]
-	[[ ${lines[12]} == *"="* ]]
+	[[ ${lines[10]} == *"Process tree"* ]]
+	[[ ${lines[11]} == *"piggie"* ]]
+	[[ ${lines[13]} == *"="* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-env and missing pages-*.img" {
@@ -447,8 +447,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree --pid 1
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Process tree"* ]]
-	[[ ${lines[9]} == *"piggie"* ]]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree and invalid PID" {
@@ -482,9 +482,9 @@ function teardown() {
 	run checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
 
-	[[ ${lines[9]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[13]} == *"Memwrite time"* ]]
-	[[ ${lines[14]} =~ [1-9] ]]
+	[[ ${lines[10]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[14]} == *"Memwrite time"* ]]
+	[[ ${lines[15]} =~ [1-9] ]]
 
 	expected_messages=(
 		"[REG 0]"
@@ -649,7 +649,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Root FS diff size"* ]]
+	[[ ${lines[9]} == *"Root FS diff size"* ]]
 }
 
 @test "Run checkpointctl inspect with multiple tar files" {
@@ -660,7 +660,7 @@ function teardown() {
 	checkpointctl inspect "$TEST_TMP_DIR2"/*.tar
 	[ "$status" -eq 0 ]
 	[[ ${lines[6]} == *"Podman"* ]]
-	[[ ${lines[14]} == *"Podman"* ]]
+	[[ ${lines[15]} == *"Podman"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file" {

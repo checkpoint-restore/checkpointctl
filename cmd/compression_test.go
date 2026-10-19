@@ -290,6 +290,78 @@ func (fixture *compressionFixture) archive(t *testing.T) string {
 	return path
 }
 
+func TestInspectCompressionIndicator(t *testing.T) {
+	legacy := newCompressionFixture(t, compressionFixtureOptions{legacy: true, blockPages: 1}).archive(t)
+
+	for _, test := range []struct {
+		name    string
+		options compressionFixtureOptions
+		want    bool
+	}{
+		{name: "legacy", options: compressionFixtureOptions{legacy: true, blockPages: 1}},
+		{name: "disabled", options: compressionFixtureOptions{blockPages: 1}},
+		{name: "enabled", options: compressionFixtureOptions{compressed: true, blockPages: 2}, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newCompressionFixture(t, test.options)
+			// Default inspection needs only the inventory, not the memory payload.
+			delete(fixture.files, "checkpoint/pages-1.img")
+			archive := fixture.archive(t)
+
+			output, err := compressionCommand(t, "inspect", archive, legacy, "--format=json")
+			if err != nil {
+				t.Fatalf("inspect: %v: %s", err, output)
+			}
+			var nodes []struct {
+				Compression *bool `json:"criu_compression"`
+			}
+			if err := json.Unmarshal([]byte(output), &nodes); err != nil {
+				t.Fatal(err)
+			}
+			if len(nodes) != 2 {
+				t.Fatalf("expected two checkpoints: %s", output)
+			}
+			for i, want := range []bool{test.want, false} {
+				if nodes[i].Compression == nil || *nodes[i].Compression != want {
+					t.Fatalf("checkpoint %d: expected criu_compression=%t: %s", i, want, output)
+				}
+			}
+
+			output, err = compressionCommand(t, "inspect", archive)
+			want := "CRIU compression: Disabled"
+			if test.want {
+				want = "CRIU compression: Enabled"
+			}
+			if err != nil || !strings.Contains(output, want) {
+				t.Fatalf("expected %q: %v: %s", want, err, output)
+			}
+		})
+	}
+}
+
+func TestInspectCompressionInvalidInventory(t *testing.T) {
+	for _, data := range [][]byte{
+		[]byte("invalid inventory"),
+		compressionImage(t, "INVENTORY", &inventory.InventoryEntry{
+			ImgVersion: proto.Uint32(3),
+			Compress:   proto.Uint32(99),
+		}),
+	} {
+		fixture := newCompressionFixture(t, compressionFixtureOptions{blockPages: 1})
+		fixture.files["checkpoint/inventory.img"] = data
+		archive := fixture.archive(t)
+		for _, args := range [][]string{
+			{"inspect", archive},
+			{"inspect", archive, "--format=json"},
+		} {
+			output, err := compressionCommand(t, args...)
+			if err == nil || !strings.Contains(output, "failed to get CRIU compression information") {
+				t.Fatalf("expected inventory error for %v: %v: %s", args, err, output)
+			}
+		}
+	}
+}
+
 func TestCompressedCheckpointCommands(t *testing.T) {
 	raw := newCompressionFixture(t, compressionFixtureOptions{legacy: true, blockPages: 1}).archive(t)
 

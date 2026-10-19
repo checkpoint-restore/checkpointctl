@@ -100,7 +100,10 @@ func inspect(cmd *cobra.Command, args []string) error {
 		*showMetdata = true
 	}
 
-	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile, metadata.NetworkStatusFile}
+	requiredFiles := []string{
+		metadata.SpecDumpFile, metadata.ConfigDumpFile, metadata.NetworkStatusFile,
+		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
+	}
 
 	if *stats {
 		requiredFiles = append(requiredFiles, "stats-dump")
@@ -145,8 +148,7 @@ func inspect(cmd *cobra.Command, args []string) error {
 		*psTree = true
 		requiredFiles = append(
 			requiredFiles,
-			// Unpack inventory.img, pagemap-*.img, pages-*.img, and mm-*.img
-			filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
+			// Unpack pagemap-*.img, pages-*.img, and mm-*.img
 			filepath.Join(metadata.CheckpointDirectory, "pagemap-"),
 			filepath.Join(metadata.CheckpointDirectory, "pages-"),
 			filepath.Join(metadata.CheckpointDirectory, "mm-"),

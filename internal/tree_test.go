@@ -30,6 +30,7 @@ func TestBuildTreeFromDisplayNode(t *testing.T) {
 		"Runtime: runc",
 		"Created: 2024-01-01T00:00:00Z",
 		"Engine: Podman",
+		"CRIU compression: Disabled",
 		"Checkpoint size:",
 	}
 

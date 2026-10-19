@@ -51,6 +51,12 @@ func buildTreeFromDisplayNode(node DisplayNode) treeprint.Tree {
 		}
 	}
 
+	compression := "Disabled"
+	if node.CriuCompression {
+		compression = "Enabled"
+	}
+	tree.AddBranch(fmt.Sprintf("CRIU compression: %s", compression))
+
 	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(node.CheckpointSize.TotalSize)))
 	if node.CheckpointSize.MemoryPagesSize != 0 {
 		checkpointSize.AddNode(fmt.Sprintf("Memory pages size: %s", metadata.ByteToString(node.CheckpointSize.MemoryPagesSize)))
