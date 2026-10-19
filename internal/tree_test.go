@@ -28,9 +28,10 @@ func TestBuildTreeFromDisplayNode(t *testing.T) {
 		"Image: test-image:latest",
 		"ID: abc123",
 		"Runtime: runc",
-		"Created: 2024-01-01T00:00:00Z",
+		"Container created: 2024-01-01T00:00:00Z",
 		"Engine: Podman",
-		"Checkpoint size:",
+		"CRIU compression: Disabled",
+		"Checkpoint data size:",
 	}
 
 	for _, expected := range expectedStrings {

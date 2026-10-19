@@ -250,9 +250,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --stats
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[12]} == *"Memwrite time"* ]]
-	[[ ${lines[13]} =~ [1-9] ]]
+	[[ ${lines[9]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[13]} == *"Memwrite time"* ]]
+	[[ ${lines[14]} =~ [1-9] ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --mounts and valid spec.dump" {
@@ -262,9 +262,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --mounts
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Overview of mounts"* ]]
-	[[ ${lines[9]} == *"Destination"* ]]
-	[[ ${lines[10]} == *"proc"* ]]
+	[[ ${lines[9]} == *"Overview of mounts"* ]]
+	[[ ${lines[10]} == *"Destination"* ]]
+	[[ ${lines[11]} == *"proc"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree" {
@@ -276,8 +276,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Process tree"* ]]
-	[[ ${lines[9]} == *"piggie"* ]]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree and missing pstree.img" {
@@ -302,8 +302,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-cmd
 	[ "$status" -eq 0 ]
-	[[ ${lines[9]} == *"Process tree"* ]]
-	[[ ${lines[10]} == *"piggie/piggie"* ]]
+	[[ ${lines[10]} == *"Process tree"* ]]
+	[[ ${lines[11]} == *"piggie/piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-cmd as non-root" {
@@ -327,8 +327,8 @@ function teardown() {
 	echo "$output"
 	rm -f "$NON_ROOT_BIN"
 	[ "$status" -eq 0 ]
-	[[ ${lines[9]} == *"Process tree"* ]]
-	[[ ${lines[10]} == *"piggie/piggie"* ]]
+	[[ ${lines[10]} == *"Process tree"* ]]
+	[[ ${lines[11]} == *"piggie/piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-cmd and missing pages-*.img" {
@@ -357,9 +357,9 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree-env
 	[ "$status" -eq 0 ]
-	[[ ${lines[9]} == *"Process tree"* ]]
-	[[ ${lines[10]} == *"piggie"* ]]
-	[[ ${lines[12]} == *"="* ]]
+	[[ ${lines[10]} == *"Process tree"* ]]
+	[[ ${lines[11]} == *"piggie"* ]]
+	[[ ${lines[13]} == *"="* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree-env and missing pages-*.img" {
@@ -447,8 +447,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --ps-tree --pid 1
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Process tree"* ]]
-	[[ ${lines[9]} == *"piggie"* ]]
+	[[ ${lines[9]} == *"Process tree"* ]]
+	[[ ${lines[10]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl inspect with tar file and --ps-tree and invalid PID" {
@@ -482,9 +482,9 @@ function teardown() {
 	run checkpointctl inspect "$TEST_TMP_DIR2"/test.tar --all
 	[ "$status" -eq 0 ]
 
-	[[ ${lines[9]} == *"CRIU dump statistics"* ]]
-	[[ ${lines[13]} == *"Memwrite time"* ]]
-	[[ ${lines[14]} =~ [1-9] ]]
+	[[ ${lines[10]} == *"CRIU dump statistics"* ]]
+	[[ ${lines[14]} == *"Memwrite time"* ]]
+	[[ ${lines[15]} =~ [1-9] ]]
 
 	expected_messages=(
 		"[REG 0]"
@@ -649,7 +649,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl inspect "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[8]} == *"Root FS diff size"* ]]
+	[[ ${lines[9]} == *"Root FS diff size"* ]]
 }
 
 @test "Run checkpointctl inspect with multiple tar files" {
@@ -660,7 +660,7 @@ function teardown() {
 	checkpointctl inspect "$TEST_TMP_DIR2"/*.tar
 	[ "$status" -eq 0 ]
 	[[ ${lines[6]} == *"Podman"* ]]
-	[[ ${lines[14]} == *"Podman"* ]]
+	[[ ${lines[15]} == *"Podman"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file" {
@@ -674,7 +674,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar
 	[ "$status" -eq 0 ]
-	[[ ${lines[3]} == *"piggie"* ]]
+	[[ ${lines[1]} == *"CRIU compression: Disabled"* ]]
+	[[ ${lines[4]} == *"piggie"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file and missing pstree.img" {
@@ -703,9 +704,9 @@ function teardown() {
 	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
 
-	# Check if the 4th line matches the expected hex pattern
+	# Check if the 5th line matches the expected hex pattern
 	# We expect lines like: '000055eb086f6030  f3 0f 1e fa 68 00 00 00 00 f2 e9 e1 ff ff ff 90  |....h...........|'
-	line="${lines[3]}"
+	line="${lines[4]}"
 
 	hex_address_regex="^[0-9a-fA-F]{16}"
 	# Check the hex address (first 16 characters)
@@ -768,7 +769,8 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search=NON_EXISTING_PATTERN "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[0]} == *"No matches"* ]]
+	[[ ${lines[0]} == *"CRIU compression: Disabled"* ]]
+	[[ ${lines[1]} == *"No matches"* ]]
 }
 
 @test "Run checkpointctl memparse with --search=PATH and --context=10 flags" {
@@ -796,7 +798,7 @@ function teardown() {
 	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
 	checkpointctl memparse --search-regex='HOME=([^?]+)' "$TEST_TMP_DIR2"/test.tar --pid=1
 	[ "$status" -eq 0 ]
-	[[ ${lines[2]} == *"HOME"* ]]
+	[[ ${lines[3]} == *"HOME"* ]]
 }
 
 @test "Run checkpointctl memparse with tar file and invalid PID" {
@@ -969,9 +971,9 @@ function teardown() {
 	checkpointctl diff "$TEST_TMP_DIR2"/test1.tar "$TEST_TMP_DIR2"/test2.tar
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"Checkpoint Diff"* ]]
-	[[ "$output" == *"Memory Changes"* ]]
+	[[ "$output" == *"Stored Page-Image Changes"* ]]
 	[[ "$output" == *"Process Tree"* ]]
-	# Both Memory Changes and Process Tree sections emit "No change".
+	# Both Stored Page-Image Changes and Process Tree sections emit "No change".
 	[ "$(echo "$output" | grep -c "No change")" -ge 2 ]
 }
 
@@ -1206,7 +1208,7 @@ function build_sk_diff_tars() {
 		"Image:"
 		"Checkpoint A:"
 		"Checkpoint B:"
-		"Memory Changes"
+		"Stored Page-Image Changes"
 		"Process Tree"
 		"Summary"
 	)

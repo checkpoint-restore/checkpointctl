@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"archive/tar"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -696,49 +695,6 @@ func TestRenderAnnotatedProcessTreeUnknownPID(t *testing.T) {
 
 func createTestCheckpointArchive(t *testing.T, dir, filename string, containerID, containerName, runtime, imageName string, created time.Time) string {
 	t.Helper()
-	archivePath := filepath.Join(dir, filename)
-	f, err := os.Create(archivePath)
-	if err != nil {
-		t.Fatalf("creating test archive: %v", err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			t.Errorf("closing test archive: %v", err)
-		}
-	}()
-
-	tw := tar.NewWriter(f)
-	defer func() {
-		if err := tw.Close(); err != nil {
-			t.Errorf("finishing test archive: %v", err)
-		}
-	}()
-
-	// 1. checkpoint/ directory
-	dirHdr := &tar.Header{
-		Name:     "checkpoint/",
-		Typeflag: tar.TypeDir,
-		Mode:     0o700,
-	}
-	if err := tw.WriteHeader(dirHdr); err != nil {
-		t.Fatalf("writing dir header: %v", err)
-	}
-
-	// 2. spec.dump
-	specContent := `{"annotations":{"io.container.manager":"libpod"}}`
-	specHdr := &tar.Header{
-		Name: "spec.dump",
-		Mode: 0o600,
-		Size: int64(len(specContent)),
-	}
-	if err := tw.WriteHeader(specHdr); err != nil {
-		t.Fatalf("writing spec header: %v", err)
-	}
-	if _, err := tw.Write([]byte(specContent)); err != nil {
-		t.Fatalf("writing spec content: %v", err)
-	}
-
-	// 3. config.dump
 	configObj := metadata.ContainerConfig{
 		ID:              containerID,
 		Name:            containerName,
@@ -750,17 +706,11 @@ func createTestCheckpointArchive(t *testing.T, dir, filename string, containerID
 	if err != nil {
 		t.Fatalf("marshaling config: %v", err)
 	}
-	configHdr := &tar.Header{
-		Name: "config.dump",
-		Mode: 0o600,
-		Size: int64(len(configBytes)),
-	}
-	if err := tw.WriteHeader(configHdr); err != nil {
-		t.Fatalf("writing config header: %v", err)
-	}
-	if _, err := tw.Write(configBytes); err != nil {
-		t.Fatalf("writing config content: %v", err)
-	}
+	archivePath := filepath.Join(dir, filename)
+	writeCheckpointArchive(t, archivePath, map[string][]byte{
+		"config.dump": configBytes,
+		"spec.dump":   []byte(`{"annotations":{"io.container.manager":"libpod"}}`),
+	})
 
 	return archivePath
 }

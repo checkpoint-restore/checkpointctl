@@ -2,6 +2,7 @@ package internal
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -90,6 +91,7 @@ type DisplayNode struct {
 	MAC                string         `json:"mac,omitempty"`
 	Networks           []NetworkNode  `json:"networks,omitempty"`
 	CheckpointSize     CheckpointSize `json:"checkpoint_size"`
+	CriuCompression    bool           `json:"criu_compression"`
 	CriuDumpStatistics *StatsNode     `json:"statistics,omitempty"`
 	Metadata           *MetadataNode  `json:"metadata,omitempty"`
 	ProcessTree        *PsNode        `json:"process_tree,omitempty"`
@@ -212,6 +214,12 @@ func CollectCheckpointData(tasks []Task) ([]DisplayNode, error) {
 		}
 
 		checkpointDirectory := filepath.Join(task.OutputDir, "checkpoint")
+		compression, err := crit.ReadCompressionInfo(checkpointDirectory)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("failed to get CRIU compression information: %w", err)
+		}
+		// Older archives may omit inventory.img and contain uncompressed pages.
+		node.CriuCompression = compression.Compressed()
 
 		if PsTree {
 			psTree, err := crit.New(nil, nil, checkpointDirectory, false, false).ExplorePs()

@@ -24,7 +24,7 @@ func Diff() *cobra.Command {
   - Process tree (new/removed/modified processes)
   - File descriptors (opened/closed files)
   - Sockets (new/removed network sockets)
-  - Memory usage (size changes)
+  - Stored memory page-image sizes
 
 Example:
   checkpointctl diff checkpoint1.tar checkpoint2.tar
@@ -84,6 +84,7 @@ func diff(cmd *cobra.Command, args []string) error {
 	requiredFiles := []string{
 		metadata.SpecDumpFile,
 		metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 	}
 
 	// Add process tree files
@@ -218,6 +219,7 @@ type CheckpointMetadata struct {
 	Created         string                `json:"created"`
 	Engine          string                `json:"engine"`
 	CheckpointSize  CheckpointSize        `json:"checkpoint_size"`
+	CriuCompression bool                  `json:"criu_compression"`
 	ProcessTree     *internal.PsNode      `json:"process_tree,omitempty"`
 	FileDescriptors []FileDescriptorEntry `json:"file_descriptors,omitempty"`
 	Sockets         []internal.SkNode     `json:"sockets,omitempty"`
@@ -256,8 +258,9 @@ type DiffResult struct {
 }
 
 type CheckpointInfo struct {
-	Created   string `json:"created"`
-	TotalSize int64  `json:"total_size"`
+	Created         string `json:"created"`
+	TotalSize       int64  `json:"total_size"`
+	CriuCompression bool   `json:"criu_compression"`
 }
 
 type ProcessDiff struct {
@@ -316,12 +319,14 @@ func computeDiff(metadataA, metadataB CheckpointMetadata) *DiffResult {
 		ContainerName: metadataA.ContainerName,
 		Image:         metadataA.Image,
 		CheckpointA: CheckpointInfo{
-			Created:   metadataA.Created,
-			TotalSize: metadataA.CheckpointSize.TotalSize,
+			Created:         metadataA.Created,
+			TotalSize:       metadataA.CheckpointSize.TotalSize,
+			CriuCompression: metadataA.CriuCompression,
 		},
 		CheckpointB: CheckpointInfo{
-			Created:   metadataB.Created,
-			TotalSize: metadataB.CheckpointSize.TotalSize,
+			Created:         metadataB.Created,
+			TotalSize:       metadataB.CheckpointSize.TotalSize,
+			CriuCompression: metadataB.CriuCompression,
 		},
 	}
 
@@ -640,10 +645,22 @@ func generateSummary(result *DiffResult) string {
 	}
 
 	if result.MemoryChanges != nil && result.MemoryChanges.SizeChangeBytes != 0 {
-		summary += fmt.Sprintf("\nMemory: %+.2f MB", result.MemoryChanges.SizeChangeMB)
+		summary += fmt.Sprintf("\nStored page images: %+.2f MiB", result.MemoryChanges.SizeChangeMB)
 	}
 
 	return summary
+}
+
+func renderCheckpointInfo(label string, info CheckpointInfo) {
+	compression := "Disabled"
+	if info.CriuCompression {
+		compression = "Enabled"
+	}
+
+	fmt.Printf("Checkpoint %s:\n", label)
+	fmt.Printf("  %-21s %s\n", "Container created:", info.Created)
+	fmt.Printf("  %-21s %d bytes\n", "Checkpoint data size:", info.TotalSize)
+	fmt.Printf("  %-21s %s\n\n", "CRIU compression:", compression)
 }
 
 func renderTreeDiff(result *DiffResult) {
@@ -656,21 +673,16 @@ func renderTreeDiff(result *DiffResult) {
 	fmt.Printf("╚════════════════════════════════════════════════════════════════╝\n\n")
 
 	// Checkpoint info
-	fmt.Printf("Checkpoint A:\n")
-	fmt.Printf("  Created: %s\n", result.CheckpointA.Created)
-	fmt.Printf("  Size:    %d bytes\n\n", result.CheckpointA.TotalSize)
-
-	fmt.Printf("Checkpoint B:\n")
-	fmt.Printf("  Created: %s\n", result.CheckpointB.Created)
-	fmt.Printf("  Size:    %d bytes\n\n", result.CheckpointB.TotalSize)
+	renderCheckpointInfo("A", result.CheckpointA)
+	renderCheckpointInfo("B", result.CheckpointB)
 
 	// Memory changes
 	if result.MemoryChanges != nil {
-		fmt.Println("┌─ Memory Changes ─────────────────────────────────────────────┐")
+		fmt.Println("┌─ Stored Page-Image Changes ──────────────────────────────────┐")
 		if result.MemoryChanges.SizeChangeBytes > 0 {
-			fmt.Printf("│ ↑ Increased by %.2f MB\n", result.MemoryChanges.SizeChangeMB)
+			fmt.Printf("│ ↑ Increased by %.2f MiB\n", result.MemoryChanges.SizeChangeMB)
 		} else if result.MemoryChanges.SizeChangeBytes < 0 {
-			fmt.Printf("│ ↓ Decreased by %.2f MB\n", -result.MemoryChanges.SizeChangeMB)
+			fmt.Printf("│ ↓ Decreased by %.2f MiB\n", -result.MemoryChanges.SizeChangeMB)
 		} else {
 			fmt.Println("│ = No change")
 		}

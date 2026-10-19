@@ -9,6 +9,21 @@ include::footer.adoc[]
 
 *checkpointctl memparse* [_OPTION_]... _FILE_
 
+== Description
+
+Display process memory sizes, write memory contents, or search memory in a
+container checkpoint archive. Memory sizes refer to memory before compression.
+
+CRIU LZ4-compressed memory pages are decoded automatically and require
+`checkpoint/inventory.img`. Page compression is separate from archive compression.
+
+Each checkpoint's output shows `CRIU compression: Enabled` or
+`CRIU compression: Disabled`. Older checkpoints without `inventory.img` show
+compression as disabled. With `--output`, the indicator is printed to the
+terminal and is not included in the memory output file.
+
+The memory pages being read must be present in the archive.
+
 == Options
 
 *-h*, *--help*::

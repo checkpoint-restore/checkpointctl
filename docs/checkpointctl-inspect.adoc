@@ -9,6 +9,23 @@ include::footer.adoc[]
 
 *checkpointctl inspect* [_OPTION_]...  _FILE_
 
+== Description
+
+Inspect container checkpoint archives. Reading command lines and environment
+variables requires memory pages in the archive. CRIU LZ4-compressed pages
+are decoded automatically and require `checkpoint/inventory.img`.
+
+The default output shows `CRIU compression: Enabled` or `CRIU compression: Disabled`.
+JSON output includes the boolean field `criu_compression`. This setting describes
+CRIU memory page compression, independently of archive compression. Archives
+without `checkpoint/inventory.img` are reported as compression disabled for
+compatibility with older checkpoints. Invalid inventory metadata returns an error.
+
+`Container created` is the container creation time. `Checkpoint data size` is
+the combined size of files under `checkpoint/`, including memory images and
+CRIU metadata. JSON output reports these values in `created` and
+`checkpoint_size.total_size`.
+
 == Options
 
 *-h*, *--help*::

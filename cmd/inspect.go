@@ -100,7 +100,10 @@ func inspect(cmd *cobra.Command, args []string) error {
 		*showMetdata = true
 	}
 
-	requiredFiles := []string{metadata.SpecDumpFile, metadata.ConfigDumpFile, metadata.NetworkStatusFile}
+	requiredFiles := []string{
+		metadata.SpecDumpFile, metadata.ConfigDumpFile, metadata.NetworkStatusFile,
+		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
+	}
 
 	if *stats {
 		requiredFiles = append(requiredFiles, "stats-dump")

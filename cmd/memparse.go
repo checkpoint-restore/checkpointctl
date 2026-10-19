@@ -6,8 +6,10 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -78,6 +80,7 @@ func MemParse() *cobra.Command {
 func memparse(cmd *cobra.Command, args []string) error {
 	requiredFiles := []string{
 		metadata.SpecDumpFile, metadata.ConfigDumpFile,
+		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
 		filepath.Join(metadata.CheckpointDirectory, "pstree.img"),
 		filepath.Join(metadata.CheckpointDirectory, "core-"),
 	}
@@ -113,6 +116,22 @@ func memparse(cmd *cobra.Command, args []string) error {
 	return showProcessMemorySizeTables(tasks)
 }
 
+func printCRIUCompression(task internal.Task) error {
+	checkpointDirectory := filepath.Join(task.OutputDir, metadata.CheckpointDirectory)
+	compression, err := crit.ReadCompressionInfo(checkpointDirectory)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to get CRIU compression information: %w", err)
+	}
+
+	// Older archives may omit inventory.img and contain uncompressed pages.
+	state := "Disabled"
+	if compression.Compressed() {
+		state = "Enabled"
+	}
+	fmt.Printf("CRIU compression: %s\n\n", state)
+	return nil
+}
+
 // Display processes memory sizes within the given container checkpoints.
 func showProcessMemorySizeTables(tasks []internal.Task) error {
 	header := []string{
@@ -145,7 +164,19 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 		var memSize int64
 
 		for _, entry := range pagemapEntries {
-			memSize += int64(entry.GetNrPages()) * int64(pageSize)
+			// Get the page count from the current format or the field used by
+			// older checkpoints. This counts memory pages before compression.
+			pages := crit.PagemapPageCount(entry)
+
+			// Each page adds pageSize bytes to memSize. MaxInt64 is the largest
+			// byte total we can store. Subtract the bytes already counted, then
+			// divide by pageSize to find how many more pages fit. Check this limit
+			// before multiplying or adding to avoid an incorrect total from overflow.
+			if pages > uint64((math.MaxInt64-memSize)/int64(pageSize)) {
+				return fmt.Errorf("memory size for PID %d exceeds supported size", root.PID)
+			}
+
+			memSize += int64(pages) * int64(pageSize)
 		}
 
 		shmemSize, err := memReader.GetShmemSize()
@@ -185,6 +216,9 @@ func showProcessMemorySizeTables(tasks []internal.Task) error {
 		}
 
 		fmt.Printf("\nDisplaying processes memory sizes from %s\n\n", task.CheckpointFilePath)
+		if err := printCRIUCompression(task); err != nil {
+			return err
+		}
 
 		internal.WriteTableHeader(w, header)
 		internal.WriteTableRows(w, rows)
@@ -252,6 +286,9 @@ func printProcessMemoryPages(task internal.Task) error {
 		compact = true // Use a compact format when writing the output to stdout
 		fmt.Printf("\nDisplaying memory pages content for process ID %d from checkpoint: %s\n\n", *pID, task.CheckpointFilePath)
 	}
+	if err := printCRIUCompression(task); err != nil {
+		return err
+	}
 
 	fmt.Fprintln(output, "Address           Hexadecimal                                       ASCII            ")
 	fmt.Fprintln(output, "-------------------------------------------------------------------------------------")
@@ -259,7 +296,17 @@ func printProcessMemoryPages(task internal.Task) error {
 	pagemapEntries := memReader.GetPagemapEntries()
 	for _, entry := range pagemapEntries {
 		start := entry.GetVaddr()
-		end := start + (uint64(pageSize) * entry.GetNrPages())
+		pages := crit.PagemapPageCount(entry)
+
+		// The end address is the start address plus the number of bytes.
+		// Subtract start from the largest uint64 address, then divide by
+		// pageSize to find how many pages fit. Check before multiplying or
+		// adding so an overflow cannot wrap the end address back to a low value.
+		if pages > (math.MaxUint64-start)/uint64(pageSize) {
+			return fmt.Errorf("memory range at %#x overflows", start)
+		}
+
+		end := start + uint64(pageSize)*pages
 		buf, err := memReader.GetMemPages(start, end)
 		if err != nil {
 			return err
@@ -360,6 +407,9 @@ func printMemorySearchResultForPID(task internal.Task) error {
 	results, err := memReader.SearchPattern(pattern, escapeRegExpCharacters, *searchContext, 0)
 	if err != nil {
 		return fmt.Errorf("failed to search pattern in memory: %w", err)
+	}
+	if err := printCRIUCompression(task); err != nil {
+		return err
 	}
 
 	if len(results) == 0 {

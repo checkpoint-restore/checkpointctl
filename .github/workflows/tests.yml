@@ -56,6 +56,31 @@ jobs:
         retention-days: 1
         path: ${{ github.event_path }}
 
+  compression:
+    name: CRIU page compression
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/ci:latest
+      credentials:
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --privileged -v /lib/modules:/lib/modules
+    steps:
+    - uses: actions/checkout@v7
+    # Fedora's packaged CRIU may predate the compressed-page image format.
+    - uses: actions/checkout@v7
+      with:
+        repository: checkpoint-restore/criu
+        ref: criu-dev
+        path: .criu-compression
+    - name: Install CRIU build dependencies
+      working-directory: .criu-compression
+      run: contrib/dependencies/dnf-packages.sh
+    - name: Build compression-capable CRIU
+      run: make -C .criu-compression -j2 criu/criu
+    - name: Test checkpointctl with images created by CRIU
+      run: make -C test test-compression CRIU_TEST_BINARY="$GITHUB_WORKSPACE/.criu-compression/criu/criu"
+
   release:
     runs-on: ubuntu-latest
     steps:

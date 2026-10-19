@@ -34,7 +34,7 @@ func buildTreeFromDisplayNode(node DisplayNode) treeprint.Tree {
 	tree.AddBranch(fmt.Sprintf("Image: %s", node.Image))
 	tree.AddBranch(fmt.Sprintf("ID: %s", node.ID))
 	tree.AddBranch(fmt.Sprintf("Runtime: %s", node.Runtime))
-	tree.AddBranch(fmt.Sprintf("Created: %s", node.Created))
+	tree.AddBranch(fmt.Sprintf("Container created: %s", node.Created))
 	if node.Checkpointed != "" {
 		tree.AddBranch(fmt.Sprintf("Checkpointed: %s", node.Checkpointed))
 	}
@@ -51,7 +51,13 @@ func buildTreeFromDisplayNode(node DisplayNode) treeprint.Tree {
 		}
 	}
 
-	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint size: %s", metadata.ByteToString(node.CheckpointSize.TotalSize)))
+	compression := "Disabled"
+	if node.CriuCompression {
+		compression = "Enabled"
+	}
+	tree.AddBranch(fmt.Sprintf("CRIU compression: %s", compression))
+
+	checkpointSize := tree.AddBranch(fmt.Sprintf("Checkpoint data size: %s", metadata.ByteToString(node.CheckpointSize.TotalSize)))
 	if node.CheckpointSize.MemoryPagesSize != 0 {
 		checkpointSize.AddNode(fmt.Sprintf("Memory pages size: %s", metadata.ByteToString(node.CheckpointSize.MemoryPagesSize)))
 	}

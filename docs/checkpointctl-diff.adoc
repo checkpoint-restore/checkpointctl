@@ -16,7 +16,29 @@ Compare two container checkpoints and show differences in:
 * Process tree (new/removed/modified processes)
 * File descriptors (opened/closed files)
 * Sockets (new/removed network sockets)
-* Memory usage (size changes)
+* Stored memory page-image sizes
+
+Command lines and environment variables are read from memory pages in each
+archive. CRIU LZ4-compressed pages are decoded automatically and require
+`checkpoint/inventory.img`.
+
+Compression can change stored page-image sizes without changing process
+memory. The `size_change_mb` field in JSON output is measured in MiB.
+
+Each checkpoint's details show `CRIU compression: Enabled` or
+`CRIU compression: Disabled`. JSON output includes the boolean field
+`criu_compression` in both `checkpoint_a` and `checkpoint_b`. This setting
+describes CRIU memory page compression, independently of archive compression.
+Archives without `checkpoint/inventory.img` are reported as compression
+disabled for compatibility with older checkpoints.
+
+`Container created` shows when the container was created, so it is the same
+for checkpoints of the same container. JSON output keeps this timestamp in
+the `created` field of `checkpoint_a` and `checkpoint_b`.
+
+`Checkpoint data size` is the combined size of files under `checkpoint/`,
+including memory images and CRIU metadata. It reflects CRIU page compression,
+but not compression of the archive. JSON output keeps this value in `total_size`.
 
 == Options
 
