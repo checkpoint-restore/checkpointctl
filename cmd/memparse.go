@@ -245,7 +245,7 @@ func printProcessMemoryPages(task internal.Task) error {
 		}
 
 		// Check if the specified process has memory pages
-		taskState := crit.TaskState(psTree.Core.GetTc().GetTaskState())
+		taskState := crit.TaskState(ps.Core.GetTc().GetTaskState())
 		if !taskState.IsAliveOrStopped() {
 			return fmt.Errorf("process %d has no memory pages (task state is zombie or dead)", ps.PID)
 		}
