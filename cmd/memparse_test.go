@@ -4,7 +4,14 @@ package cmd
 
 import (
 	"bytes"
+	"strings"
 	"testing"
+
+	"github.com/checkpoint-restore/go-criu/v8/crit"
+	core "github.com/checkpoint-restore/go-criu/v8/crit/images/criu-core"
+	"github.com/checkpoint-restore/go-criu/v8/crit/images/pagemap"
+	"github.com/checkpoint-restore/go-criu/v8/crit/images/pstree"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestHexdump(t *testing.T) {
@@ -71,6 +78,73 @@ func TestHexdump(t *testing.T) {
 			hexdump(&out, bytes.NewBuffer(tc.buf), 0, tc.compact)
 			if out.String() != tc.want {
 				t.Errorf("unexpected output:\ngot:\n%s\nwant:\n%s", out.String(), tc.want)
+			}
+		})
+	}
+}
+
+func memparseStateFixture(t *testing.T, rootState, childState uint32) string {
+	t.Helper()
+
+	fixture := newCompressionFixture(t, compressionFixtureOptions{blockPages: 1})
+	fixture.files["checkpoint/pstree.img"] = compressionImage(t, "PSTREE",
+		&pstree.PstreeEntry{Pid: proto.Uint32(1), Ppid: proto.Uint32(0), Threads: []uint32{1}},
+		&pstree.PstreeEntry{Pid: proto.Uint32(2), Ppid: proto.Uint32(1), Threads: []uint32{2}},
+	)
+	for pid, state := range map[string]uint32{"1": rootState, "2": childState} {
+		fixture.files["checkpoint/core-"+pid+".img"] = compressionImage(t, "CORE", &core.CoreEntry{
+			Tc: &core.TaskCoreEntry{
+				TaskState: proto.Uint32(state),
+				Comm:      proto.String("demo"),
+			},
+		})
+	}
+	fixture.files["checkpoint/mm-2.img"] = fixture.files["checkpoint/mm-1.img"]
+
+	records := []proto.Message{&pagemap.PagemapHead{PagesId: proto.Uint32(1)}}
+	for _, entry := range fixture.entries {
+		records = append(records, entry)
+	}
+	fixture.files["checkpoint/pagemap-2.img"] = compressionImage(t, "PAGEMAP", records...)
+	return fixture.archive(t)
+}
+
+func TestMemparsePidChecksRequestedProcessState(t *testing.T) {
+	const (
+		alive   = uint32(crit.TaskAlive)
+		stopped = uint32(crit.TaskStopped)
+		dead    = uint32(crit.TaskDead)
+	)
+
+	tests := []struct {
+		name       string
+		rootState  uint32
+		childState uint32
+		wantErr    bool
+	}{
+		// CRIU writes dead tasks only as leaves.
+		{name: "dead child under live root", rootState: alive, childState: dead, wantErr: true},
+		{name: "stopped child under live root", rootState: alive, childState: stopped},
+		// CRIU never writes a dead task with children.
+		{name: "live child under dead root", rootState: dead, childState: alive},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			archive := memparseStateFixture(t, tt.rootState, tt.childState)
+
+			out, err := compressionCommand(t, "memparse", archive, "--pid=2")
+			if tt.wantErr {
+				if err == nil || !strings.Contains(out, "process 2 has no memory pages") {
+					t.Fatalf("expected no memory pages error for process 2: %v: %s", err, out)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("memparse --pid=2: %v: %s", err, out)
+			}
+			if !strings.Contains(out, "Displaying memory pages content for process ID 2") {
+				t.Fatalf("expected memory pages for process 2: %s", out)
 			}
 		})
 	}
