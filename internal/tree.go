@@ -108,7 +108,14 @@ func addMetadataNodeToTree(tree treeprint.Tree, meta *MetadataNode) {
 	}
 	if len(meta.Annotations) > 0 {
 		annotationTree := podTree.AddBranch("Annotations")
-		for key, value := range meta.Annotations {
+		annotationKeys := make([]string, 0, len(meta.Annotations))
+		for key := range meta.Annotations {
+			annotationKeys = append(annotationKeys, key)
+		}
+		sort.Strings(annotationKeys)
+
+		for _, key := range annotationKeys {
+			value := meta.Annotations[key]
 			switch key {
 			case "io.kubernetes.cri-o.Labels",
 				"io.kubernetes.cri-o.Annotations",
@@ -172,8 +179,14 @@ func addPsNodeBranch(tree treeprint.Tree, ps *PsNode, fds []FdNode, sks []SkNode
 	// Add environment variables if present
 	if len(ps.EnvVars) > 0 {
 		envTree := node.AddBranch("Environment variables")
-		for key, value := range ps.EnvVars {
-			envTree.AddBranch(fmt.Sprintf("%s=%s", key, value))
+		envKeys := make([]string, 0, len(ps.EnvVars))
+		for key := range ps.EnvVars {
+			envKeys = append(envKeys, key)
+		}
+		sort.Strings(envKeys)
+
+		for _, key := range envKeys {
+			envTree.AddBranch(fmt.Sprintf("%s=%s", key, ps.EnvVars[key]))
 		}
 	}
 
@@ -295,7 +308,14 @@ type mountAnnotations struct {
 }
 
 func addMapToTree(tree treeprint.Tree, data map[string]interface{}) {
-	for key, value := range data {
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := data[key]
 		switch v := value.(type) {
 		case map[string]interface{}:
 			// Recursively add nested maps
