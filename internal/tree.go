@@ -3,6 +3,8 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
@@ -108,7 +110,8 @@ func addMetadataNodeToTree(tree treeprint.Tree, meta *MetadataNode) {
 	}
 	if len(meta.Annotations) > 0 {
 		annotationTree := podTree.AddBranch("Annotations")
-		for key, value := range meta.Annotations {
+		for _, key := range slices.Sorted(maps.Keys(meta.Annotations)) {
+			value := meta.Annotations[key]
 			switch key {
 			case "io.kubernetes.cri-o.Labels",
 				"io.kubernetes.cri-o.Annotations",
@@ -172,8 +175,8 @@ func addPsNodeBranch(tree treeprint.Tree, ps *PsNode, fds []FdNode, sks []SkNode
 	// Add environment variables if present
 	if len(ps.EnvVars) > 0 {
 		envTree := node.AddBranch("Environment variables")
-		for key, value := range ps.EnvVars {
-			envTree.AddBranch(fmt.Sprintf("%s=%s", key, value))
+		for _, key := range slices.Sorted(maps.Keys(ps.EnvVars)) {
+			envTree.AddBranch(fmt.Sprintf("%s=%s", key, ps.EnvVars[key]))
 		}
 	}
 
@@ -295,7 +298,8 @@ type mountAnnotations struct {
 }
 
 func addMapToTree(tree treeprint.Tree, data map[string]interface{}) {
-	for key, value := range data {
+	for _, key := range slices.Sorted(maps.Keys(data)) {
+		value := data[key]
 		switch v := value.(type) {
 		case map[string]interface{}:
 			// Recursively add nested maps

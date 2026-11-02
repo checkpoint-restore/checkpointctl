@@ -674,3 +674,83 @@ func TestAddArrayToTree(t *testing.T) {
 		}
 	}
 }
+
+func TestAddPsNodeToTreeEnvVarsSorted(t *testing.T) {
+	tree := treeprint.New()
+	ps := &PsNode{
+		PID:       1,
+		Comm:      "test",
+		TaskState: "Alive",
+		EnvVars: map[string]string{
+			"ZULU":  "z",
+			"ALPHA": "a",
+			"MIKE":  "m",
+			"DELTA": "d",
+		},
+	}
+
+	addPsNodeToTree(tree, ps, nil, nil)
+	result := tree.String()
+
+	assertOrderInTree(t, result, []string{"ALPHA=a", "DELTA=d", "MIKE=m", "ZULU=z"})
+}
+
+func TestAddMetadataNodeToTreeAnnotationsSorted(t *testing.T) {
+	tree := treeprint.New()
+	meta := &MetadataNode{
+		Annotations: map[string]string{
+			"zebra.annotation/key":  "1",
+			"alpha.annotation/key":  "2",
+			"middle.annotation/key": "3",
+			"bravo.annotation/key":  "4",
+			"yankee.annotation/key": "5",
+		},
+	}
+
+	addMetadataNodeToTree(tree, meta)
+	result := tree.String()
+
+	assertOrderInTree(t, result, []string{
+		"alpha.annotation/key: 2",
+		"bravo.annotation/key: 4",
+		"middle.annotation/key: 3",
+		"yankee.annotation/key: 5",
+		"zebra.annotation/key: 1",
+	})
+}
+
+func TestAddMapToTreeSorted(t *testing.T) {
+	tree := treeprint.New()
+	data := map[string]interface{}{
+		"delta":   "d",
+		"alpha":   "a",
+		"charlie": "c",
+		"nested": map[string]interface{}{
+			"zulu": "z",
+			"beta": "b",
+		},
+	}
+
+	addMapToTree(tree, data)
+	result := tree.String()
+
+	assertOrderInTree(t, result, []string{"alpha: a", "charlie: c", "delta: d", "nested:"})
+	assertOrderInTree(t, result, []string{"beta: b", "zulu: z"})
+}
+
+func assertOrderInTree(t *testing.T, result string, expected []string) {
+	t.Helper()
+	prev := -1
+	for _, s := range expected {
+		idx := strings.Index(result, s)
+		if idx == -1 {
+			t.Errorf("Expected tree to contain %q, but it didn't.\nTree:\n%s", s, result)
+			return
+		}
+		if idx < prev {
+			t.Errorf("Expected %q after the previous entry, but the tree is not sorted.\nTree:\n%s", s, result)
+			return
+		}
+		prev = idx
+	}
+}
