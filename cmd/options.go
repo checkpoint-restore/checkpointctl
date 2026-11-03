@@ -18,5 +18,6 @@ var (
 	searchPattern      *string = &internal.SearchPattern
 	searchRegexPattern *string = &internal.SearchRegexPattern
 	searchContext      *int    = &internal.SearchContext
+	addressRange       *string = &internal.AddressRange
 	showMetdata        *bool   = &internal.Metadata
 )

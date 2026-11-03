@@ -816,6 +816,201 @@ function teardown() {
 	[[ ${lines[0]} == *"no process with PID 9999"* ]]
 }
 
+@test "Run checkpointctl memparse with --address-range and missing --pid" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --address-range=0x1000-0x2000
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"--address-range requires --pid"* ]]
+}
+
+@test "Run checkpointctl memparse with empty --address-range" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range=""
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"invalid address range: cannot be empty"* ]]
+}
+
+@test "Run checkpointctl memparse with invalid --address-range where start >= end" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range=0x2000-0x1000
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"start must be smaller than end"* ]]
+}
+
+@test "Run checkpointctl memparse with unparsable --address-range" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range=not-a-range
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"invalid address range"* ]]
+}
+
+@test "Run checkpointctl memparse with filtered hexdump using --address-range" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	base_addr="${lines[4]%% *}"
+	base_dec=$(( 16#$base_addr ))
+	start_hex=$(printf "0x%x" $base_dec)
+	end_hex=$(printf "0x%x" $(( base_dec + 32 )))
+
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range="${start_hex}-${end_hex}"
+	[ "$status" -eq 0 ]
+	[ "${#lines[@]}" -eq 6 ]
+	[[ ${lines[4]} == "${base_addr}"* ]]
+	expected_next=$(printf "%016x" $(( base_dec + 16 )))
+	[[ ${lines[5]} == "${expected_next}"* ]]
+}
+
+@test "Run checkpointctl memparse with range starting and ending mid-entry (clipping)" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img \
+		test-imgs/mm-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	base_addr="${lines[4]%% *}"
+	base_dec=$(( 16#$base_addr ))
+	# Select 32 bytes starting and ending mid-entry.
+	start_dec=$(( base_dec + 16 ))
+	end_dec=$(( base_dec + 48 ))
+	start_hex=$(printf "0x%x" $start_dec)
+	end_hex=$(printf "0x%x" $end_dec)
+
+	checkpointctl memparse "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range="${start_hex}-${end_hex}"
+	[ "$status" -eq 0 ]
+	[ "${#lines[@]}" -eq 6 ]
+	expected_first=$(printf "%016x" $start_dec)
+	expected_second=$(printf "%016x" $(( start_dec + 16 )))
+	[[ ${lines[4]} == "${expected_first}"* ]]
+	[[ ${lines[5]} == "${expected_second}"* ]]
+}
+
+@test "Run checkpointctl memparse with filtered search and range straddling" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+
+	checkpointctl memparse --search=PATH "$TEST_TMP_DIR2"/test.tar --pid=1
+	[ "$status" -eq 0 ]
+	match_line=""
+	for l in "${lines[@]}"; do
+		if [[ "$l" == *"PATH"* ]]; then
+			match_line="$l"
+			break
+		fi
+	done
+	[ -n "$match_line" ]
+	match_addr="${match_line%% *}"
+	match_dec=$(( 16#$match_addr ))
+
+	# Matching range that covers the pattern exactly
+	start_hex=$(printf "0x%x" $match_dec)
+	end_hex=$(printf "0x%x" $(( match_dec + 4 )))
+	checkpointctl memparse --search=PATH "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range="${start_hex}-${end_hex}"
+	[ "$status" -eq 0 ]
+	found=0
+	for l in "${lines[@]}"; do
+		if [[ "$l" == "${match_addr}"* ]]; then
+			found=1
+		fi
+	done
+	[ "$found" -eq 1 ]
+
+	# Range starts inside the match; expect no result.
+	straddle_start_hex=$(printf "0x%x" $(( match_dec + 1 )))
+	straddle_end_hex=$(printf "0x%x" $(( match_dec + 10 )))
+	checkpointctl memparse --search=PATH "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range="${straddle_start_hex}-${straddle_end_hex}"
+	[ "$status" -eq 0 ]
+	[[ ${lines[1]} == *"No matches"* ]]
+
+	# Range ends inside the match; expect no result.
+	straddle_start2_hex=$(printf "0x%x" $(( match_dec - 10 )))
+	straddle_end2_hex=$(printf "0x%x" $(( match_dec + 2 )))
+	checkpointctl memparse --search=PATH "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range="${straddle_start2_hex}-${straddle_end2_hex}"
+	[ "$status" -eq 0 ]
+	[[ ${lines[1]} == *"No matches"* ]]
+}
+
+@test "Run checkpointctl memparse with --search=PATH and --context=-1 under --address-range" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search=PATH --context=-1 "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range=0x1000-0x2000
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"context size cannot be negative"* ]]
+}
+
+@test "Run checkpointctl memparse with malformed --search-regex under --address-range" {
+	cp data/config.dump \
+		data/spec.dump "$TEST_TMP_DIR1"
+	mkdir "$TEST_TMP_DIR1"/checkpoint
+	cp test-imgs/pstree.img \
+		test-imgs/core-*.img \
+		test-imgs/pagemap-*.img \
+		test-imgs/pages-*.img "$TEST_TMP_DIR1"/checkpoint
+	( cd "$TEST_TMP_DIR1" && tar cf "$TEST_TMP_DIR2"/test.tar . )
+	checkpointctl memparse --search-regex='(' "$TEST_TMP_DIR2"/test.tar --pid=1 --address-range=0x1000-0x2000
+	[ "$status" -eq 1 ]
+	[[ ${lines[0]} == *"failed to compile regex pattern"* ]]
+}
+
 @test "Run checkpointctl inspect with json format" {
 	cp data/config.dump data/spec.dump test-imgs/stats-dump "$TEST_TMP_DIR1"
 	mkdir "$TEST_TMP_DIR1"/checkpoint
