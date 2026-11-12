@@ -154,7 +154,7 @@ go.podman.io/storage/pkg/reexec
 go.podman.io/storage/pkg/regexp
 go.podman.io/storage/pkg/system
 go.podman.io/storage/pkg/unshare
-# golang.org/x/sys v0.49.0
+# golang.org/x/sys v0.50.0
 ## explicit; go 1.26.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
