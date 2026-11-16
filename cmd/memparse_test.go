@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -147,5 +149,72 @@ func TestMemparsePidChecksRequestedProcessState(t *testing.T) {
 				t.Fatalf("expected memory pages for process 2: %s", out)
 			}
 		})
+	}
+}
+
+func TestMemparseProcessesAllArchives(t *testing.T) {
+	fixtureA := newCompressionFixture(t, compressionFixtureOptions{blockPages: 2})
+	archiveA := fixtureA.archive(t)
+	fixtureB := newCompressionFixture(t, compressionFixtureOptions{blockPages: 2})
+	archiveB := fixtureB.archive(t)
+
+	for _, tt := range []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "pid",
+			args: []string{"--pid=1"},
+		},
+		{
+			name: "search",
+			args: []string{"--search=CROSS_BLOCK_NEEDLE", "--pid=1"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			args := append([]string{"memparse"}, tt.args...)
+			args = append(args, archiveA, archiveB)
+
+			out, err := compressionCommand(t, args...)
+			if err != nil {
+				t.Fatalf("memparse: %v: %s", err, out)
+			}
+			for _, archive := range []string{archiveA, archiveB} {
+				if !strings.Contains(out, "from checkpoint: "+archive) {
+					t.Errorf("archive %s was not processed: %s", archive, out)
+				}
+			}
+		})
+	}
+}
+
+func TestMemparseMultipleArchivesRejectsOutput(t *testing.T) {
+	fixtureA := newCompressionFixture(t, compressionFixtureOptions{blockPages: 2})
+	archiveA := fixtureA.archive(t)
+	fixtureB := newCompressionFixture(t, compressionFixtureOptions{blockPages: 2})
+	archiveB := fixtureB.archive(t)
+	destination := filepath.Join(t.TempDir(), "memory.dump")
+
+	out, err := compressionCommand(t, "memparse", archiveA, archiveB, "--pid=1", "--output="+destination)
+	if err == nil || !strings.Contains(out, "--output requires a single checkpoint archive when --pid is used") {
+		t.Fatalf("expected --output error, got: %v: %s", err, out)
+	}
+	if _, statErr := os.Stat(destination); !os.IsNotExist(statErr) {
+		t.Errorf("output file was created: %v", statErr)
+	}
+}
+
+func TestMemparseSearchInvalidPIDDoesNotPrintHeader(t *testing.T) {
+	fixtureA := newCompressionFixture(t, compressionFixtureOptions{blockPages: 2})
+	archiveA := fixtureA.archive(t)
+	fixtureB := newCompressionFixture(t, compressionFixtureOptions{blockPages: 2})
+	archiveB := fixtureB.archive(t)
+
+	out, err := compressionCommand(t, "memparse", "--search=CROSS_BLOCK_NEEDLE", "--pid=999", archiveA, archiveB)
+	if err == nil || !strings.Contains(out, "no process with PID 999") {
+		t.Fatalf("expected missing PID error, got: %v: %s", err, out)
+	}
+	if strings.Contains(out, "Searching memory pages") {
+		t.Errorf("unexpected header before PID validation: %s", out)
 	}
 }
