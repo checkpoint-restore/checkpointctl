@@ -44,6 +44,13 @@ The memory pages being read must be present in the archive.
 *-c, --context*=_CONTEXT_::
   Print the specified number of bytes surrounding each match
 
+*--address-range*=_START_-_END_::
+  Filter memory by virtual address range, e.g. "0x7f0000000000-0x7f0000010000".
+  Requires *--pid*. The addresses are hexadecimal, with or without a "0x"
+  prefix. With *--search* or *--search-regex*, only matches that lie fully
+  inside the range are reported, and the context printed around a match stops
+  at the range edge.
+
 == See also
 
 checkpointctl(1)

@@ -16,5 +16,6 @@ var (
 	SearchPattern      string
 	SearchRegexPattern string
 	SearchContext      int
+	AddressRange       string
 	Metadata           bool
 )
