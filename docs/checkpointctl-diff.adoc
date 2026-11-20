@@ -61,7 +61,8 @@ but not compression of the archive. JSON output keeps this value in `total_size`
   Show entries that are identical between the two checkpoints
 
 *--sockets*::
-  Include sockets in the diff
+  Include sockets in the diff. Internet sockets with different local
+  addresses are compared separately, even when their ports match.
 
 == Examples
 

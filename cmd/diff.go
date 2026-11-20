@@ -508,17 +508,18 @@ func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
 	diff := &SocketDiff{}
 
 	// Build socket maps
-	// Key format: PID:Protocol:Type:Address:SrcPort:Dest:DstPort
+	// Key format: PID:Protocol:Type:Address:quotedSource:SrcPort:Dest:DstPort
 	mapA := make(map[string]SocketInfo)
 	mapB := make(map[string]SocketInfo)
 
 	for _, entry := range sksA {
 		for _, socket := range entry.OpenSockets {
-			key := fmt.Sprintf("%d:%s:%s:%s:%d:%s:%d",
+			key := fmt.Sprintf("%d:%s:%s:%s:%q:%d:%s:%d",
 				entry.PID,
 				socket.Protocol,
 				socket.Data.Type,
 				socket.Data.Address,
+				socket.Data.Source,
 				socket.Data.SourcePort,
 				socket.Data.Dest,
 				socket.Data.DestPort,
@@ -539,11 +540,12 @@ func compareSockets(sksA, sksB []internal.SkNode) *SocketDiff {
 
 	for _, entry := range sksB {
 		for _, socket := range entry.OpenSockets {
-			key := fmt.Sprintf("%d:%s:%s:%s:%d:%s:%d",
+			key := fmt.Sprintf("%d:%s:%s:%s:%q:%d:%s:%d",
 				entry.PID,
 				socket.Protocol,
 				socket.Data.Type,
 				socket.Data.Address,
+				socket.Data.Source,
 				socket.Data.SourcePort,
 				socket.Data.Dest,
 				socket.Data.DestPort,

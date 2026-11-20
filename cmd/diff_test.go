@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -1043,5 +1044,77 @@ func TestCompareSocketsDeterministicOrderSameLocalEndpoint(t *testing.T) {
 	}
 	if first.Unchanged[0].DstPort != 9000 || first.Unchanged[1].DstPort != 9001 {
 		t.Errorf("Unchanged sockets not sorted by destination port: %d, %d", first.Unchanged[0].DstPort, first.Unchanged[1].DstPort)
+	}
+}
+
+func TestCompareSocketsLocalAddresses(t *testing.T) {
+	for _, protocol := range []string{"TCP", "UDP"} {
+		for _, addresses := range [][]string{{"127.0.0.1", "127.0.0.2"}, {"::1", "::2"}} {
+			t.Run(protocol+"/"+addresses[0], func(t *testing.T) {
+				dest := "0.0.0.0"
+				if addresses[0] == "::1" {
+					dest = "::"
+				}
+				socket := func(source string) internal.SocketNode {
+					return internal.SocketNode{Protocol: protocol, Data: internal.SkData{
+						Type: protocol, Source: source, SourcePort: 8080, Dest: dest,
+					}}
+				}
+				info := func(source string) SocketInfo {
+					return SocketInfo{PID: 100, Protocol: protocol, Type: protocol, Source: source, SrcPort: 8080, Dest: dest}
+				}
+				first, second := socket(addresses[0]), socket(addresses[1])
+				firstInfo, secondInfo := info(addresses[0]), info(addresses[1])
+				for _, tc := range []struct {
+					name string
+					a, b []internal.SocketNode
+					want SocketDiff
+				}{
+					{"added", nil, []internal.SocketNode{second, first}, SocketDiff{Added: []SocketInfo{firstInfo, secondInfo}}},
+					{"removed", []internal.SocketNode{second, first}, nil, SocketDiff{Removed: []SocketInfo{firstInfo, secondInfo}}},
+					{"unchanged", []internal.SocketNode{first, second}, []internal.SocketNode{second, first}, SocketDiff{Unchanged: []SocketInfo{firstInfo, secondInfo}}},
+					{"rebound", []internal.SocketNode{first}, []internal.SocketNode{second}, SocketDiff{Added: []SocketInfo{secondInfo}, Removed: []SocketInfo{firstInfo}}},
+					{"one added", []internal.SocketNode{first}, []internal.SocketNode{first, second}, SocketDiff{Added: []SocketInfo{secondInfo}, Unchanged: []SocketInfo{firstInfo}}},
+					{"one removed", []internal.SocketNode{first, second}, []internal.SocketNode{second}, SocketDiff{Removed: []SocketInfo{firstInfo}, Unchanged: []SocketInfo{secondInfo}}},
+				} {
+					t.Run(tc.name, func(t *testing.T) {
+						a := []internal.SkNode{{PID: 100, OpenSockets: tc.a}}
+						b := []internal.SkNode{{PID: 100, OpenSockets: tc.b}}
+						got := compareSockets(a, b)
+						if !reflect.DeepEqual(*got, tc.want) {
+							t.Errorf("compareSockets() = %#v, want %#v", *got, tc.want)
+						}
+					})
+				}
+			})
+		}
+	}
+}
+
+func TestCompareSocketsIPv6KeyBoundaries(t *testing.T) {
+	sockets := []internal.SocketNode{
+		{Protocol: "TCP", Data: internal.SkData{Type: "TCP", Source: "::1", SourcePort: 80, Dest: "2:90:4::3", DestPort: 443}},
+		{Protocol: "TCP", Data: internal.SkData{Type: "TCP", Source: "::1:80:2", SourcePort: 90, Dest: "4::3", DestPort: 443}},
+	}
+	want := []SocketInfo{
+		{PID: 100, Protocol: "TCP", Type: "TCP", Source: "::1", SrcPort: 80, Dest: "2:90:4::3", DstPort: 443},
+		{PID: 100, Protocol: "TCP", Type: "TCP", Source: "::1:80:2", SrcPort: 90, Dest: "4::3", DstPort: 443},
+	}
+	nodes := []internal.SkNode{{PID: 100, OpenSockets: sockets}}
+	for _, tc := range []struct {
+		name string
+		a, b []internal.SkNode
+		want SocketDiff
+	}{
+		{"added", nil, nodes, SocketDiff{Added: want}},
+		{"removed", nodes, nil, SocketDiff{Removed: want}},
+		{"unchanged", nodes, nodes, SocketDiff{Unchanged: want}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := compareSockets(tc.a, tc.b)
+			if !reflect.DeepEqual(*got, tc.want) {
+				t.Errorf("compareSockets() = %#v, want %#v", *got, tc.want)
+			}
+		})
 	}
 }
