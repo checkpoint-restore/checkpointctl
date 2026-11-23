@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 )
@@ -16,22 +15,28 @@ func FormatTime(microseconds uint32) string {
 		return fmt.Sprintf("%d µs", microseconds)
 	}
 
-	var value float64
-	var unit string
+	// Round to five significant digits with integers. A float64 cannot
+	// hold values like 100.035 exactly, so halfway values would not
+	// always round up.
+	n := uint64(microseconds)
+	step := uint64(1)
+	for n/step >= 100000 {
+		step *= 10
+	}
+	n = (n + step/2) / step * step
 
-	if microseconds < 1000000 {
-		value = float64(microseconds) / 1000
-		unit = "ms"
-	} else {
-		duration := time.Duration(microseconds) * time.Microsecond
-		value = duration.Seconds()
-		unit = "s"
+	// Pick the unit after rounding, so 999995 µs prints as 1 s.
+	unit, scale, decimals := "ms", uint64(1000), 3
+	if n >= 1000000 {
+		unit, scale, decimals = "s", 1000000, 6
 	}
 
-	// Trim trailing zeros and dot
-	formatted := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.5g", value), "0"), ".")
-
-	return fmt.Sprintf("%s %s", formatted, unit)
+	whole, frac := n/scale, n%scale
+	if frac == 0 {
+		return fmt.Sprintf("%d %s", whole, unit)
+	}
+	fracDigits := strings.TrimRight(fmt.Sprintf("%0*d", decimals, frac), "0")
+	return fmt.Sprintf("%d.%s %s", whole, fracDigits, unit)
 }
 
 type Task struct {
