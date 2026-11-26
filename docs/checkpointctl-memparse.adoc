@@ -7,7 +7,7 @@ include::footer.adoc[]
 
 == Synopsis
 
-*checkpointctl memparse* [_OPTION_]... _FILE_
+*checkpointctl memparse* [_OPTION_]... _FILE_...
 
 == Description
 

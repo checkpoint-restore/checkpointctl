@@ -78,6 +78,10 @@ func MemParse() *cobra.Command {
 }
 
 func memparse(cmd *cobra.Command, args []string) error {
+	if *pID != 0 && *outputFilePath != "" && len(args) > 1 {
+		return fmt.Errorf("--output requires a single checkpoint archive when --pid is used")
+	}
+
 	requiredFiles := []string{
 		metadata.SpecDumpFile, metadata.ConfigDumpFile,
 		filepath.Join(metadata.CheckpointDirectory, "inventory.img"),
@@ -106,11 +110,21 @@ func memparse(cmd *cobra.Command, args []string) error {
 	defer internal.CleanupTasks(tasks)
 
 	if *searchPattern != "" || *searchRegexPattern != "" {
-		return printMemorySearchResultForPID(tasks[0])
+		for _, task := range tasks {
+			if err := printMemorySearchResultForPID(task, len(tasks) > 1); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	if *pID != 0 {
-		return printProcessMemoryPages(tasks[0])
+		for _, task := range tasks {
+			if err := printProcessMemoryPages(task); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	return showProcessMemorySizeTables(tasks)
@@ -363,7 +377,7 @@ func generateHexAndAscii(data []byte) (string, string) {
 }
 
 // Searches for a pattern in the memory of a given PID and prints the results.
-func printMemorySearchResultForPID(task internal.Task) error {
+func printMemorySearchResultForPID(task internal.Task, showHeader bool) error {
 	c := crit.New(nil, nil, filepath.Join(task.OutputDir, metadata.CheckpointDirectory), false, false)
 	psTree, err := c.ExplorePs()
 	if err != nil {
@@ -380,6 +394,10 @@ func printMemorySearchResultForPID(task internal.Task) error {
 	taskState := crit.TaskState(ps.Core.GetTc().GetTaskState())
 	if !taskState.IsAliveOrStopped() {
 		return fmt.Errorf("process %d has no memory pages (task state is zombie or dead)", ps.PID)
+	}
+
+	if showHeader {
+		fmt.Printf("\nSearching memory pages for process ID %d from checkpoint: %s\n\n", *pID, task.CheckpointFilePath)
 	}
 
 	memReader, err := crit.NewMemoryReader(
