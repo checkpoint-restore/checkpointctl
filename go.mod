@@ -6,7 +6,7 @@ require (
 	github.com/checkpoint-restore/go-criu/v8 v8.5.0
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/opencontainers/runtime-spec v1.3.0
-	github.com/pierrec/lz4/v4 v4.1.33
+	github.com/pierrec/lz4/v4 v4.1.34
 	github.com/spf13/cobra v1.10.2
 	github.com/xlab/treeprint v1.2.0
 	go.podman.io/storage v1.65.1
